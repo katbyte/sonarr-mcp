@@ -1,0 +1,36 @@
+{
+  "host": "thexem.info",
+  "interactions": [
+    {
+      "key": "GET thexem.info/map/allNames?origin=tvdb\u0026seasonNumbers=True",
+      "method": "GET",
+      "host": "thexem.info",
+      "path": "/map/allNames",
+      "query": "seasonNumbers=True\u0026origin=tvdb",
+      "status": 200,
+      "headers": {
+        "Cache-Control": "max-age=3600, public",
+        "Content-Type": "application/json",
+        "Server": "cloudflare",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "{\"data\":{},\"message\":\"\",\"result\":\"success\"}"
+    },
+    {
+      "key": "GET thexem.info/map/havemap?origin=tvdb",
+      "method": "GET",
+      "host": "thexem.info",
+      "path": "/map/havemap",
+      "query": "origin=tvdb",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "max-age=3600, public",
+        "Content-Type": "application/json",
+        "Server": "cloudflare",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "{\"data\":[],\"message\":\"These shows have some kind of mapping\",\"result\":\"success\"}"
+    }
+  ]
+}

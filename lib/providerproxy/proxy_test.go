@@ -412,3 +412,89 @@ func TestRedactJSONFields(t *testing.T) {
 		}
 	}
 }
+
+// getThrough fetches a URL through a proxy and returns the body.
+func getThrough(t *testing.T, p *Proxy, target string) string {
+	t.Helper()
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, target, http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := clientThrough(t, p).Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return string(b)
+}
+
+// A trimmed response is recorded and served trimmed: a provider's list of
+// every show it knows is cut to the entries a suite reads, and replay answers
+// with exactly what was recorded.
+func TestRecordTrims(t *testing.T) {
+	t.Parallel()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/fail" {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		_, _ = io.WriteString(w, `[{"tvdbId":1},{"tvdbId":2},{"tvdbId":3}]`)
+	}))
+	defer upstream.Close()
+	u, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keepTwo := func(body []byte) ([]byte, error) {
+		var all []map[string]int
+		if err := json.Unmarshal(body, &all); err != nil {
+			return nil, err
+		}
+		var kept []map[string]int
+		for _, e := range all {
+			if e["tvdbId"] == 2 {
+				kept = append(kept, e)
+			}
+		}
+		return json.Marshal(kept)
+	}
+	dir := t.TempDir()
+	p, err := New(Options{
+		Mode: Record, CassetteDir: dir, Logger: log.New(io.Discard, "", 0),
+		Trim: map[string]func([]byte) ([]byte, error){u.Host + "/list": keepTwo, u.Host + "/fail": keepTwo},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	get := func(p *Proxy, path string) string {
+		t.Helper()
+		return getThrough(t, p, upstream.URL+path)
+	}
+	if got := get(p, "/list"); got != `[{"tvdbId":2}]` {
+		t.Errorf("recorded and served = %s", got)
+	}
+	// an answer that is not a 200 is recorded as it came, untrimmed
+	if got := get(p, "/fail"); got != `[{"tvdbId":1},{"tvdbId":2},{"tvdbId":3}]` {
+		t.Errorf("a failure = %s", got)
+	}
+	if err := p.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	replay, err := New(Options{CassetteDir: dir, Logger: log.New(io.Discard, "", 0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = replay.Close() }()
+	if got := get(replay, "/list"); got != `[{"tvdbId":2}]` {
+		t.Errorf("replayed = %s", got)
+	}
+}

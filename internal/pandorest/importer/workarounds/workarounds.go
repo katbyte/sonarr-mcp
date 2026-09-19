@@ -44,6 +44,7 @@ var All = []Workaround{
 	sonarrTestAllResults{},
 	sonarrCommandBody{},
 	sonarrHTTPURIString{},
+	sonarrBulkUpdateLists{},
 }
 
 // Apply runs every workaround for a service, logging each, and returns the

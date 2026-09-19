@@ -49,6 +49,11 @@ type Service struct {
 	// GetEpisodeFile. Keys are lower case; a segment not listed is
 	// capitalised as it stands.
 	Words map[string]string
+	// WrittenWhole names the object schemas callers read and write back
+	// whole - settings objects - whose empty strings and zero numbers the
+	// generated models send rather than leave out (definitions.Model's
+	// WrittenWhole). A name the document does not have fails the import.
+	WrittenWhole []string
 	// Auth names the lib/client authorizer the generated New uses.
 	Auth string
 
@@ -60,16 +65,33 @@ type Service struct {
 // Services is every service, in the order the make targets process them.
 var Services = []Service{
 	{
-		Name:        "sonarr",
-		Package:     "sonarr",
-		Spec:        "docs/sonarr-openapi.json",
-		Definitions: "api-definitions/sonarr",
-		Output:      "lib/sonarr",
-		Naming:      PathNaming,
-		PathPrefix:  "/api/v3",
-		Words:       sonarrWords,
-		Auth:        "Sonarr",
+		Name:         "sonarr",
+		Package:      "sonarr",
+		Spec:         "docs/sonarr-openapi.json",
+		Definitions:  "api-definitions/sonarr",
+		Output:       "lib/sonarr",
+		Naming:       PathNaming,
+		PathPrefix:   "/api/v3",
+		Words:        sonarrWords,
+		WrittenWhole: sonarrSettings,
+		Auth:         "Sonarr",
 	},
+}
+
+// sonarrSettings are Sonarr's settings sections, each one object read with a
+// GET and saved with a PUT of the whole of it. Sonarr saves a section field
+// by field, and a string left out arrives as null: the host settings'
+// ConfigFileProvider.SaveConfigDictionary calls ToString on it and answers
+// 500, and the others' ConfigService.SaveConfigDictionary skips it, so a
+// setting cleared to "" is quietly kept instead.
+var sonarrSettings = []string{
+	"DownloadClientConfigResource",
+	"HostConfigResource",
+	"ImportListConfigResource",
+	"IndexerConfigResource",
+	"MediaManagementConfigResource",
+	"NamingConfigResource",
+	"UiConfigResource",
 }
 
 // sonarrWords are the path segments of Sonarr's API that run two or more

@@ -12,7 +12,7 @@ import (
 // PutCustomFormatBulkOperationResponse is the result of PutCustomFormatBulk.
 type PutCustomFormatBulkOperationResponse struct {
 	HttpResponse *http.Response
-	Model        *CustomFormatResource
+	Model        []CustomFormatResource
 }
 
 // PutCustomFormatBulk calls PUT /api/v3/customformat/bulk.
@@ -44,9 +44,7 @@ func (c Client) PutCustomFormatBulk(ctx context.Context, input CustomFormatBulkR
 		return
 	}
 
-	var model CustomFormatResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Model); err != nil {
 		return
 	}
 

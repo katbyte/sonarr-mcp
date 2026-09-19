@@ -12,7 +12,7 @@ import (
 // PutIndexerBulkOperationResponse is the result of PutIndexerBulk.
 type PutIndexerBulkOperationResponse struct {
 	HttpResponse *http.Response
-	Model        *IndexerResource
+	Model        []IndexerResource
 }
 
 // PutIndexerBulk calls PUT /api/v3/indexer/bulk.
@@ -44,9 +44,7 @@ func (c Client) PutIndexerBulk(ctx context.Context, input IndexerBulkResource) (
 		return
 	}
 
-	var model IndexerResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Model); err != nil {
 		return
 	}
 

@@ -143,6 +143,11 @@ type Model struct {
 	// Union lists the variants when the schema is a oneOf/anyOf; such a
 	// model has no fields and is raw JSON for the caller to decode.
 	Union []string `json:"Union,omitempty"`
+	// WrittenWhole marks a model callers read and write back whole - a
+	// settings object - so its empty strings and zero numbers are sent
+	// rather than left out: the server reads a field left out as null,
+	// which is not the value that was read, and not a value it will save.
+	WrittenWhole bool `json:"WrittenWhole,omitempty"`
 }
 
 // Field is one property of a model.

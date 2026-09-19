@@ -68,6 +68,7 @@ func TestDiff(t *testing.T) {
 	items.Operations = items.Operations[:1]                                                                                                  // DeleteItem removed
 	items.Operations = append(items.Operations, definitions.Operation{Name: "PostItem", Method: "POST", Path: "/Items", ExpectedStatusCodes: []int{200}})
 	items.Models[0].Fields = append(items.Models[0].Fields[:1], definitions.Field{Name: "TagItems", JSONName: "TagItems", Type: str()})
+	items.Models[0].WrittenWhole = true // not breaking: a body sends more of what it holds
 	items.Constants[0].Values = append(items.Constants[0].Values[:1], definitions.ConstantValue{Name: "KindEpisode", Value: "Episode"})
 	newer.Groups = append(newer.Groups, definitions.Group{Name: "Other", Models: []definitions.Model{{Name: "Extra"}}})
 
@@ -89,6 +90,7 @@ func TestDiff(t *testing.T) {
 		"    + option query searchterm: String",
 		"    ~ expected status codes [200] -> [200 204]\n",
 		"~ model Item",
+		"    ~ written whole false -> true\n",
 		"    + field TagItems: String",
 		"    - field Tags: List[String] [breaking]",
 		"+ model Extra",

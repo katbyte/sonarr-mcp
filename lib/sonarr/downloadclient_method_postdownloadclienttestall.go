@@ -20,6 +20,7 @@ func (c Client) PostDownloadClientTestAll(ctx context.Context) (result PostDownl
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
+			http.StatusBadRequest,
 		},
 		HttpMethod: http.MethodPost,
 		Path:       "/api/v3/downloadclient/testall",

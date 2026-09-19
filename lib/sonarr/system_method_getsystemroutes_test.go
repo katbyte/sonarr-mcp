@@ -3,6 +3,7 @@
 package sonarr
 
 import (
+	"io"
 	"net/http"
 	"testing"
 
@@ -12,7 +13,7 @@ import (
 func TestOperationGetSystemRoutes(t *testing.T) {
 	t.Parallel()
 
-	c, s := newOperationServer(t, 200, "application/json", "{}")
+	c, s := newOperationServer(t, 200, "text/plain", "file bytes")
 	result, err := c.GetSystemRoutes(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -23,15 +24,10 @@ func TestOperationGetSystemRoutes(t *testing.T) {
 	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
-	if result.Model == nil {
-		t.Error("the model was not decoded")
-	}
-
-	// an answer that does not decode is an error, with the response
-	c, _ = newOperationServer(t, 200, "application/json", "<html>")
-	result, err = c.GetSystemRoutes(t.Context())
-	if err == nil || client.StatusCode(err) != 0 || result.HttpResponse == nil {
-		t.Errorf("an answer that does not decode = %v", err)
+	streamed, _ := io.ReadAll(result.HttpResponse.Body)
+	_ = result.HttpResponse.Body.Close()
+	if string(streamed) != "file bytes" {
+		t.Errorf("streamed body = %q", streamed)
 	}
 
 	// a status the operation does not document is an error, with the response

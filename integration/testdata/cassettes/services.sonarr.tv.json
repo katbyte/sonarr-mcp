@@ -1,0 +1,68 @@
+{
+  "host": "services.sonarr.tv",
+  "interactions": [
+    {
+      "key": "GET services.sonarr.tv/v1/dailyseries",
+      "method": "GET",
+      "host": "services.sonarr.tv",
+      "path": "/v1/dailyseries",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Server": "cloudflare"
+      },
+      "body": "[{\"tvdbId\":70336},{\"tvdbId\":71256},{\"tvdbId\":71424},{\"tvdbId\":71753},{\"tvdbId\":71998},{\"tvdbId\":72194},{\"tvdbId\":73387},{\"tvdbId\":74490},{\"tvdbId\":75088},{\"tvdbId\":76573},{\"tvdbId\":79274},{\"tvdbId\":82483},{\"tvdbId\":82616},{\"tvdbId\":85355},{\"tvdbId\":109411},{\"tvdbId\":114851},{\"tvdbId\":194751},{\"tvdbId\":249673},{\"tvdbId\":250544},{\"tvdbId\":270261},{\"tvdbId\":270262},{\"tvdbId\":271728},{\"tvdbId\":271958},{\"tvdbId\":274099}]"
+    },
+    {
+      "key": "GET services.sonarr.tv/v1/notification?branch=main\u0026os=linuxmusl\u0026version=4.0.20.3014",
+      "method": "GET",
+      "host": "services.sonarr.tv",
+      "path": "/v1/notification",
+      "query": "branch=main\u0026os=linuxmusl\u0026version=4.0.20.3014",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Server": "cloudflare"
+      },
+      "body": "[]"
+    },
+    {
+      "key": "GET services.sonarr.tv/v1/scenemapping",
+      "method": "GET",
+      "host": "services.sonarr.tv",
+      "path": "/v1/scenemapping",
+      "status": 200,
+      "headers": {
+        "Cache-Control": "public, max-age=21600, s-max-age=900",
+        "Content-Type": "application/json; charset=utf-8",
+        "Server": "cloudflare"
+      },
+      "body": "[{\"mappingId\":\"s-62180683739961a148bfc81c\",\"tvdbId\":371980,\"title\":\"Separación\",\"searchTitle\":\"Separación\",\"season\":-1},{\"mappingId\":\"s-62341fb8739961111c456743\",\"tvdbId\":371980,\"title\":\"Scissione\",\"searchTitle\":\"Scissione\",\"season\":-1},{\"mappingId\":\"s-67c1c95100648721db1f56ed\",\"tvdbId\":371980,\"title\":\"Severence Scissione\",\"searchTitle\":\"Severence Scissione\",\"season\":-1},{\"mappingId\":\"s-67e6ca3d7152151bf0ca8148\",\"tvdbId\":371980,\"title\":\"Separacion\",\"searchTitle\":\"Separacion\",\"season\":-1},{\"mappingId\":\"s-689248b62b0db28edc89d402\",\"tvdbId\":78874,\"title\":\"Firefly - Der Aufbruch der Serenity\",\"searchTitle\":\"Firefly - Der Aufbruch der Serenity\",\"season\":-1}]"
+    },
+    {
+      "key": "GET services.sonarr.tv/v1/time",
+      "method": "GET",
+      "host": "services.sonarr.tv",
+      "path": "/v1/time",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Server": "cloudflare"
+      },
+      "body": "{\"dateTimeUtc\":\"2026-09-19T15:41:14.2358004Z\"}"
+    },
+    {
+      "key": "GET services.sonarr.tv/v1/update/main/changes?os=linuxmusl\u0026runtime=netcore\u0026runtimeVer=6.0.13\u0026version=4.0.20.3014",
+      "method": "GET",
+      "host": "services.sonarr.tv",
+      "path": "/v1/update/main/changes",
+      "query": "os=linuxmusl\u0026runtime=netcore\u0026runtimeVer=6.0.13\u0026version=4.0.20.3014",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Server": "cloudflare"
+      },
+      "body": "[{\"version\":\"4.0.20.3014\",\"releaseDate\":\"2026-09-16T16:40:21.222Z\",\"filename\":\"Sonarr.main.4.0.20.3014.linux-musl-arm64.tar.gz\",\"url\":\"https://github.com/Sonarr/Sonarr/releases/download/v4.0.20.3014/Sonarr.main.4.0.20.3014.linux-musl-arm64.tar.gz\",\"changes\":{\"new\":[\"Add Trusted Networks setting\",\"Add hostname validation\"],\"fixed\":[\"Update help text for Allowed Hosts\",\"Improve logging for 'Allowed Hosts' and 'Trusted Networks'\",\"Importing single files from Freebox\",\"Re-run allowed hosts health check when config updated\",\"Format of timestamps for Discord notifications from some systems\",\"Avoid checking for free space if other specifications fail first\",\"Connecting to Jellyfin 12+\",\"Exclude streaming extensions for probing media info\",\"Unexpected languages stored in DB will be treated as Unknown\"]},\"hash\":\"70380901110092f43c2d54f4d8077ace386867b5e29a30a8baebac884cfb5695\",\"branch\":\"main\"},{\"version\":\"4.0.19.2979\",\"releaseDate\":\"2026-06-26T17:24:52.524Z\",\"filename\":\"Sonarr.main.4.0.19.2979.linux-musl-arm64.tar.gz\",\"url\":\"https://github.com/Sonarr/Sonarr/releases/download/v4.0.19.2979/Sonarr.main.4.0.19.2979.linux-musl-arm64.tar.gz\",\"changes\":{\"new\":[],\"fixed\":[\"Basic auth for qBittorrent\",\"Bump FFprobe to 5.1.10\"]},\"hash\":\"2ffef06bba1c28b50b58af3117de482d250fe20539508f2f3e0303dc55d23495\",\"branch\":\"main\"},{\"version\":\"4.0.18.2971\",\"releaseDate\":\"2026-06-24T14:51:53.98Z\",\"filename\":\"Sonarr.main.4.0.18.2971.linux-musl-arm64.tar.gz\",\"url\":\"https://github.com/Sonarr/Sonarr/releases/download/v4.0.18.2971/Sonarr.main.4.0.18.2971.linux-musl-arm64.tar.gz\",\"changes\":{\"new\":[\"API key support for qBittorrent\"],\"fixed\":[\"Login with credentials on Qbittorrent 5.2\",\"Testing qBittorrent after credentials change would always pass tests\",\"Downloading backups when path contains a trailing slash\"]},\"hash\":\"fe5bee034493a2e21db57af5dd1e793a8ddf8d0ba81f14ec6a1f0d73f5e3d38d\",\"branch\":\"main\"},{\"version\":\"4.0.17.2952\",\"releaseDate\":\"2026-03-19T14:56:49.442Z\",\"filename\":\"Sonarr.main.4.0.17.2952.linux-musl-arm64.tar.gz\",\"url\":\"https://github.com/Sonarr/Sonarr/releases/download/v4.0.17.2952/Sonarr.main.4.0.17.2952.linux-musl-arm64.tar.gz\",\"changes\":{\"new\":[],\"fixed\":[\"Plexmatch special episode numbers\",\"Multiple XML declarations in kodi/xmbc episodes metadata\"]},\"hash\":\"e168be9fa9d68345b22bf5c3048dcb5c9d880cc1b21fe4731cdf3ef14ac8486d\",\"branch\":\"main\"},{\"version\":\"4.0.16.2944\",\"releaseDate\":\"2025-11-05T01:57:31.412Z\",\"filename\":\"Sonarr.main.4.0.16.2944.linux-musl-arm64.tar.gz\",\"url\":\"https://github.com/Sonarr/Sonarr/releases/download/v4.0.16.2944/Sonarr.main.4.0.16.2944.linux-musl-arm64.tar.gz\",\"changes\":{\"new\":[],\"fixed\":[\"qBittorrent /login API success check\",\"Prevent modals from overflowing screen width\",\"Default runtime to 45 minutes if unavailable when importing episode files\"]},\"hash\":\"2540234eee8d2fd31d75518df3b747aa942445e84810afc57765ca2a08dbd185\",\"branch\":\"main\"}]"
+    }
+  ]
+}

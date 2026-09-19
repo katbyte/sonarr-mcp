@@ -4,44 +4,44 @@ package sonarr
 
 // HostConfigResource is the "HostConfigResource" schema.
 type HostConfigResource struct {
-	AllowedHosts              string                     `json:"allowedHosts,omitempty"`
+	AllowedHosts              string                     `json:"allowedHosts"`
 	AnalyticsEnabled          *bool                      `json:"analyticsEnabled,omitempty"`
-	ApiKey                    string                     `json:"apiKey,omitempty"`
-	ApplicationUrl            string                     `json:"applicationUrl,omitempty"`
+	ApiKey                    string                     `json:"apiKey"`
+	ApplicationUrl            string                     `json:"applicationUrl"`
 	AuthenticationMethod      AuthenticationType         `json:"authenticationMethod,omitempty"`
 	AuthenticationRequired    AuthenticationRequiredType `json:"authenticationRequired,omitempty"`
-	BackupFolder              string                     `json:"backupFolder,omitempty"`
-	BackupInterval            int                        `json:"backupInterval,omitempty"`
-	BackupRetention           int                        `json:"backupRetention,omitempty"`
-	BindAddress               string                     `json:"bindAddress,omitempty"`
-	Branch                    string                     `json:"branch,omitempty"`
+	BackupFolder              string                     `json:"backupFolder"`
+	BackupInterval            int                        `json:"backupInterval"`
+	BackupRetention           int                        `json:"backupRetention"`
+	BindAddress               string                     `json:"bindAddress"`
+	Branch                    string                     `json:"branch"`
 	CertificateValidation     CertificateValidationType  `json:"certificateValidation,omitempty"`
-	ConsoleLogLevel           string                     `json:"consoleLogLevel,omitempty"`
+	ConsoleLogLevel           string                     `json:"consoleLogLevel"`
 	EnableSsl                 *bool                      `json:"enableSsl,omitempty"`
-	Id                        int                        `json:"id,omitempty"`
-	InstanceName              string                     `json:"instanceName,omitempty"`
+	Id                        int                        `json:"id"`
+	InstanceName              string                     `json:"instanceName"`
 	LaunchBrowser             *bool                      `json:"launchBrowser,omitempty"`
-	LogLevel                  string                     `json:"logLevel,omitempty"`
-	LogSizeLimit              int                        `json:"logSizeLimit,omitempty"`
-	Password                  string                     `json:"password,omitempty"`
-	PasswordConfirmation      string                     `json:"passwordConfirmation,omitempty"`
-	Port                      int                        `json:"port,omitempty"`
-	ProxyBypassFilter         string                     `json:"proxyBypassFilter,omitempty"`
+	LogLevel                  string                     `json:"logLevel"`
+	LogSizeLimit              int                        `json:"logSizeLimit"`
+	Password                  string                     `json:"password"`
+	PasswordConfirmation      string                     `json:"passwordConfirmation"`
+	Port                      int                        `json:"port"`
+	ProxyBypassFilter         string                     `json:"proxyBypassFilter"`
 	ProxyBypassLocalAddresses *bool                      `json:"proxyBypassLocalAddresses,omitempty"`
 	ProxyEnabled              *bool                      `json:"proxyEnabled,omitempty"`
-	ProxyHostname             string                     `json:"proxyHostname,omitempty"`
-	ProxyPassword             string                     `json:"proxyPassword,omitempty"`
-	ProxyPort                 int                        `json:"proxyPort,omitempty"`
+	ProxyHostname             string                     `json:"proxyHostname"`
+	ProxyPassword             string                     `json:"proxyPassword"`
+	ProxyPort                 int                        `json:"proxyPort"`
 	ProxyType                 ProxyType                  `json:"proxyType,omitempty"`
-	ProxyUsername             string                     `json:"proxyUsername,omitempty"`
-	SslCertPassword           string                     `json:"sslCertPassword,omitempty"`
-	SslCertPath               string                     `json:"sslCertPath,omitempty"`
-	SslPort                   int                        `json:"sslPort,omitempty"`
+	ProxyUsername             string                     `json:"proxyUsername"`
+	SslCertPassword           string                     `json:"sslCertPassword"`
+	SslCertPath               string                     `json:"sslCertPath"`
+	SslPort                   int                        `json:"sslPort"`
 	TrustCgnatIpAddresses     *bool                      `json:"trustCgnatIpAddresses,omitempty"`
-	TrustedNetworks           string                     `json:"trustedNetworks,omitempty"`
+	TrustedNetworks           string                     `json:"trustedNetworks"`
 	UpdateAutomatically       *bool                      `json:"updateAutomatically,omitempty"`
 	UpdateMechanism           UpdateMechanism            `json:"updateMechanism,omitempty"`
-	UpdateScriptPath          string                     `json:"updateScriptPath,omitempty"`
-	UrlBase                   string                     `json:"urlBase,omitempty"`
-	Username                  string                     `json:"username,omitempty"`
+	UpdateScriptPath          string                     `json:"updateScriptPath"`
+	UrlBase                   string                     `json:"urlBase"`
+	Username                  string                     `json:"username"`
 }

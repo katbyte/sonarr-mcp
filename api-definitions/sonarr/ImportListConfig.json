@@ -100,7 +100,8 @@
             "Type": "Integer"
           }
         }
-      ]
+      ],
+      "WrittenWhole": true
     }
   ],
   "Constants": [

@@ -305,6 +305,9 @@ func diffModels(older, newer map[string]*definitions.Model) []Change {
 			if !slices.Equal(o.Union, n.Union) {
 				d.change(true, "union %v -> %v", o.Union, n.Union)
 			}
+			if o.WrittenWhole != n.WrittenWhole {
+				d.change(false, "written whole %t -> %t", o.WrittenWhole, n.WrittenWhole)
+			}
 			oldFields, oldNames := keyed(o.Fields, func(f definitions.Field) string { return f.JSONName })
 			newFields, newNames := keyed(n.Fields, func(f definitions.Field) string { return f.JSONName })
 			for _, field := range union(oldNames, newNames) {

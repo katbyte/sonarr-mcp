@@ -1,0 +1,485 @@
+{
+  "host": "artworks.thetvdb.com",
+  "interactions": [
+    {
+      "key": "GET artworks.thetvdb.com/banners/fanart/original/280619-12.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/fanart/original/280619-12.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 253331
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/fanart/original/74205-38.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/fanart/original/74205-38.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 657748
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/fanart/original/76885-20.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/fanart/original/76885-20.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 399308
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/fanart/original/78874-5.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/fanart/original/78874-5.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 448879
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/fanart/original/81189-21.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/fanart/original/81189-21.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 559843
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/graphical/280619-g6.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/graphical/280619-g6.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 72240
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/graphical/7097-g.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/graphical/7097-g.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 58941
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/graphical/74205-g3.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/graphical/74205-g3.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 90193
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/graphical/76885-g2.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/graphical/76885-g2.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 62578
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/graphical/81189-g21.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/graphical/81189-g21.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 69058
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/posters/5cc12861c93e4.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/posters/5cc12861c93e4.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 398929
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/posters/74205-12.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/posters/74205-12.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 232119
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/posters/76885-3.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/posters/76885-3.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 208283
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/posters/78874-2.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/posters/78874-2.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 305213
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/posters/81189-10.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/posters/81189-10.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 452045
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/series/360893/backgrounds/62017319.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/series/360893/backgrounds/62017319.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 1608597
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/280619/clearlogo/697e889c6dfc1.png",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/280619/clearlogo/697e889c6dfc1.png",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/png",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)",
+        "X-Amz-Server-Side-Encryption": "AES256"
+      },
+      "elided": true,
+      "elided_type": "image/png",
+      "elided_size": 59933
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/280619/posters/61acea8cc0aab.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/280619/posters/61acea8cc0aab.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 165736
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/360893/banners/6751caac5a993.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/360893/banners/6751caac5a993.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)",
+        "X-Amz-Server-Side-Encryption": "AES256"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 99678
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/360893/clearlogo/611be4d52d6a8.png",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/360893/clearlogo/611be4d52d6a8.png",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/png",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/png",
+      "elided_size": 102478
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/371980/backgrounds/61bdee7c62d99.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/371980/backgrounds/61bdee7c62d99.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 388834
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/371980/banners/67d3854a3f3f2.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/371980/banners/67d3854a3f3f2.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)",
+        "X-Amz-Server-Side-Encryption": "AES256"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 35401
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/371980/clearlogo/67deb201804b5.png",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/371980/clearlogo/67deb201804b5.png",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/png",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)",
+        "X-Amz-Server-Side-Encryption": "AES256"
+      },
+      "elided": true,
+      "elided_type": "image/png",
+      "elided_size": 54160
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/371980/posters/621096b26f0e2.jpg",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/371980/posters/621096b26f0e2.jpg",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/jpeg",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/jpeg",
+      "elided_size": 102064
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/74205/clearlogo/611b6d5b9ae72.png",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/74205/clearlogo/611b6d5b9ae72.png",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/png",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/png",
+      "elided_size": 262808
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/76885/clearlogo/611b7facc3918.png",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/76885/clearlogo/611b7facc3918.png",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/png",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/png",
+      "elided_size": 105613
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/78874/clearlogo/611b6261b69a7.png",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/78874/clearlogo/611b6261b69a7.png",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/png",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/png",
+      "elided_size": 203701
+    },
+    {
+      "key": "GET artworks.thetvdb.com/banners/v4/series/81189/clearlogo/611b4df33bac5.png",
+      "method": "GET",
+      "host": "artworks.thetvdb.com",
+      "path": "/banners/v4/series/81189/clearlogo/611b4df33bac5.png",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Content-Type": "image/png",
+        "Server": "AmazonS3",
+        "Vary": "Origin",
+        "Via": "1.1 ecda248b8ab2d316de66446dcb388074.cloudfront.net (CloudFront)"
+      },
+      "elided": true,
+      "elided_type": "image/png",
+      "elided_size": 89021
+    }
+  ]
+}

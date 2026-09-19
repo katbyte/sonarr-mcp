@@ -44,4 +44,5 @@
 //   - sonarr-test-all-results
 //   - sonarr-command-body
 //   - sonarr-http-uri-string
+//   - sonarr-bulk-update-lists
 package sonarr

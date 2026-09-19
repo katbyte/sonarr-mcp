@@ -188,6 +188,12 @@ all.Items        // every page's records
 - In models, booleans are `*bool` and lists and maps are `omitzero`, so a body
   can leave a flag to the server's default, send an explicit false, and clear a
   list with an empty one.
+- A model the config names as written whole (`config.Service.WrittenWhole`:
+  Sonarr's settings sections, read with a GET and saved with a PUT of all of
+  it) always sends its strings and numbers, empty or not. Sonarr saves a
+  section field by field, and a field left out arrives as null: the host
+  settings answer 500 to one, and the others keep the old value instead of
+  the `""` a caller cleared it to.
 - `Model` is a pointer for a struct, enum or primitive, and the value for a
   list, map or raw JSON. An operation that answers a file has no `Model`: its
   body is left unread in `HttpResponse.Body` for the caller to read and close.

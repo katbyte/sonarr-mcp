@@ -38,7 +38,7 @@ func (g *gen) modelFile(m *definitions.Model) string {
 				b.WriteString("\n")
 			}
 			b.WriteString(comment("\t", f.Description))
-			fmt.Fprintf(&b, "\t%s %s `json:%q`\n", f.Name, g.fieldType(f), fieldTag(f))
+			fmt.Fprintf(&b, "\t%s %s `json:%q`\n", f.Name, g.fieldType(f), fieldTag(f, m.WrittenWhole))
 		}
 		b.WriteString("}\n")
 	}

@@ -4,7 +4,7 @@ package sonarr
 
 // ImportListConfigResource is the "ImportListConfigResource" schema.
 type ImportListConfigResource struct {
-	Id            int               `json:"id,omitempty"`
+	Id            int               `json:"id"`
 	ListSyncLevel ListSyncLevelType `json:"listSyncLevel,omitempty"`
-	ListSyncTag   int               `json:"listSyncTag,omitempty"`
+	ListSyncTag   int               `json:"listSyncTag"`
 }

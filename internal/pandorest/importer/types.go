@@ -2,6 +2,7 @@ package importer
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/katbyte/sonarr-mcp/internal/pandorest/definitions"
@@ -119,7 +120,13 @@ func (im *importer) importSchemas() {
 		default:
 			im.claimName(name, "schema "+schemaName)
 			m := im.objectModel(name, schemaName, s)
+			m.WrittenWhole = slices.Contains(im.cfg.WrittenWhole, schemaName)
 			im.models[name] = &m
+		}
+	}
+	for _, schemaName := range im.cfg.WrittenWhole {
+		if s := im.spec.Components.Schemas[schemaName]; s == nil || im.kindOf(schemaName) != kindObject {
+			im.fail(fmt.Sprintf("the config names %s as written whole, but the document has no object schema by that name", schemaName))
 		}
 	}
 }

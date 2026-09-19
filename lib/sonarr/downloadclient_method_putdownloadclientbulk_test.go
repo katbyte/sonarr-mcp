@@ -13,7 +13,7 @@ import (
 func TestOperationPutDownloadClientBulk(t *testing.T) {
 	t.Parallel()
 
-	c, s := newOperationServer(t, 202, "application/json", "{}")
+	c, s := newOperationServer(t, 202, "application/json", "[{}]")
 	result, err := c.PutDownloadClientBulk(t.Context(), DownloadClientBulkResource{})
 	if err != nil {
 		t.Fatal(err)

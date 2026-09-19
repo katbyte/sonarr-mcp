@@ -190,7 +190,8 @@
         }
       },
       "ExpectedStatusCodes": [
-        200
+        200,
+        400
       ]
     },
     {
@@ -207,8 +208,11 @@
       "Response": {
         "ContentType": "application/json",
         "Type": {
-          "Type": "Reference",
-          "ReferenceName": "IndexerResource"
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "IndexerResource"
+          }
         }
       },
       "ExpectedStatusCodes": [

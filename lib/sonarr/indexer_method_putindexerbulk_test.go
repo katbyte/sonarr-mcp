@@ -13,7 +13,7 @@ import (
 func TestOperationPutIndexerBulk(t *testing.T) {
 	t.Parallel()
 
-	c, s := newOperationServer(t, 202, "application/json", "{}")
+	c, s := newOperationServer(t, 202, "application/json", "[{}]")
 	result, err := c.PutIndexerBulk(t.Context(), IndexerBulkResource{})
 	if err != nil {
 		t.Fatal(err)

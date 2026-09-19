@@ -20,6 +20,7 @@ func (c Client) PostIndexerTestAll(ctx context.Context) (result PostIndexerTestA
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
+			http.StatusBadRequest,
 		},
 		HttpMethod: http.MethodPost,
 		Path:       "/api/v3/indexer/testall",

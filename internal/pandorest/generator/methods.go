@@ -220,6 +220,7 @@ var httpMethods = map[string]string{
 var statusNames = map[int]string{
 	http.StatusOK: "http.StatusOK", http.StatusCreated: "http.StatusCreated", http.StatusAccepted: "http.StatusAccepted",
 	http.StatusNoContent: "http.StatusNoContent", http.StatusPartialContent: "http.StatusPartialContent",
+	http.StatusBadRequest: "http.StatusBadRequest",
 }
 
 func (g *gen) writeMethod(b *strings.Builder, o *definitions.Operation, responseType, optionsType string) {

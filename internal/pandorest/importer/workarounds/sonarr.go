@@ -64,10 +64,12 @@ var sonarrUndeclaredGets = map[string]string{
 	"/api/v3/filesystem/mediafiles":   answersJSON, // [{"path", "relativePath", "name"}]
 	"/api/v3/config/naming/examples":  answersJSON,
 	"/api/v3/series/{id}/folder":      answersJSON, // {"folder": "Series Title (2020)"}
-	"/api/v3/system/routes":           answersJSON,
 	"/api/v3/system/routes/duplicate": answersJSON,
 
 	// files
+	// SystemController.GetRoutes: the routing graph in DOT, as Content(graph,
+	// "text/plain"), whatever its [Produces] says
+	"/api/v3/system/routes":                    "text/plain",
 	"/api/v3/log/file/{filename}":              "text/plain",
 	"/api/v3/log/file/update/{filename}":       "text/plain",
 	"/api/v3/mediacover/{seriesId}/{filename}": "image/*",
@@ -397,6 +399,52 @@ func (sonarrTestAllResults) Apply(spec *openapi.Spec) error {
 		}
 		ok.Content = results()
 		op.Responses["400"] = &openapi.Response{Description: "At least one provider failed its test", Content: results()}
+	}
+
+	return nil
+}
+
+// sonarrBulkUpdateLists declares what the bulk updates answer: every resource
+// they changed, not the one resource documented.
+type sonarrBulkUpdateLists struct{}
+
+// sonarrBulkUpdates are the bulk updates: ProviderControllerBase.UpdateProvider
+// for the providers, and CustomFormatController.Update, each declared as
+// ActionResult<TResource> and answering Accepted(the list it updated).
+var sonarrBulkUpdates = []string{
+	"/api/v3/customformat/bulk",
+	"/api/v3/downloadclient/bulk",
+	"/api/v3/importlist/bulk",
+	"/api/v3/indexer/bulk",
+}
+
+func (sonarrBulkUpdateLists) Name() string    { return "sonarr-bulk-update-lists" }
+func (sonarrBulkUpdateLists) Service() string { return sonarr }
+func (sonarrBulkUpdateLists) Bug() string {
+	return "the bulk updates (PUT .../bulk) are documented as answering one resource, but answer the list of every resource they changed, which one resource cannot decode"
+}
+
+func (sonarrBulkUpdateLists) Apply(spec *openapi.Spec) error {
+	for _, path := range sonarrBulkUpdates {
+		op, err := operation(spec, http.MethodPut, path)
+		if err != nil {
+			return err
+		}
+		// the 202 sonarr-created-accepted moves the answer to, or the 200 the
+		// document has before it runs
+		answer := op.Responses["202"]
+		if answer == nil {
+			answer = op.Responses["200"]
+		}
+		if answer == nil {
+			return fmt.Errorf("PUT %s has no success response", path)
+		}
+		for ct, media := range answer.Content {
+			if media.Schema == nil || media.Schema.RefName() == "" {
+				return fmt.Errorf("PUT %s's %s answer is no longer one resource", path, ct)
+			}
+			media.Schema = &openapi.Schema{Type: openapi.TypeArray, Items: media.Schema}
+		}
 	}
 
 	return nil

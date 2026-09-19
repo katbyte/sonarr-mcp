@@ -20,6 +20,7 @@ func (c Client) PostImportListTestAll(ctx context.Context) (result PostImportLis
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
+			http.StatusBadRequest,
 		},
 		HttpMethod: http.MethodPost,
 		Path:       "/api/v3/importlist/testall",

@@ -13,7 +13,7 @@ import (
 func TestOperationPutCustomFormatBulk(t *testing.T) {
 	t.Parallel()
 
-	c, s := newOperationServer(t, 202, "application/json", "{}")
+	c, s := newOperationServer(t, 202, "application/json", "[{}]")
 	result, err := c.PutCustomFormatBulk(t.Context(), CustomFormatBulkResource{})
 	if err != nil {
 		t.Fatal(err)

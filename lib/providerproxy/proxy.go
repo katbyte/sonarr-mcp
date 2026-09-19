@@ -28,6 +28,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"math/big"
@@ -64,6 +65,7 @@ type Proxy struct {
 	redact     []string
 	redactBody []string
 	ignore     []string
+	trim       map[string]func([]byte) ([]byte, error)
 
 	tunnelsMu sync.Mutex
 	tunnels   map[string]bool
@@ -119,6 +121,12 @@ type Options struct {
 	// cannot exclude because the address is only known once the container is
 	// running, and which is no part of what these cassettes are about.
 	IgnoreHosts []string
+	// Trim cuts a response down before it is recorded, keyed by host and
+	// path ("services.sonarr.tv/v1/scenemapping"): a provider's list of
+	// every show it knows runs to megabytes, of which the suite reads the
+	// few entries for its own fixtures. The trimmed body is what is stored
+	// and served, in Record and Verify alike, so replay sees the same.
+	Trim map[string]func(body []byte) ([]byte, error)
 }
 
 // New starts a proxy and returns it. Close stops it and, in Record mode,
@@ -149,6 +157,7 @@ func New(opts Options) (*Proxy, error) {
 		redact:     opts.RedactQuery,
 		redactBody: opts.RedactBodyFields,
 		ignore:     opts.IgnoreHosts,
+		trim:       opts.Trim,
 		store:      st,
 		logger:     opts.Logger,
 		ca:         ca,
@@ -465,6 +474,11 @@ func (p *Proxy) fetch(r *http.Request, host, k, path string) (*interaction, erro
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+	if trim := p.trim[strings.ToLower(host)+path]; trim != nil && resp.StatusCode == http.StatusOK {
+		if body, err = trim(body); err != nil {
+			return nil, fmt.Errorf("trimming %s%s: %w", host, path, err)
+		}
 	}
 
 	i := &interaction{

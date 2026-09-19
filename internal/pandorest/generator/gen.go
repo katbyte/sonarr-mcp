@@ -114,10 +114,18 @@ func (g *gen) fieldType(f *definitions.Field) string {
 // the servers default many flags to true, so a body must be able to leave one
 // unset as well as send an explicit false. Lists and maps are omitzero, so a
 // nil one is left out but an empty one is sent, which is how a body clears a
-// list. The rest are omitempty.
-func fieldTag(f *definitions.Field) string {
-	if f.Type.Type == definitions.List || f.Type.Type == definitions.Dictionary {
+// list. The rest are omitempty, except the strings and numbers of a model
+// written back whole (a settings object), which are always sent: read "",
+// write "", rather than a null the server does not save.
+func fieldTag(f *definitions.Field, whole bool) string {
+	switch f.Type.Type {
+	case definitions.List, definitions.Dictionary:
 		return f.JSONName + ",omitzero"
+	case definitions.String, definitions.Integer, definitions.Integer64, definitions.Float, definitions.Double:
+		if whole {
+			return f.JSONName
+		}
+	default:
 	}
 
 	return f.JSONName + ",omitempty"

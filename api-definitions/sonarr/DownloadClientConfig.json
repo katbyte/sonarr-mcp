@@ -114,7 +114,8 @@
             "Type": "Integer"
           }
         }
-      ]
+      ],
+      "WrittenWhole": true
     }
   ]
 }

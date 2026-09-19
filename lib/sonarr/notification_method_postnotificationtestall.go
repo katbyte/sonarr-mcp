@@ -20,6 +20,7 @@ func (c Client) PostNotificationTestAll(ctx context.Context) (result PostNotific
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
+			http.StatusBadRequest,
 		},
 		HttpMethod: http.MethodPost,
 		Path:       "/api/v3/notification/testall",

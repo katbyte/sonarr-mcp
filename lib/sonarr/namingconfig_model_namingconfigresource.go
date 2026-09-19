@@ -4,16 +4,16 @@ package sonarr
 
 // NamingConfigResource is the "NamingConfigResource" schema.
 type NamingConfigResource struct {
-	AnimeEpisodeFormat           string `json:"animeEpisodeFormat,omitempty"`
-	ColonReplacementFormat       int    `json:"colonReplacementFormat,omitempty"`
-	CustomColonReplacementFormat string `json:"customColonReplacementFormat,omitempty"`
-	DailyEpisodeFormat           string `json:"dailyEpisodeFormat,omitempty"`
-	Id                           int    `json:"id,omitempty"`
-	MultiEpisodeStyle            int    `json:"multiEpisodeStyle,omitempty"`
+	AnimeEpisodeFormat           string `json:"animeEpisodeFormat"`
+	ColonReplacementFormat       int    `json:"colonReplacementFormat"`
+	CustomColonReplacementFormat string `json:"customColonReplacementFormat"`
+	DailyEpisodeFormat           string `json:"dailyEpisodeFormat"`
+	Id                           int    `json:"id"`
+	MultiEpisodeStyle            int    `json:"multiEpisodeStyle"`
 	RenameEpisodes               *bool  `json:"renameEpisodes,omitempty"`
 	ReplaceIllegalCharacters     *bool  `json:"replaceIllegalCharacters,omitempty"`
-	SeasonFolderFormat           string `json:"seasonFolderFormat,omitempty"`
-	SeriesFolderFormat           string `json:"seriesFolderFormat,omitempty"`
-	SpecialsFolderFormat         string `json:"specialsFolderFormat,omitempty"`
-	StandardEpisodeFormat        string `json:"standardEpisodeFormat,omitempty"`
+	SeasonFolderFormat           string `json:"seasonFolderFormat"`
+	SeriesFolderFormat           string `json:"seriesFolderFormat"`
+	SpecialsFolderFormat         string `json:"specialsFolderFormat"`
+	StandardEpisodeFormat        string `json:"standardEpisodeFormat"`
 }

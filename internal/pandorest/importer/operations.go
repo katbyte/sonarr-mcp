@@ -152,7 +152,7 @@ func (im *importer) operation(namer *uniqueNamer, method, path string, op *opena
 
 	o.Request = im.requestBody(method, path, op.RequestBody)
 	o.Response = im.responseBody(method, path, op)
-	o.ExpectedStatusCodes = im.expectedStatusCodes(method, path, op)
+	o.ExpectedStatusCodes = im.expectedStatusCodes(method, path, op, o.Response)
 
 	return o
 }
@@ -329,25 +329,47 @@ func (im *importer) responseType(s *openapi.Schema, owner string) definitions.Ty
 	return im.typeRef(s, owner, "Response")
 }
 
-func (im *importer) expectedStatusCodes(method, path string, op *openapi.Operation) []int {
+// expectedStatusCodes are the statuses the generated method treats as an
+// answer rather than an error: every 2xx the operation declares, and any
+// other status whose answer the document gives the same JSON shape as the
+// success - a failure that still answers in full, as Sonarr's test-all
+// answers 400 with every provider's result when one of them fails.
+func (im *importer) expectedStatusCodes(method, path string, op *openapi.Operation, success *definitions.Body) []int {
 	var codes []int
-	for code := range op.Responses {
+	for code, resp := range op.Responses {
+		n, err := strconv.Atoi(code)
 		if !strings.HasPrefix(code, "2") {
+			if err == nil && im.sameAnswer(resp, success, method+" "+path) {
+				codes = append(codes, n)
+			}
 			continue
 		}
-		n, err := strconv.Atoi(code)
 		if err != nil {
 			im.fail(fmt.Sprintf("%s %s: success response %q is not a status code", method, path, code))
 			continue
 		}
 		codes = append(codes, n)
 	}
-	if len(codes) == 0 {
+	if !slices.ContainsFunc(codes, func(c int) bool { return c >= 200 && c < 300 }) {
 		im.fail(fmt.Sprintf("%s %s: declares no success response", method, path))
 	}
 	slices.Sort(codes)
 
 	return codes
+}
+
+// sameAnswer reports whether a response declares JSON of the success
+// answer's type.
+func (im *importer) sameAnswer(resp *openapi.Response, success *definitions.Body, owner string) bool {
+	if resp == nil || success == nil || success.Type.Type == definitions.RawFile {
+		return false
+	}
+	ct, ok := pickJSON(resp.Content)
+	if !ok {
+		return false
+	}
+
+	return im.responseType(resp.Content[ct].Schema, owner).Equal(success.Type)
 }
 
 // markPageable flags the list operations that page by page number and page

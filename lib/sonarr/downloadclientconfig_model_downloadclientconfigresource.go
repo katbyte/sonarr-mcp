@@ -6,7 +6,7 @@ package sonarr
 type DownloadClientConfigResource struct {
 	AutoRedownloadFailed                      *bool  `json:"autoRedownloadFailed,omitempty"`
 	AutoRedownloadFailedFromInteractiveSearch *bool  `json:"autoRedownloadFailedFromInteractiveSearch,omitempty"`
-	DownloadClientWorkingFolders              string `json:"downloadClientWorkingFolders,omitempty"`
+	DownloadClientWorkingFolders              string `json:"downloadClientWorkingFolders"`
 	EnableCompletedDownloadHandling           *bool  `json:"enableCompletedDownloadHandling,omitempty"`
-	Id                                        int    `json:"id,omitempty"`
+	Id                                        int    `json:"id"`
 }

@@ -234,7 +234,8 @@
             "Type": "Boolean"
           }
         }
-      ]
+      ],
+      "WrittenWhole": true
     }
   ],
   "Constants": [

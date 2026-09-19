@@ -331,3 +331,64 @@ func TestImportFailures(t *testing.T) {
 		})
 	}
 }
+
+// A model the config names as written whole is marked so; a name the
+// document lacks, or one that is not an object, fails the import rather than
+// being ignored.
+func TestWrittenWhole(t *testing.T) {
+	t.Parallel()
+
+	spec, err := openapi.Parse([]byte(miniSpec))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := miniConfig
+	cfg.WrittenWhole = []string{"Item"}
+	svc, err := FromSpec(cfg, spec, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	models := svc.Models()
+	if !models["Item"].WrittenWhole || models["Unused"].WrittenWhole {
+		t.Errorf("WrittenWhole: Item %v, Unused %v; want only Item", models["Item"].WrittenWhole, models["Unused"].WrittenWhole)
+	}
+
+	for _, name := range []string{"Nope", "Kind"} {
+		spec, err := openapi.Parse([]byte(miniSpec))
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg.WrittenWhole = []string{name}
+		if _, err := FromSpec(cfg, spec, nil, nil); err == nil || !strings.Contains(err.Error(), "names "+name+" as written whole") {
+			t.Errorf("WrittenWhole %s = %v, want the import to fail naming it", name, err)
+		}
+	}
+}
+
+// A failure the document gives the success answer's own shape is an answer,
+// not an error: Sonarr's test-all answers 400 with every provider's result
+// when one fails. A failure answering something else stays an error.
+func TestExpectedFailureAnswers(t *testing.T) {
+	t.Parallel()
+
+	svc, err := importMini(t, func(s *openapi.Spec) {
+		op := s.Operation("GET", "/Items/{itemId}")
+		op.Responses["400"] = &openapi.Response{Content: op.Responses["200"].Content}
+		op.Responses["404"] = &openapi.Response{Content: map[string]*openapi.MediaType{"application/json": {Schema: &openapi.Schema{Type: openapi.TypeString}}}}
+		s.Operation("POST", "/Items/{itemId}").Responses["400"] = &openapi.Response{Content: op.Responses["200"].Content}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	codes := map[string][]int{}
+	for _, o := range svc.Operations() {
+		codes[o.Name] = o.ExpectedStatusCodes
+	}
+	if got := codes["GetItem"]; !slices.Equal(got, []int{200, 400}) {
+		t.Errorf("GetItem expects %v, want [200 400]: the 400 answers the item, the 404 a string", got)
+	}
+	// an operation that answers nothing has no shape for a failure to share
+	if got := codes["UpdateItem"]; !slices.Equal(got, []int{204}) {
+		t.Errorf("UpdateItem expects %v, want [204]", got)
+	}
+}

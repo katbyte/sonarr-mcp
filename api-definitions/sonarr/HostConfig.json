@@ -384,7 +384,8 @@
           },
           "Nullable": true
         }
-      ]
+      ],
+      "WrittenWhole": true
     }
   ],
   "Constants": [

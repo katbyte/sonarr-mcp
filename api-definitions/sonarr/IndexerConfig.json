@@ -113,7 +113,8 @@
             "Type": "Integer"
           }
         }
-      ]
+      ],
+      "WrittenWhole": true
     }
   ]
 }

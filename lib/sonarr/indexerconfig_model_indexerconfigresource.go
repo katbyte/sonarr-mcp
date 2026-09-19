@@ -4,9 +4,9 @@ package sonarr
 
 // IndexerConfigResource is the "IndexerConfigResource" schema.
 type IndexerConfigResource struct {
-	Id              int `json:"id,omitempty"`
-	MaximumSize     int `json:"maximumSize,omitempty"`
-	MinimumAge      int `json:"minimumAge,omitempty"`
-	Retention       int `json:"retention,omitempty"`
-	RssSyncInterval int `json:"rssSyncInterval,omitempty"`
+	Id              int `json:"id"`
+	MaximumSize     int `json:"maximumSize"`
+	MinimumAge      int `json:"minimumAge"`
+	Retention       int `json:"retention"`
+	RssSyncInterval int `json:"rssSyncInterval"`
 }

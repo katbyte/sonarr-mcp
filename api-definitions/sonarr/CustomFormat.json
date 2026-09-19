@@ -130,8 +130,11 @@
       "Response": {
         "ContentType": "application/json",
         "Type": {
-          "Type": "Reference",
-          "ReferenceName": "CustomFormatResource"
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "CustomFormatResource"
+          }
         }
       },
       "ExpectedStatusCodes": [

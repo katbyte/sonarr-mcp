@@ -7,9 +7,9 @@
       "Method": "GET",
       "Path": "/api/v3/system/routes",
       "Response": {
-        "ContentType": "application/json",
+        "ContentType": "text/plain",
         "Type": {
-          "Type": "RawObject"
+          "Type": "RawFile"
         }
       },
       "ExpectedStatusCodes": [

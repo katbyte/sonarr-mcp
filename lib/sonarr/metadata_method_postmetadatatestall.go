@@ -20,6 +20,7 @@ func (c Client) PostMetadataTestAll(ctx context.Context) (result PostMetadataTes
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
+			http.StatusBadRequest,
 		},
 		HttpMethod: http.MethodPost,
 		Path:       "/api/v3/metadata/testall",

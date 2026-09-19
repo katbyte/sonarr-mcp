@@ -12,7 +12,7 @@ import (
 // PutDownloadClientBulkOperationResponse is the result of PutDownloadClientBulk.
 type PutDownloadClientBulkOperationResponse struct {
 	HttpResponse *http.Response
-	Model        *DownloadClientResource
+	Model        []DownloadClientResource
 }
 
 // PutDownloadClientBulk calls PUT /api/v3/downloadclient/bulk.
@@ -44,9 +44,7 @@ func (c Client) PutDownloadClientBulk(ctx context.Context, input DownloadClientB
 		return
 	}
 
-	var model DownloadClientResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Model); err != nil {
 		return
 	}
 

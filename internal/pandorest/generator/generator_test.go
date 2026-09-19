@@ -89,7 +89,9 @@ func miniDefinitions(t *testing.T) *definitions.Service {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc, err := importer.FromSpec(config.Service{Name: "mini", Package: "mini", Naming: config.OperationIDNaming, Auth: "Sonarr"}, spec, []string{"mini-fix"}, nil)
+	svc, err := importer.FromSpec(config.Service{
+		Name: "mini", Package: "mini", Naming: config.OperationIDNaming, Auth: "Sonarr", WrittenWhole: []string{"Item"},
+	}, spec, []string{"mini-fix"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +198,12 @@ func TestGenerate(t *testing.T) {
 				t.Errorf("the package lacks %q", want)
 			}
 		}
-		for _, re := range []string{"`json:\"IsFolder,omitempty\"`", "`json:\"Children,omitzero\"`", "`json:\"Parent,omitempty\"`", `Parent +\*Item`, `Blur +\*ItemBlur`, `Rating +float32`} {
+		// Item is written whole: its strings and numbers are sent even when
+		// empty, its flag and its struct still left out when unset
+		for _, re := range []string{
+			"`json:\"IsFolder,omitempty\"`", "`json:\"Children,omitzero\"`", "`json:\"Parent,omitempty\"`", `Parent +\*Item`, `Blur +\*ItemBlur`, `Rating +float32`,
+			"Id +string +`json:\"Id\"`", "Rating +float32 +`json:\"Rating\"`",
+		} {
 			if !regexp.MustCompile(re).MatchString(all) {
 				t.Errorf("the package lacks %s", re)
 			}

@@ -4,14 +4,14 @@ package sonarr
 
 // UiConfigResource is the "UiConfigResource" schema.
 type UiConfigResource struct {
-	CalendarWeekColumnHeader string `json:"calendarWeekColumnHeader,omitempty"`
+	CalendarWeekColumnHeader string `json:"calendarWeekColumnHeader"`
 	EnableColorImpairedMode  *bool  `json:"enableColorImpairedMode,omitempty"`
-	FirstDayOfWeek           int    `json:"firstDayOfWeek,omitempty"`
-	Id                       int    `json:"id,omitempty"`
-	LongDateFormat           string `json:"longDateFormat,omitempty"`
-	ShortDateFormat          string `json:"shortDateFormat,omitempty"`
+	FirstDayOfWeek           int    `json:"firstDayOfWeek"`
+	Id                       int    `json:"id"`
+	LongDateFormat           string `json:"longDateFormat"`
+	ShortDateFormat          string `json:"shortDateFormat"`
 	ShowRelativeDates        *bool  `json:"showRelativeDates,omitempty"`
-	Theme                    string `json:"theme,omitempty"`
-	TimeFormat               string `json:"timeFormat,omitempty"`
-	UiLanguage               int    `json:"uiLanguage,omitempty"`
+	Theme                    string `json:"theme"`
+	TimeFormat               string `json:"timeFormat"`
+	UiLanguage               int    `json:"uiLanguage"`
 }

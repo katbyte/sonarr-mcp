@@ -12,6 +12,7 @@
     "sonarr-created-accepted",
     "sonarr-test-all-results",
     "sonarr-command-body",
-    "sonarr-http-uri-string"
+    "sonarr-http-uri-string",
+    "sonarr-bulk-update-lists"
   ]
 }

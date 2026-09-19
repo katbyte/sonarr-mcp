@@ -4,16 +4,17 @@ package sonarr
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 
 	"github.com/katbyte/sonarr-mcp/lib/client"
 )
 
 // GetSystemRoutesOperationResponse is the result of GetSystemRoutes.
+//
+// The operation answers text/plain, left unread in HttpResponse.Body, which
+// the caller must close.
 type GetSystemRoutesOperationResponse struct {
 	HttpResponse *http.Response
-	Model        json.RawMessage
 }
 
 // GetSystemRoutes calls GET /api/v3/system/routes.
@@ -22,8 +23,9 @@ func (c Client) GetSystemRoutes(ctx context.Context) (result GetSystemRoutesOper
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
-		HttpMethod: http.MethodGet,
-		Path:       "/api/v3/system/routes",
+		HttpMethod:     http.MethodGet,
+		Path:           "/api/v3/system/routes",
+		StreamResponse: true,
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -37,10 +39,6 @@ func (c Client) GetSystemRoutes(ctx context.Context) (result GetSystemRoutesOper
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
-	}
-
-	if err = resp.Unmarshal(&result.Model); err != nil {
 		return
 	}
 

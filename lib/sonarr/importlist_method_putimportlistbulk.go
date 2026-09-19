@@ -12,7 +12,7 @@ import (
 // PutImportListBulkOperationResponse is the result of PutImportListBulk.
 type PutImportListBulkOperationResponse struct {
 	HttpResponse *http.Response
-	Model        *ImportListResource
+	Model        []ImportListResource
 }
 
 // PutImportListBulk calls PUT /api/v3/importlist/bulk.
@@ -44,9 +44,7 @@ func (c Client) PutImportListBulk(ctx context.Context, input ImportListBulkResou
 		return
 	}
 
-	var model ImportListResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Model); err != nil {
 		return
 	}
 

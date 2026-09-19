@@ -175,7 +175,8 @@
         }
       },
       "ExpectedStatusCodes": [
-        200
+        200,
+        400
       ]
     },
     {
