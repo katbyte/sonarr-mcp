@@ -1,0 +1,55 @@
+{
+  "host": "services.sonarr.tv",
+  "interactions": [
+    {
+      "key": "GET services.sonarr.tv/v1/dailyseries",
+      "method": "GET",
+      "host": "services.sonarr.tv",
+      "path": "/v1/dailyseries",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Server": "cloudflare"
+      },
+      "body": "[{\"tvdbId\":70336},{\"tvdbId\":71256},{\"tvdbId\":71424},{\"tvdbId\":71753},{\"tvdbId\":71998},{\"tvdbId\":72194},{\"tvdbId\":73387},{\"tvdbId\":74490},{\"tvdbId\":75088},{\"tvdbId\":76573},{\"tvdbId\":79274},{\"tvdbId\":82483},{\"tvdbId\":82616},{\"tvdbId\":85355},{\"tvdbId\":109411},{\"tvdbId\":114851},{\"tvdbId\":194751},{\"tvdbId\":249673},{\"tvdbId\":250544},{\"tvdbId\":270261},{\"tvdbId\":270262},{\"tvdbId\":271728},{\"tvdbId\":271958},{\"tvdbId\":274099}]"
+    },
+    {
+      "key": "GET services.sonarr.tv/v1/notification?branch=main\u0026os=linuxmusl\u0026version=4.0.20.3014",
+      "method": "GET",
+      "host": "services.sonarr.tv",
+      "path": "/v1/notification",
+      "query": "branch=main\u0026os=linuxmusl\u0026version=4.0.20.3014",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Server": "cloudflare"
+      },
+      "body": "[]"
+    },
+    {
+      "key": "GET services.sonarr.tv/v1/scenemapping",
+      "method": "GET",
+      "host": "services.sonarr.tv",
+      "path": "/v1/scenemapping",
+      "status": 200,
+      "headers": {
+        "Cache-Control": "public, max-age=21600, s-max-age=900",
+        "Content-Type": "application/json; charset=utf-8",
+        "Server": "cloudflare"
+      },
+      "body": "[{\"mappingId\":\"s-62180683739961a148bfc81c\",\"tvdbId\":371980,\"title\":\"Separación\",\"searchTitle\":\"Separación\",\"season\":-1},{\"mappingId\":\"s-62341fb8739961111c456743\",\"tvdbId\":371980,\"title\":\"Scissione\",\"searchTitle\":\"Scissione\",\"season\":-1},{\"mappingId\":\"s-67c1c95100648721db1f56ed\",\"tvdbId\":371980,\"title\":\"Severence Scissione\",\"searchTitle\":\"Severence Scissione\",\"season\":-1},{\"mappingId\":\"s-67e6ca3d7152151bf0ca8148\",\"tvdbId\":371980,\"title\":\"Separacion\",\"searchTitle\":\"Separacion\",\"season\":-1},{\"mappingId\":\"s-689248b62b0db28edc89d402\",\"tvdbId\":78874,\"title\":\"Firefly - Der Aufbruch der Serenity\",\"searchTitle\":\"Firefly - Der Aufbruch der Serenity\",\"season\":-1}]"
+    },
+    {
+      "key": "GET services.sonarr.tv/v1/time",
+      "method": "GET",
+      "host": "services.sonarr.tv",
+      "path": "/v1/time",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Server": "cloudflare"
+      },
+      "body": "{\"dateTimeUtc\":\"2026-09-19T14:58:57.3095515Z\"}"
+    }
+  ]
+}

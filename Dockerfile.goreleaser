@@ -1,0 +1,15 @@
+# Used by goreleaser (dockers_v2 in .goreleaser.yaml) to publish ghcr.io/katbyte/sonarr-mcp on
+# tag: the build context holds the prebuilt binary per platform, so this only copies it onto
+# alpine. Dockerfile (from source) is what make docker uses; keep the two final stages in sync.
+FROM alpine:3.24
+RUN apk add --no-cache ca-certificates tzdata \
+    && adduser -D -H -u 65532 sonarrmcp
+ARG TARGETPLATFORM
+COPY $TARGETPLATFORM/sonarr-mcp /usr/local/bin/sonarr-mcp
+USER sonarrmcp
+ENV SONARR_LISTEN=:8080
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
+  CMD wget -q --spider http://127.0.0.1:8080/healthz || exit 1
+ENTRYPOINT ["sonarr-mcp"]
+CMD ["serve"]

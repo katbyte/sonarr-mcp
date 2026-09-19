@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "sonarr": {
+      "command": "sonarr-mcp",
+      "args": ["serve"]
+    }
+  }
+}

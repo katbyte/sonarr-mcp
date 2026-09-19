@@ -1,0 +1,33 @@
+---
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  # dependabot auto-detects the vendor/ directory and runs `go mod tidy` + `go mod vendor` on updates
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  # dev tools (golangci-lint, gofumpt) pinned in .tools/go.mod
+  - package-ecosystem: "gomod"
+    directory: "/.tools"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  # actionlint has its own module (yaml dependency conflicts with golangci-lint's)
+  - package-ecosystem: "gomod"
+    directory: "/.tools/actionlint"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7

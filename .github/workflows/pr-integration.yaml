@@ -1,0 +1,106 @@
+---
+name: tests
+on:
+  push:
+    branches: [ 'main' ]
+  pull_request:
+    types: ['opened', 'synchronize']
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'vendor/**'
+      - 'makefile'
+      - 'scripts/testenv.sh'
+      - 'acceptance/**'
+      - 'integration/**'
+      - 'lib/providerproxy/**'
+      # internal/pandorest's tests re-import the spec and regenerate the SDK,
+      # failing when api-definitions/ or lib/sonarr are stale
+      - 'docs/*-openapi.json'
+      - 'api-definitions/**'
+      - '.github/workflows/pr-integration.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # the unit tests need no server: the tools against a canned one, and the
+  # parsers, scoring and SDK generation on their own
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ./.go-version
+      - run: make test
+
+  # one job per suite, so a failure names which layer broke: the client's
+  # view of the API, or the tools' behaviour on top of it
+  integration:
+    name: integration (lib/sonarr against a real Sonarr)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ./.go-version
+
+      # ffmpeg generates the fixture videos, jq parses the setup responses
+      # and openssl mints the provider proxy's CA. ffmpeg is not on the
+      # runner image, so install it rather than assume it is there.
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          command -v ffmpeg jq openssl docker
+
+      # make owns the container lifecycle, so CI runs exactly what a
+      # developer runs rather than a second copy of the same steps. Provider
+      # calls replay from the committed cassettes, so this needs no network
+      # beyond the container image.
+      - name: Run the SDK suite
+        run: make testacc-integration
+
+      - name: Tear down
+        if: always()
+        run: |
+          SONARR_TEST_CONTAINER=sonarr-mcp-integration \
+            SONARR_TEST_DATA="$HOME/.cache/sonarr-mcp/testenv/integration" \
+            scripts/testenv.sh down || true
+
+  acceptance:
+    name: acceptance (tools against a real Sonarr)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ./.go-version
+
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          command -v ffmpeg jq openssl docker
+
+      - name: Run the tool suite
+        run: make testacc-acceptance
+
+      - name: Tear down
+        if: always()
+        run: |
+          SONARR_TEST_CONTAINER=sonarr-mcp-acceptance \
+            SONARR_TEST_DATA="$HOME/.cache/sonarr-mcp/testenv/acceptance" \
+            scripts/testenv.sh down || true
