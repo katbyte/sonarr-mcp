@@ -1,0 +1,204 @@
+{
+  "Name": "QualityDefinition",
+  "Tag": "QualityDefinition",
+  "Operations": [
+    {
+      "Name": "GetQualityDefinition",
+      "Method": "GET",
+      "Path": "/api/v3/qualitydefinition",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "QualityDefinitionResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetQualityDefinitionById",
+      "Method": "GET",
+      "Path": "/api/v3/qualitydefinition/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "QualityDefinitionResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetQualityDefinitionLimits",
+      "Method": "GET",
+      "Path": "/api/v3/qualitydefinition/limits",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "QualityDefinitionLimitsResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PutQualityDefinitionById",
+      "Method": "PUT",
+      "Path": "/api/v3/qualitydefinition/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "QualityDefinitionResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "QualityDefinitionResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    },
+    {
+      "Name": "PutQualityDefinitionUpdate",
+      "Method": "PUT",
+      "Path": "/api/v3/qualitydefinition/update",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "QualityDefinitionResource"
+          }
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "QualityDefinitionResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "QualityDefinitionLimitsResource",
+      "SchemaName": "QualityDefinitionLimitsResource",
+      "Fields": [
+        {
+          "Name": "Max",
+          "JsonName": "max",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Min",
+          "JsonName": "min",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "QualityDefinitionResource",
+      "SchemaName": "QualityDefinitionResource",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "MaxSize",
+          "JsonName": "maxSize",
+          "Type": {
+            "Type": "Double"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "MinSize",
+          "JsonName": "minSize",
+          "Type": {
+            "Type": "Double"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "PreferredSize",
+          "JsonName": "preferredSize",
+          "Type": {
+            "Type": "Double"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Quality",
+          "JsonName": "quality",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "Quality"
+          }
+        },
+        {
+          "Name": "Title",
+          "JsonName": "title",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Weight",
+          "JsonName": "weight",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    }
+  ]
+}

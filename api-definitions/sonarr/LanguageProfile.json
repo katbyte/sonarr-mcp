@@ -1,0 +1,122 @@
+{
+  "Name": "LanguageProfile",
+  "Tag": "LanguageProfile",
+  "Operations": [
+    {
+      "Name": "DeleteLanguageProfileById",
+      "Method": "DELETE",
+      "Path": "/api/v3/languageprofile/{id}",
+      "Deprecated": true,
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetLanguageProfile",
+      "Method": "GET",
+      "Path": "/api/v3/languageprofile",
+      "Deprecated": true,
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "LanguageProfileResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetLanguageProfileById",
+      "Method": "GET",
+      "Path": "/api/v3/languageprofile/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "LanguageProfileResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostLanguageProfile",
+      "Method": "POST",
+      "Path": "/api/v3/languageprofile",
+      "Deprecated": true,
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "LanguageProfileResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "LanguageProfileResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    },
+    {
+      "Name": "PutLanguageProfileById",
+      "Method": "PUT",
+      "Path": "/api/v3/languageprofile/{id}",
+      "Deprecated": true,
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "LanguageProfileResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "LanguageProfileResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ]
+}

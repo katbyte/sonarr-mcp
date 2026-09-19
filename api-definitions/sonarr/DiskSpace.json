@@ -1,0 +1,69 @@
+{
+  "Name": "DiskSpace",
+  "Tag": "DiskSpace",
+  "Operations": [
+    {
+      "Name": "GetDiskSpace",
+      "Method": "GET",
+      "Path": "/api/v3/diskspace",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "DiskSpaceResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "DiskSpaceResource",
+      "SchemaName": "DiskSpaceResource",
+      "Fields": [
+        {
+          "Name": "FreeSpace",
+          "JsonName": "freeSpace",
+          "Type": {
+            "Type": "Integer64"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Label",
+          "JsonName": "label",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Path",
+          "JsonName": "path",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TotalSpace",
+          "JsonName": "totalSpace",
+          "Type": {
+            "Type": "Integer64"
+          }
+        }
+      ]
+    }
+  ]
+}

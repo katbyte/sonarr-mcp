@@ -1,0 +1,139 @@
+{
+  "Name": "Backup",
+  "Tag": "Backup",
+  "Operations": [
+    {
+      "Name": "DeleteSystemBackupById",
+      "Method": "DELETE",
+      "Path": "/api/v3/system/backup/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetSystemBackup",
+      "Method": "GET",
+      "Path": "/api/v3/system/backup",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "BackupResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostSystemBackupRestoreById",
+      "Method": "POST",
+      "Path": "/api/v3/system/backup/restore/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostSystemBackupRestoreUpload",
+      "Method": "POST",
+      "Path": "/api/v3/system/backup/restore/upload",
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "BackupResource",
+      "SchemaName": "BackupResource",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Path",
+          "JsonName": "path",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Size",
+          "JsonName": "size",
+          "Type": {
+            "Type": "Integer64"
+          }
+        },
+        {
+          "Name": "Time",
+          "JsonName": "time",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "Type",
+          "JsonName": "type",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "BackupType"
+          }
+        }
+      ]
+    }
+  ],
+  "Constants": [
+    {
+      "Name": "BackupType",
+      "SchemaName": "BackupType",
+      "Values": [
+        {
+          "Name": "BackupTypeScheduled",
+          "Value": "scheduled"
+        },
+        {
+          "Name": "BackupTypeManual",
+          "Value": "manual"
+        },
+        {
+          "Name": "BackupTypeUpdate",
+          "Value": "update"
+        }
+      ]
+    }
+  ]
+}

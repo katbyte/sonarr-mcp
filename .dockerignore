@@ -1,0 +1,13 @@
+.git
+.github
+.idea
+.tools/bin
+.tools/venv
+dist
+docs
+acceptance/testdata
+integration/testdata
+sonarr-mcp
+*.md
+docker-compose.yml
+.env*

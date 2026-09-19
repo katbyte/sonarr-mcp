@@ -1,0 +1,167 @@
+{
+  "Name": "RootFolder",
+  "Tag": "RootFolder",
+  "Operations": [
+    {
+      "Name": "DeleteRootFolderById",
+      "Method": "DELETE",
+      "Path": "/api/v3/rootfolder/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetRootFolder",
+      "Method": "GET",
+      "Path": "/api/v3/rootfolder",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "RootFolderResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetRootFolderById",
+      "Method": "GET",
+      "Path": "/api/v3/rootfolder/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "RootFolderResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostRootFolder",
+      "Method": "POST",
+      "Path": "/api/v3/rootfolder",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "RootFolderResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "RootFolderResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "RootFolderResource",
+      "SchemaName": "RootFolderResource",
+      "Fields": [
+        {
+          "Name": "Accessible",
+          "JsonName": "accessible",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "FreeSpace",
+          "JsonName": "freeSpace",
+          "Type": {
+            "Type": "Integer64"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Path",
+          "JsonName": "path",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "UnmappedFolders",
+          "JsonName": "unmappedFolders",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "UnmappedFolder"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "UnmappedFolder",
+      "SchemaName": "UnmappedFolder",
+      "Fields": [
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Path",
+          "JsonName": "path",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "RelativePath",
+          "JsonName": "relativePath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ]
+}

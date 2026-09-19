@@ -1,0 +1,526 @@
+{
+  "Name": "Notification",
+  "Tag": "Notification",
+  "Operations": [
+    {
+      "Name": "DeleteNotificationById",
+      "Method": "DELETE",
+      "Path": "/api/v3/notification/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetNotification",
+      "Method": "GET",
+      "Path": "/api/v3/notification",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "NotificationResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetNotificationById",
+      "Method": "GET",
+      "Path": "/api/v3/notification/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "NotificationResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetNotificationSchema",
+      "Method": "GET",
+      "Path": "/api/v3/notification/schema",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "NotificationResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostNotification",
+      "Method": "POST",
+      "Path": "/api/v3/notification",
+      "Options": [
+        {
+          "Name": "forceSave",
+          "Field": "ForceSave",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "NotificationResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "NotificationResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ]
+    },
+    {
+      "Name": "PostNotificationActionByName",
+      "Method": "POST",
+      "Path": "/api/v3/notification/action/{name}",
+      "PathParameters": [
+        {
+          "Name": "name",
+          "Argument": "name",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "NotificationResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostNotificationTest",
+      "Method": "POST",
+      "Path": "/api/v3/notification/test",
+      "Options": [
+        {
+          "Name": "forceTest",
+          "Field": "ForceTest",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "NotificationResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostNotificationTestAll",
+      "Method": "POST",
+      "Path": "/api/v3/notification/testall",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "ProviderTestAllResult"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PutNotificationById",
+      "Method": "PUT",
+      "Path": "/api/v3/notification/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Options": [
+        {
+          "Name": "forceSave",
+          "Field": "ForceSave",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "NotificationResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "NotificationResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "NotificationResource",
+      "SchemaName": "NotificationResource",
+      "Fields": [
+        {
+          "Name": "ConfigContract",
+          "JsonName": "configContract",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Fields",
+          "JsonName": "fields",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "Field"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Implementation",
+          "JsonName": "implementation",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ImplementationName",
+          "JsonName": "implementationName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "IncludeHealthWarnings",
+          "JsonName": "includeHealthWarnings",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "InfoLink",
+          "JsonName": "infoLink",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Link",
+          "JsonName": "link",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Message",
+          "JsonName": "message",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ProviderMessage"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "OnApplicationUpdate",
+          "JsonName": "onApplicationUpdate",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnDownload",
+          "JsonName": "onDownload",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnEpisodeFileDelete",
+          "JsonName": "onEpisodeFileDelete",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnEpisodeFileDeleteForUpgrade",
+          "JsonName": "onEpisodeFileDeleteForUpgrade",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnGrab",
+          "JsonName": "onGrab",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnHealthIssue",
+          "JsonName": "onHealthIssue",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnHealthRestored",
+          "JsonName": "onHealthRestored",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnImportComplete",
+          "JsonName": "onImportComplete",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnManualInteractionRequired",
+          "JsonName": "onManualInteractionRequired",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnRename",
+          "JsonName": "onRename",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnSeriesAdd",
+          "JsonName": "onSeriesAdd",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnSeriesDelete",
+          "JsonName": "onSeriesDelete",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "OnUpgrade",
+          "JsonName": "onUpgrade",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Presets",
+          "JsonName": "presets",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "NotificationResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SupportsOnApplicationUpdate",
+          "JsonName": "supportsOnApplicationUpdate",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnDownload",
+          "JsonName": "supportsOnDownload",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnEpisodeFileDelete",
+          "JsonName": "supportsOnEpisodeFileDelete",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnEpisodeFileDeleteForUpgrade",
+          "JsonName": "supportsOnEpisodeFileDeleteForUpgrade",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnGrab",
+          "JsonName": "supportsOnGrab",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnHealthIssue",
+          "JsonName": "supportsOnHealthIssue",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnHealthRestored",
+          "JsonName": "supportsOnHealthRestored",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnImportComplete",
+          "JsonName": "supportsOnImportComplete",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnManualInteractionRequired",
+          "JsonName": "supportsOnManualInteractionRequired",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnRename",
+          "JsonName": "supportsOnRename",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnSeriesAdd",
+          "JsonName": "supportsOnSeriesAdd",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnSeriesDelete",
+          "JsonName": "supportsOnSeriesDelete",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SupportsOnUpgrade",
+          "JsonName": "supportsOnUpgrade",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Tags",
+          "JsonName": "tags",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TestCommand",
+          "JsonName": "testCommand",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ]
+}

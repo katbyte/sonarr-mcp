@@ -1,0 +1,38 @@
+{
+  "Name": "QueueAction",
+  "Tag": "QueueAction",
+  "Operations": [
+    {
+      "Name": "PostQueueGrabBulk",
+      "Method": "POST",
+      "Path": "/api/v3/queue/grab/bulk",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "QueueBulkResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostQueueGrabById",
+      "Method": "POST",
+      "Path": "/api/v3/queue/grab/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

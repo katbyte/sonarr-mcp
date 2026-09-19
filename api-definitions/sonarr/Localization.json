@@ -1,0 +1,100 @@
+{
+  "Name": "Localization",
+  "Tag": "Localization",
+  "Operations": [
+    {
+      "Name": "GetLocalization",
+      "Method": "GET",
+      "Path": "/api/v3/localization",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "LocalizationResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetLocalizationById",
+      "Method": "GET",
+      "Path": "/api/v3/localization/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "LocalizationResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetLocalizationLanguage",
+      "Method": "GET",
+      "Path": "/api/v3/localization/language",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "LocalizationLanguageResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "LocalizationLanguageResource",
+      "SchemaName": "LocalizationLanguageResource",
+      "Fields": [
+        {
+          "Name": "Identifier",
+          "JsonName": "identifier",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "LocalizationResource",
+      "SchemaName": "LocalizationResource",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Strings",
+          "JsonName": "strings",
+          "Type": {
+            "Type": "Dictionary",
+            "NestedItem": {
+              "Type": "String"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ]
+}

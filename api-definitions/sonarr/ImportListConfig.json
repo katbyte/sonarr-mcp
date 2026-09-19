@@ -1,0 +1,130 @@
+{
+  "Name": "ImportListConfig",
+  "Tag": "ImportListConfig",
+  "Operations": [
+    {
+      "Name": "GetConfigImportList",
+      "Method": "GET",
+      "Path": "/api/v3/config/importlist",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetConfigImportListById",
+      "Method": "GET",
+      "Path": "/api/v3/config/importlist/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PutConfigImportListById",
+      "Method": "PUT",
+      "Path": "/api/v3/config/importlist/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListConfigResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "ImportListConfigResource",
+      "SchemaName": "ImportListConfigResource",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "ListSyncLevel",
+          "JsonName": "listSyncLevel",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ListSyncLevelType"
+          }
+        },
+        {
+          "Name": "ListSyncTag",
+          "JsonName": "listSyncTag",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    }
+  ],
+  "Constants": [
+    {
+      "Name": "ListSyncLevelType",
+      "SchemaName": "ListSyncLevelType",
+      "Values": [
+        {
+          "Name": "ListSyncLevelTypeDisabled",
+          "Value": "disabled"
+        },
+        {
+          "Name": "ListSyncLevelTypeLogOnly",
+          "Value": "logOnly"
+        },
+        {
+          "Name": "ListSyncLevelTypeKeepAndUnmonitor",
+          "Value": "keepAndUnmonitor"
+        },
+        {
+          "Name": "ListSyncLevelTypeKeepAndTag",
+          "Value": "keepAndTag"
+        }
+      ]
+    }
+  ]
+}

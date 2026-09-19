@@ -1,0 +1,442 @@
+{
+  "Name": "HostConfig",
+  "Tag": "HostConfig",
+  "Operations": [
+    {
+      "Name": "GetConfigHost",
+      "Method": "GET",
+      "Path": "/api/v3/config/host",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "HostConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetConfigHostById",
+      "Method": "GET",
+      "Path": "/api/v3/config/host/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "HostConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PutConfigHostById",
+      "Method": "PUT",
+      "Path": "/api/v3/config/host/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "HostConfigResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "HostConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "HostConfigResource",
+      "SchemaName": "HostConfigResource",
+      "Fields": [
+        {
+          "Name": "AllowedHosts",
+          "JsonName": "allowedHosts",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "AnalyticsEnabled",
+          "JsonName": "analyticsEnabled",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "ApiKey",
+          "JsonName": "apiKey",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ApplicationUrl",
+          "JsonName": "applicationUrl",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "AuthenticationMethod",
+          "JsonName": "authenticationMethod",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "AuthenticationType"
+          }
+        },
+        {
+          "Name": "AuthenticationRequired",
+          "JsonName": "authenticationRequired",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "AuthenticationRequiredType"
+          }
+        },
+        {
+          "Name": "BackupFolder",
+          "JsonName": "backupFolder",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "BackupInterval",
+          "JsonName": "backupInterval",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "BackupRetention",
+          "JsonName": "backupRetention",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "BindAddress",
+          "JsonName": "bindAddress",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Branch",
+          "JsonName": "branch",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "CertificateValidation",
+          "JsonName": "certificateValidation",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "CertificateValidationType"
+          }
+        },
+        {
+          "Name": "ConsoleLogLevel",
+          "JsonName": "consoleLogLevel",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EnableSsl",
+          "JsonName": "enableSsl",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "InstanceName",
+          "JsonName": "instanceName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "LaunchBrowser",
+          "JsonName": "launchBrowser",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "LogLevel",
+          "JsonName": "logLevel",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "LogSizeLimit",
+          "JsonName": "logSizeLimit",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Password",
+          "JsonName": "password",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "PasswordConfirmation",
+          "JsonName": "passwordConfirmation",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Port",
+          "JsonName": "port",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "ProxyBypassFilter",
+          "JsonName": "proxyBypassFilter",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ProxyBypassLocalAddresses",
+          "JsonName": "proxyBypassLocalAddresses",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "ProxyEnabled",
+          "JsonName": "proxyEnabled",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "ProxyHostname",
+          "JsonName": "proxyHostname",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ProxyPassword",
+          "JsonName": "proxyPassword",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ProxyPort",
+          "JsonName": "proxyPort",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "ProxyType",
+          "JsonName": "proxyType",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ProxyType"
+          }
+        },
+        {
+          "Name": "ProxyUsername",
+          "JsonName": "proxyUsername",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SslCertPassword",
+          "JsonName": "sslCertPassword",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SslCertPath",
+          "JsonName": "sslCertPath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SslPort",
+          "JsonName": "sslPort",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "TrustCgnatIpAddresses",
+          "JsonName": "trustCgnatIpAddresses",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "TrustedNetworks",
+          "JsonName": "trustedNetworks",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "UpdateAutomatically",
+          "JsonName": "updateAutomatically",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "UpdateMechanism",
+          "JsonName": "updateMechanism",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "UpdateMechanism"
+          }
+        },
+        {
+          "Name": "UpdateScriptPath",
+          "JsonName": "updateScriptPath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "UrlBase",
+          "JsonName": "urlBase",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Username",
+          "JsonName": "username",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ],
+  "Constants": [
+    {
+      "Name": "AuthenticationRequiredType",
+      "SchemaName": "AuthenticationRequiredType",
+      "Values": [
+        {
+          "Name": "AuthenticationRequiredTypeEnabled",
+          "Value": "enabled"
+        },
+        {
+          "Name": "AuthenticationRequiredTypeDisabledForLocalAddresses",
+          "Value": "disabledForLocalAddresses"
+        }
+      ]
+    },
+    {
+      "Name": "CertificateValidationType",
+      "SchemaName": "CertificateValidationType",
+      "Values": [
+        {
+          "Name": "CertificateValidationTypeEnabled",
+          "Value": "enabled"
+        },
+        {
+          "Name": "CertificateValidationTypeDisabledForLocalAddresses",
+          "Value": "disabledForLocalAddresses"
+        },
+        {
+          "Name": "CertificateValidationTypeDisabled",
+          "Value": "disabled"
+        }
+      ]
+    },
+    {
+      "Name": "ProxyType",
+      "SchemaName": "ProxyType",
+      "Values": [
+        {
+          "Name": "ProxyTypeHttp",
+          "Value": "http"
+        },
+        {
+          "Name": "ProxyTypeSocks4",
+          "Value": "socks4"
+        },
+        {
+          "Name": "ProxyTypeSocks5",
+          "Value": "socks5"
+        }
+      ]
+    }
+  ]
+}

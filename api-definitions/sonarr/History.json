@@ -1,0 +1,501 @@
+{
+  "Name": "History",
+  "Tag": "History",
+  "Operations": [
+    {
+      "Name": "GetHistory",
+      "Method": "GET",
+      "Path": "/api/v3/history",
+      "Options": [
+        {
+          "Name": "page",
+          "Field": "Page",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "pageSize",
+          "Field": "PageSize",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "sortKey",
+          "Field": "SortKey",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "sortDirection",
+          "Field": "SortDirection",
+          "In": "Query",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SortDirection"
+          }
+        },
+        {
+          "Name": "includeSeries",
+          "Field": "IncludeSeries",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "includeEpisode",
+          "Field": "IncludeEpisode",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "eventType",
+          "Field": "EventType",
+          "In": "Query",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          }
+        },
+        {
+          "Name": "episodeId",
+          "Field": "EpisodeId",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "downloadId",
+          "Field": "DownloadId",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "seriesIds",
+          "Field": "SeriesIds",
+          "In": "Query",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          }
+        },
+        {
+          "Name": "languages",
+          "Field": "Languages",
+          "In": "Query",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          }
+        },
+        {
+          "Name": "quality",
+          "Field": "Quality",
+          "In": "Query",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "HistoryResourcePagingResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ],
+      "Pageable": {
+        "PageOption": "Page",
+        "PageSizeOption": "PageSize",
+        "RecordsField": "Records",
+        "TotalField": "TotalRecords",
+        "ItemType": {
+          "Type": "Reference",
+          "ReferenceName": "HistoryResource"
+        }
+      }
+    },
+    {
+      "Name": "GetHistorySeries",
+      "Method": "GET",
+      "Path": "/api/v3/history/series",
+      "Options": [
+        {
+          "Name": "seriesId",
+          "Field": "SeriesId",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "seasonNumber",
+          "Field": "SeasonNumber",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "eventType",
+          "Field": "EventType",
+          "In": "Query",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "EpisodeHistoryEventType"
+          }
+        },
+        {
+          "Name": "includeSeries",
+          "Field": "IncludeSeries",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "includeEpisode",
+          "Field": "IncludeEpisode",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "HistoryResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetHistorySince",
+      "Method": "GET",
+      "Path": "/api/v3/history/since",
+      "Options": [
+        {
+          "Name": "date",
+          "Field": "Date",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "eventType",
+          "Field": "EventType",
+          "In": "Query",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "EpisodeHistoryEventType"
+          }
+        },
+        {
+          "Name": "includeSeries",
+          "Field": "IncludeSeries",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "includeEpisode",
+          "Field": "IncludeEpisode",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "HistoryResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostHistoryFailedById",
+      "Method": "POST",
+      "Path": "/api/v3/history/failed/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "HistoryResource",
+      "SchemaName": "HistoryResource",
+      "Fields": [
+        {
+          "Name": "CustomFormatScore",
+          "JsonName": "customFormatScore",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "CustomFormats",
+          "JsonName": "customFormats",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "CustomFormatResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Data",
+          "JsonName": "data",
+          "Type": {
+            "Type": "Dictionary",
+            "NestedItem": {
+              "Type": "String"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Date",
+          "JsonName": "date",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "DownloadId",
+          "JsonName": "downloadId",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Episode",
+          "JsonName": "episode",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "EpisodeResource"
+          }
+        },
+        {
+          "Name": "EpisodeId",
+          "JsonName": "episodeId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "EventType",
+          "JsonName": "eventType",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "EpisodeHistoryEventType"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Languages",
+          "JsonName": "languages",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "Language"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Quality",
+          "JsonName": "quality",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "QualityModel"
+          }
+        },
+        {
+          "Name": "QualityCutoffNotMet",
+          "JsonName": "qualityCutoffNotMet",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Series",
+          "JsonName": "series",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesResource"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "SourceTitle",
+          "JsonName": "sourceTitle",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "HistoryResourcePagingResource",
+      "SchemaName": "HistoryResourcePagingResource",
+      "Fields": [
+        {
+          "Name": "Page",
+          "JsonName": "page",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "PageSize",
+          "JsonName": "pageSize",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Records",
+          "JsonName": "records",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "HistoryResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SortDirection",
+          "JsonName": "sortDirection",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SortDirection"
+          }
+        },
+        {
+          "Name": "SortKey",
+          "JsonName": "sortKey",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TotalRecords",
+          "JsonName": "totalRecords",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    }
+  ],
+  "Constants": [
+    {
+      "Name": "EpisodeHistoryEventType",
+      "SchemaName": "EpisodeHistoryEventType",
+      "Values": [
+        {
+          "Name": "EpisodeHistoryEventTypeUnknown",
+          "Value": "unknown"
+        },
+        {
+          "Name": "EpisodeHistoryEventTypeGrabbed",
+          "Value": "grabbed"
+        },
+        {
+          "Name": "EpisodeHistoryEventTypeSeriesFolderImported",
+          "Value": "seriesFolderImported"
+        },
+        {
+          "Name": "EpisodeHistoryEventTypeDownloadFolderImported",
+          "Value": "downloadFolderImported"
+        },
+        {
+          "Name": "EpisodeHistoryEventTypeDownloadFailed",
+          "Value": "downloadFailed"
+        },
+        {
+          "Name": "EpisodeHistoryEventTypeEpisodeFileDeleted",
+          "Value": "episodeFileDeleted"
+        },
+        {
+          "Name": "EpisodeHistoryEventTypeEpisodeFileRenamed",
+          "Value": "episodeFileRenamed"
+        },
+        {
+          "Name": "EpisodeHistoryEventTypeDownloadIgnored",
+          "Value": "downloadIgnored"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "Name": "SeriesLookup",
+  "Tag": "SeriesLookup",
+  "Operations": [
+    {
+      "Name": "GetSeriesLookup",
+      "Method": "GET",
+      "Path": "/api/v3/series/lookup",
+      "Options": [
+        {
+          "Name": "term",
+          "Field": "Term",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

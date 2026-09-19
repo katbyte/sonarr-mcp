@@ -1,0 +1,47 @@
+{
+  "Name": "LogFile",
+  "Tag": "LogFile",
+  "Operations": [
+    {
+      "Name": "GetLogFile",
+      "Method": "GET",
+      "Path": "/api/v3/log/file",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "LogFileResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetLogFileByFilename",
+      "Method": "GET",
+      "Path": "/api/v3/log/file/{filename}",
+      "PathParameters": [
+        {
+          "Name": "filename",
+          "Argument": "filename",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "text/plain",
+        "Type": {
+          "Type": "RawFile"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

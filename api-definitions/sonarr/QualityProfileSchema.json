@@ -1,0 +1,21 @@
+{
+  "Name": "QualityProfileSchema",
+  "Tag": "QualityProfileSchema",
+  "Operations": [
+    {
+      "Name": "GetQualityProfileSchema",
+      "Method": "GET",
+      "Path": "/api/v3/qualityprofile/schema",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "QualityProfileResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

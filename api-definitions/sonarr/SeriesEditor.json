@@ -1,0 +1,153 @@
+{
+  "Name": "SeriesEditor",
+  "Tag": "SeriesEditor",
+  "Operations": [
+    {
+      "Name": "DeleteSeriesEditor",
+      "Method": "DELETE",
+      "Path": "/api/v3/series/editor",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "SeriesEditorResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PutSeriesEditor",
+      "Method": "PUT",
+      "Path": "/api/v3/series/editor",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "SeriesEditorResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "SeriesEditorResource",
+      "SchemaName": "SeriesEditorResource",
+      "Fields": [
+        {
+          "Name": "AddImportListExclusion",
+          "JsonName": "addImportListExclusion",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "ApplyTags",
+          "JsonName": "applyTags",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ApplyTags"
+          }
+        },
+        {
+          "Name": "DeleteFiles",
+          "JsonName": "deleteFiles",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "MonitorNewItems",
+          "JsonName": "monitorNewItems",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "NewItemMonitorTypes"
+          }
+        },
+        {
+          "Name": "Monitored",
+          "JsonName": "monitored",
+          "Type": {
+            "Type": "Boolean"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "MoveFiles",
+          "JsonName": "moveFiles",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "QualityProfileId",
+          "JsonName": "qualityProfileId",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "RootFolderPath",
+          "JsonName": "rootFolderPath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeasonFolder",
+          "JsonName": "seasonFolder",
+          "Type": {
+            "Type": "Boolean"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeriesIds",
+          "JsonName": "seriesIds",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeriesType",
+          "JsonName": "seriesType",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesTypes"
+          }
+        },
+        {
+          "Name": "Tags",
+          "JsonName": "tags",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,301 @@
+{
+  "Name": "Queue",
+  "Tag": "Queue",
+  "Operations": [
+    {
+      "Name": "DeleteQueueBulk",
+      "Method": "DELETE",
+      "Path": "/api/v3/queue/bulk",
+      "Options": [
+        {
+          "Name": "removeFromClient",
+          "Field": "RemoveFromClient",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "blocklist",
+          "Field": "Blocklist",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "skipRedownload",
+          "Field": "SkipRedownload",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "changeCategory",
+          "Field": "ChangeCategory",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "QueueBulkResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "DeleteQueueById",
+      "Method": "DELETE",
+      "Path": "/api/v3/queue/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Options": [
+        {
+          "Name": "removeFromClient",
+          "Field": "RemoveFromClient",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "blocklist",
+          "Field": "Blocklist",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "skipRedownload",
+          "Field": "SkipRedownload",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "changeCategory",
+          "Field": "ChangeCategory",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetQueue",
+      "Method": "GET",
+      "Path": "/api/v3/queue",
+      "Options": [
+        {
+          "Name": "page",
+          "Field": "Page",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "pageSize",
+          "Field": "PageSize",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "sortKey",
+          "Field": "SortKey",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "sortDirection",
+          "Field": "SortDirection",
+          "In": "Query",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SortDirection"
+          }
+        },
+        {
+          "Name": "includeUnknownSeriesItems",
+          "Field": "IncludeUnknownSeriesItems",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "includeSeries",
+          "Field": "IncludeSeries",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "includeEpisode",
+          "Field": "IncludeEpisode",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "seriesIds",
+          "Field": "SeriesIds",
+          "In": "Query",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          }
+        },
+        {
+          "Name": "protocol",
+          "Field": "Protocol",
+          "In": "Query",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "DownloadProtocol"
+          }
+        },
+        {
+          "Name": "languages",
+          "Field": "Languages",
+          "In": "Query",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          }
+        },
+        {
+          "Name": "quality",
+          "Field": "Quality",
+          "In": "Query",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          }
+        },
+        {
+          "Name": "status",
+          "Field": "Status",
+          "In": "Query",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "QueueStatus"
+            }
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "QueueResourcePagingResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ],
+      "Pageable": {
+        "PageOption": "Page",
+        "PageSizeOption": "PageSize",
+        "RecordsField": "Records",
+        "TotalField": "TotalRecords",
+        "ItemType": {
+          "Type": "Reference",
+          "ReferenceName": "QueueResource"
+        }
+      }
+    }
+  ],
+  "Models": [
+    {
+      "Name": "QueueResourcePagingResource",
+      "SchemaName": "QueueResourcePagingResource",
+      "Fields": [
+        {
+          "Name": "Page",
+          "JsonName": "page",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "PageSize",
+          "JsonName": "pageSize",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Records",
+          "JsonName": "records",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "QueueResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SortDirection",
+          "JsonName": "sortDirection",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SortDirection"
+          }
+        },
+        {
+          "Name": "SortKey",
+          "JsonName": "sortKey",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TotalRecords",
+          "JsonName": "totalRecords",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    }
+  ]
+}

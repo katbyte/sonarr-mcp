@@ -1,0 +1,94 @@
+{
+  "Name": "Health",
+  "Tag": "Health",
+  "Operations": [
+    {
+      "Name": "GetHealth",
+      "Method": "GET",
+      "Path": "/api/v3/health",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "HealthResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "HealthResource",
+      "SchemaName": "HealthResource",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Message",
+          "JsonName": "message",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Source",
+          "JsonName": "source",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Type",
+          "JsonName": "type",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "HealthCheckResult"
+          }
+        },
+        {
+          "Name": "WikiUrl",
+          "JsonName": "wikiUrl",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "Constants": [
+    {
+      "Name": "HealthCheckResult",
+      "SchemaName": "HealthCheckResult",
+      "Values": [
+        {
+          "Name": "HealthCheckResultOk",
+          "Value": "ok"
+        },
+        {
+          "Name": "HealthCheckResultNotice",
+          "Value": "notice"
+        },
+        {
+          "Name": "HealthCheckResultWarning",
+          "Value": "warning"
+        },
+        {
+          "Name": "HealthCheckResultError",
+          "Value": "error"
+        }
+      ]
+    }
+  ]
+}

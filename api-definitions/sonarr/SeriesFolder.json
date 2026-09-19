@@ -1,0 +1,29 @@
+{
+  "Name": "SeriesFolder",
+  "Tag": "SeriesFolder",
+  "Operations": [
+    {
+      "Name": "GetSeriesByIdFolder",
+      "Method": "GET",
+      "Path": "/api/v3/series/{id}/folder",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "RawObject"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

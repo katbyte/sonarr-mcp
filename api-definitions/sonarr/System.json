@@ -1,0 +1,351 @@
+{
+  "Name": "System",
+  "Tag": "System",
+  "Operations": [
+    {
+      "Name": "GetSystemRoutes",
+      "Method": "GET",
+      "Path": "/api/v3/system/routes",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "RawObject"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetSystemRoutesDuplicate",
+      "Method": "GET",
+      "Path": "/api/v3/system/routes/duplicate",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "RawObject"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetSystemStatus",
+      "Method": "GET",
+      "Path": "/api/v3/system/status",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "SystemResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostSystemRestart",
+      "Method": "POST",
+      "Path": "/api/v3/system/restart",
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostSystemShutdown",
+      "Method": "POST",
+      "Path": "/api/v3/system/shutdown",
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "SystemResource",
+      "SchemaName": "SystemResource",
+      "Fields": [
+        {
+          "Name": "AppData",
+          "JsonName": "appData",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "AppName",
+          "JsonName": "appName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Authentication",
+          "JsonName": "authentication",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "AuthenticationType"
+          }
+        },
+        {
+          "Name": "Branch",
+          "JsonName": "branch",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "BuildTime",
+          "JsonName": "buildTime",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "DatabaseType",
+          "JsonName": "databaseType",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "DatabaseType"
+          }
+        },
+        {
+          "Name": "DatabaseVersion",
+          "JsonName": "databaseVersion",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "InstanceName",
+          "JsonName": "instanceName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "IsAdmin",
+          "JsonName": "isAdmin",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsDebug",
+          "JsonName": "isDebug",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsDocker",
+          "JsonName": "isDocker",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsLinux",
+          "JsonName": "isLinux",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsNetCore",
+          "JsonName": "isNetCore",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsOsx",
+          "JsonName": "isOsx",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsProduction",
+          "JsonName": "isProduction",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsUserInteractive",
+          "JsonName": "isUserInteractive",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsWindows",
+          "JsonName": "isWindows",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "MigrationVersion",
+          "JsonName": "migrationVersion",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Mode",
+          "JsonName": "mode",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "RuntimeMode"
+          }
+        },
+        {
+          "Name": "OsName",
+          "JsonName": "osName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "OsVersion",
+          "JsonName": "osVersion",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "PackageAuthor",
+          "JsonName": "packageAuthor",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "PackageUpdateMechanism",
+          "JsonName": "packageUpdateMechanism",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "UpdateMechanism"
+          }
+        },
+        {
+          "Name": "PackageUpdateMechanismMessage",
+          "JsonName": "packageUpdateMechanismMessage",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "PackageVersion",
+          "JsonName": "packageVersion",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "RuntimeName",
+          "JsonName": "runtimeName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "RuntimeVersion",
+          "JsonName": "runtimeVersion",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SqliteVersion",
+          "JsonName": "sqliteVersion",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "StartTime",
+          "JsonName": "startTime",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "StartupPath",
+          "JsonName": "startupPath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "UrlBase",
+          "JsonName": "urlBase",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Version",
+          "JsonName": "version",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ],
+  "Constants": [
+    {
+      "Name": "DatabaseType",
+      "SchemaName": "DatabaseType",
+      "Values": [
+        {
+          "Name": "DatabaseTypeSqLite",
+          "Value": "sqLite"
+        },
+        {
+          "Name": "DatabaseTypePostgreSQL",
+          "Value": "postgreSQL"
+        }
+      ]
+    },
+    {
+      "Name": "RuntimeMode",
+      "SchemaName": "RuntimeMode",
+      "Values": [
+        {
+          "Name": "RuntimeModeConsole",
+          "Value": "console"
+        },
+        {
+          "Name": "RuntimeModeService",
+          "Value": "service"
+        },
+        {
+          "Name": "RuntimeModeTray",
+          "Value": "tray"
+        }
+      ]
+    }
+  ]
+}

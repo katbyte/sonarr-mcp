@@ -1,0 +1,11 @@
+.claude/
+.DS_Store
+.idea/
+dist/
+/sonarr-mcp
+.tools/bin/
+.tools/venv/
+.env
+.sonarr-mcp
+.testenv*.sh
+.coverage/

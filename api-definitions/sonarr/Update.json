@@ -1,0 +1,151 @@
+{
+  "Name": "Update",
+  "Tag": "Update",
+  "Operations": [
+    {
+      "Name": "GetUpdate",
+      "Method": "GET",
+      "Path": "/api/v3/update",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "UpdateResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "UpdateChanges",
+      "SchemaName": "UpdateChanges",
+      "Fields": [
+        {
+          "Name": "Fixed",
+          "JsonName": "fixed",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "String"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "New",
+          "JsonName": "new",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "String"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "UpdateResource",
+      "SchemaName": "UpdateResource",
+      "Fields": [
+        {
+          "Name": "Branch",
+          "JsonName": "branch",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Changes",
+          "JsonName": "changes",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "UpdateChanges"
+          }
+        },
+        {
+          "Name": "FileName",
+          "JsonName": "fileName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Hash",
+          "JsonName": "hash",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Installable",
+          "JsonName": "installable",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Installed",
+          "JsonName": "installed",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "InstalledOn",
+          "JsonName": "installedOn",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Latest",
+          "JsonName": "latest",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "ReleaseDate",
+          "JsonName": "releaseDate",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "Url",
+          "JsonName": "url",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Version",
+          "JsonName": "version",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ]
+}

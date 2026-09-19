@@ -1,0 +1,94 @@
+{
+  "Name": "FileSystem",
+  "Tag": "FileSystem",
+  "Operations": [
+    {
+      "Name": "GetFileSystem",
+      "Method": "GET",
+      "Path": "/api/v3/filesystem",
+      "Options": [
+        {
+          "Name": "path",
+          "Field": "Path",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "includeFiles",
+          "Field": "IncludeFiles",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "allowFoldersWithoutTrailingSlashes",
+          "Field": "AllowFoldersWithoutTrailingSlashes",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "RawObject"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetFileSystemMediaFiles",
+      "Method": "GET",
+      "Path": "/api/v3/filesystem/mediafiles",
+      "Options": [
+        {
+          "Name": "path",
+          "Field": "Path",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "RawObject"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetFileSystemType",
+      "Method": "GET",
+      "Path": "/api/v3/filesystem/type",
+      "Options": [
+        {
+          "Name": "path",
+          "Field": "Path",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "RawObject"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

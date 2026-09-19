@@ -1,0 +1,159 @@
+{
+  "Name": "UiConfig",
+  "Tag": "UiConfig",
+  "Operations": [
+    {
+      "Name": "GetConfigUi",
+      "Method": "GET",
+      "Path": "/api/v3/config/ui",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "UiConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetConfigUiById",
+      "Method": "GET",
+      "Path": "/api/v3/config/ui/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "UiConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PutConfigUiById",
+      "Method": "PUT",
+      "Path": "/api/v3/config/ui/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "UiConfigResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "UiConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "UiConfigResource",
+      "SchemaName": "UiConfigResource",
+      "Fields": [
+        {
+          "Name": "CalendarWeekColumnHeader",
+          "JsonName": "calendarWeekColumnHeader",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EnableColorImpairedMode",
+          "JsonName": "enableColorImpairedMode",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "FirstDayOfWeek",
+          "JsonName": "firstDayOfWeek",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "LongDateFormat",
+          "JsonName": "longDateFormat",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ShortDateFormat",
+          "JsonName": "shortDateFormat",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ShowRelativeDates",
+          "JsonName": "showRelativeDates",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Theme",
+          "JsonName": "theme",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TimeFormat",
+          "JsonName": "timeFormat",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "UiLanguage",
+          "JsonName": "uiLanguage",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    }
+  ]
+}

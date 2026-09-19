@@ -1,0 +1,20 @@
+{
+  "Name": "ApiInfo",
+  "Tag": "ApiInfo",
+  "Operations": [
+    {
+      "Name": "GetApi",
+      "Method": "GET",
+      "Path": "/api",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "RawObject"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

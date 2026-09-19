@@ -1,0 +1,34 @@
+{
+  "Name": "SeriesImport",
+  "Tag": "SeriesImport",
+  "Operations": [
+    {
+      "Name": "PostSeriesImport",
+      "Method": "POST",
+      "Path": "/api/v3/series/import",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesResource"
+          }
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

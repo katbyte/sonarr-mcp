@@ -1,0 +1,22 @@
+{
+  "Name": "LanguageProfileSchema",
+  "Tag": "LanguageProfileSchema",
+  "Operations": [
+    {
+      "Name": "GetLanguageProfileSchema",
+      "Method": "GET",
+      "Path": "/api/v3/languageprofile/schema",
+      "Deprecated": true,
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "LanguageProfileResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

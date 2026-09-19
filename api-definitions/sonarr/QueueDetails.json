@@ -1,0 +1,61 @@
+{
+  "Name": "QueueDetails",
+  "Tag": "QueueDetails",
+  "Operations": [
+    {
+      "Name": "GetQueueDetails",
+      "Method": "GET",
+      "Path": "/api/v3/queue/details",
+      "Options": [
+        {
+          "Name": "seriesId",
+          "Field": "SeriesId",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "episodeIds",
+          "Field": "EpisodeIds",
+          "In": "Query",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          }
+        },
+        {
+          "Name": "includeSeries",
+          "Field": "IncludeSeries",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "includeEpisode",
+          "Field": "IncludeEpisode",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "QueueResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

@@ -1,0 +1,305 @@
+{
+  "Name": "Blocklist",
+  "Tag": "Blocklist",
+  "Operations": [
+    {
+      "Name": "DeleteBlocklistBulk",
+      "Method": "DELETE",
+      "Path": "/api/v3/blocklist/bulk",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "BlocklistBulkResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "DeleteBlocklistById",
+      "Method": "DELETE",
+      "Path": "/api/v3/blocklist/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetBlocklist",
+      "Method": "GET",
+      "Path": "/api/v3/blocklist",
+      "Options": [
+        {
+          "Name": "page",
+          "Field": "Page",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "pageSize",
+          "Field": "PageSize",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "sortKey",
+          "Field": "SortKey",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "sortDirection",
+          "Field": "SortDirection",
+          "In": "Query",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SortDirection"
+          }
+        },
+        {
+          "Name": "seriesIds",
+          "Field": "SeriesIds",
+          "In": "Query",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          }
+        },
+        {
+          "Name": "protocols",
+          "Field": "Protocols",
+          "In": "Query",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "DownloadProtocol"
+            }
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "BlocklistResourcePagingResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ],
+      "Pageable": {
+        "PageOption": "Page",
+        "PageSizeOption": "PageSize",
+        "RecordsField": "Records",
+        "TotalField": "TotalRecords",
+        "ItemType": {
+          "Type": "Reference",
+          "ReferenceName": "BlocklistResource"
+        }
+      }
+    }
+  ],
+  "Models": [
+    {
+      "Name": "BlocklistBulkResource",
+      "SchemaName": "BlocklistBulkResource",
+      "Fields": [
+        {
+          "Name": "Ids",
+          "JsonName": "ids",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "BlocklistResource",
+      "SchemaName": "BlocklistResource",
+      "Fields": [
+        {
+          "Name": "CustomFormats",
+          "JsonName": "customFormats",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "CustomFormatResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Date",
+          "JsonName": "date",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "EpisodeIds",
+          "JsonName": "episodeIds",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Indexer",
+          "JsonName": "indexer",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Languages",
+          "JsonName": "languages",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "Language"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Message",
+          "JsonName": "message",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Protocol",
+          "JsonName": "protocol",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "DownloadProtocol"
+          }
+        },
+        {
+          "Name": "Quality",
+          "JsonName": "quality",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "QualityModel"
+          }
+        },
+        {
+          "Name": "Series",
+          "JsonName": "series",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesResource"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "SourceTitle",
+          "JsonName": "sourceTitle",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "BlocklistResourcePagingResource",
+      "SchemaName": "BlocklistResourcePagingResource",
+      "Fields": [
+        {
+          "Name": "Page",
+          "JsonName": "page",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "PageSize",
+          "JsonName": "pageSize",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Records",
+          "JsonName": "records",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "BlocklistResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SortDirection",
+          "JsonName": "sortDirection",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SortDirection"
+          }
+        },
+        {
+          "Name": "SortKey",
+          "JsonName": "sortKey",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TotalRecords",
+          "JsonName": "totalRecords",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    }
+  ]
+}

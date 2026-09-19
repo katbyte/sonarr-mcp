@@ -1,0 +1,245 @@
+{
+  "Name": "DelayProfile",
+  "Tag": "DelayProfile",
+  "Operations": [
+    {
+      "Name": "DeleteDelayProfileById",
+      "Method": "DELETE",
+      "Path": "/api/v3/delayprofile/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetDelayProfile",
+      "Method": "GET",
+      "Path": "/api/v3/delayprofile",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "DelayProfileResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetDelayProfileById",
+      "Method": "GET",
+      "Path": "/api/v3/delayprofile/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "DelayProfileResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostDelayProfile",
+      "Method": "POST",
+      "Path": "/api/v3/delayprofile",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "DelayProfileResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "DelayProfileResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ]
+    },
+    {
+      "Name": "PutDelayProfileById",
+      "Method": "PUT",
+      "Path": "/api/v3/delayprofile/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "DelayProfileResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "DelayProfileResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    },
+    {
+      "Name": "PutDelayProfileReorderById",
+      "Method": "PUT",
+      "Path": "/api/v3/delayprofile/reorder/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Options": [
+        {
+          "Name": "after",
+          "Field": "After",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "DelayProfileResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "DelayProfileResource",
+      "SchemaName": "DelayProfileResource",
+      "Fields": [
+        {
+          "Name": "BypassIfAboveCustomFormatScore",
+          "JsonName": "bypassIfAboveCustomFormatScore",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "BypassIfHighestQuality",
+          "JsonName": "bypassIfHighestQuality",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "EnableTorrent",
+          "JsonName": "enableTorrent",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "EnableUsenet",
+          "JsonName": "enableUsenet",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "MinimumCustomFormatScore",
+          "JsonName": "minimumCustomFormatScore",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Order",
+          "JsonName": "order",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "PreferredProtocol",
+          "JsonName": "preferredProtocol",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "DownloadProtocol"
+          }
+        },
+        {
+          "Name": "Tags",
+          "JsonName": "tags",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TorrentDelay",
+          "JsonName": "torrentDelay",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "UsenetDelay",
+          "JsonName": "usenetDelay",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    }
+  ]
+}

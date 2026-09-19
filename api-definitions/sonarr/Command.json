@@ -1,0 +1,428 @@
+{
+  "Name": "Command",
+  "Tag": "Command",
+  "Operations": [
+    {
+      "Name": "DeleteCommandById",
+      "Method": "DELETE",
+      "Path": "/api/v3/command/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetCommand",
+      "Method": "GET",
+      "Path": "/api/v3/command",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "CommandResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetCommandById",
+      "Method": "GET",
+      "Path": "/api/v3/command/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostCommand",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "RawObject"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "Command",
+      "SchemaName": "Command",
+      "Fields": [
+        {
+          "Name": "ClientUserAgent",
+          "JsonName": "clientUserAgent",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "CompletionMessage",
+          "JsonName": "completionMessage",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "IsExclusive",
+          "JsonName": "isExclusive",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsLongRunning",
+          "JsonName": "isLongRunning",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "LastExecutionTime",
+          "JsonName": "lastExecutionTime",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "LastStartTime",
+          "JsonName": "lastStartTime",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "RequiresDiskAccess",
+          "JsonName": "requiresDiskAccess",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SendUpdatesToClient",
+          "JsonName": "sendUpdatesToClient",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SuppressMessages",
+          "JsonName": "suppressMessages",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Trigger",
+          "JsonName": "trigger",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "CommandTrigger"
+          }
+        },
+        {
+          "Name": "UpdateScheduledTask",
+          "JsonName": "updateScheduledTask",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "CommandResource",
+      "SchemaName": "CommandResource",
+      "Fields": [
+        {
+          "Name": "Body",
+          "JsonName": "body",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "Command"
+          }
+        },
+        {
+          "Name": "ClientUserAgent",
+          "JsonName": "clientUserAgent",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "CommandName",
+          "JsonName": "commandName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Duration",
+          "JsonName": "duration",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Ended",
+          "JsonName": "ended",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Exception",
+          "JsonName": "exception",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "LastExecutionTime",
+          "JsonName": "lastExecutionTime",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Message",
+          "JsonName": "message",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Priority",
+          "JsonName": "priority",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "CommandPriority"
+          }
+        },
+        {
+          "Name": "Queued",
+          "JsonName": "queued",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "Result",
+          "JsonName": "result",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "CommandResult"
+          }
+        },
+        {
+          "Name": "SendUpdatesToClient",
+          "JsonName": "sendUpdatesToClient",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Started",
+          "JsonName": "started",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "StateChangeTime",
+          "JsonName": "stateChangeTime",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Status",
+          "JsonName": "status",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "CommandStatus"
+          }
+        },
+        {
+          "Name": "Trigger",
+          "JsonName": "trigger",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "CommandTrigger"
+          }
+        },
+        {
+          "Name": "UpdateScheduledTask",
+          "JsonName": "updateScheduledTask",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ]
+    }
+  ],
+  "Constants": [
+    {
+      "Name": "CommandPriority",
+      "SchemaName": "CommandPriority",
+      "Values": [
+        {
+          "Name": "CommandPriorityNormal",
+          "Value": "normal"
+        },
+        {
+          "Name": "CommandPriorityHigh",
+          "Value": "high"
+        },
+        {
+          "Name": "CommandPriorityLow",
+          "Value": "low"
+        }
+      ]
+    },
+    {
+      "Name": "CommandResult",
+      "SchemaName": "CommandResult",
+      "Values": [
+        {
+          "Name": "CommandResultUnknown",
+          "Value": "unknown"
+        },
+        {
+          "Name": "CommandResultSuccessful",
+          "Value": "successful"
+        },
+        {
+          "Name": "CommandResultUnsuccessful",
+          "Value": "unsuccessful"
+        }
+      ]
+    },
+    {
+      "Name": "CommandStatus",
+      "SchemaName": "CommandStatus",
+      "Values": [
+        {
+          "Name": "CommandStatusQueued",
+          "Value": "queued"
+        },
+        {
+          "Name": "CommandStatusStarted",
+          "Value": "started"
+        },
+        {
+          "Name": "CommandStatusCompleted",
+          "Value": "completed"
+        },
+        {
+          "Name": "CommandStatusFailed",
+          "Value": "failed"
+        },
+        {
+          "Name": "CommandStatusAborted",
+          "Value": "aborted"
+        },
+        {
+          "Name": "CommandStatusCancelled",
+          "Value": "cancelled"
+        },
+        {
+          "Name": "CommandStatusOrphaned",
+          "Value": "orphaned"
+        }
+      ]
+    },
+    {
+      "Name": "CommandTrigger",
+      "SchemaName": "CommandTrigger",
+      "Values": [
+        {
+          "Name": "CommandTriggerUnspecified",
+          "Value": "unspecified"
+        },
+        {
+          "Name": "CommandTriggerManual",
+          "Value": "manual"
+        },
+        {
+          "Name": "CommandTriggerScheduled",
+          "Value": "scheduled"
+        }
+      ]
+    }
+  ]
+}

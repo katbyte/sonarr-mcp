@@ -1,0 +1,37 @@
+{
+  "Name": "Ping",
+  "Tag": "Ping",
+  "Operations": [
+    {
+      "Name": "GetPing",
+      "Method": "GET",
+      "Path": "/ping",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "PingResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "PingResource",
+      "SchemaName": "PingResource",
+      "Fields": [
+        {
+          "Name": "Status",
+          "JsonName": "status",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ]
+}

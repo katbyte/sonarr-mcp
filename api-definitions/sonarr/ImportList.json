@@ -1,0 +1,532 @@
+{
+  "Name": "ImportList",
+  "Tag": "ImportList",
+  "Operations": [
+    {
+      "Name": "DeleteImportListBulk",
+      "Method": "DELETE",
+      "Path": "/api/v3/importlist/bulk",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListBulkResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "DeleteImportListById",
+      "Method": "DELETE",
+      "Path": "/api/v3/importlist/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetImportList",
+      "Method": "GET",
+      "Path": "/api/v3/importlist",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "ImportListResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetImportListById",
+      "Method": "GET",
+      "Path": "/api/v3/importlist/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetImportListSchema",
+      "Method": "GET",
+      "Path": "/api/v3/importlist/schema",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "ImportListResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostImportList",
+      "Method": "POST",
+      "Path": "/api/v3/importlist",
+      "Options": [
+        {
+          "Name": "forceSave",
+          "Field": "ForceSave",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ]
+    },
+    {
+      "Name": "PostImportListActionByName",
+      "Method": "POST",
+      "Path": "/api/v3/importlist/action/{name}",
+      "PathParameters": [
+        {
+          "Name": "name",
+          "Argument": "name",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostImportListTest",
+      "Method": "POST",
+      "Path": "/api/v3/importlist/test",
+      "Options": [
+        {
+          "Name": "forceTest",
+          "Field": "ForceTest",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PostImportListTestAll",
+      "Method": "POST",
+      "Path": "/api/v3/importlist/testall",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "ProviderTestAllResult"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PutImportListBulk",
+      "Method": "PUT",
+      "Path": "/api/v3/importlist/bulk",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListBulkResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    },
+    {
+      "Name": "PutImportListById",
+      "Method": "PUT",
+      "Path": "/api/v3/importlist/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Options": [
+        {
+          "Name": "forceSave",
+          "Field": "ForceSave",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ImportListResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "ImportListBulkResource",
+      "SchemaName": "ImportListBulkResource",
+      "Fields": [
+        {
+          "Name": "ApplyTags",
+          "JsonName": "applyTags",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ApplyTags"
+          }
+        },
+        {
+          "Name": "EnableAutomaticAdd",
+          "JsonName": "enableAutomaticAdd",
+          "Type": {
+            "Type": "Boolean"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Ids",
+          "JsonName": "ids",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "QualityProfileId",
+          "JsonName": "qualityProfileId",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "RootFolderPath",
+          "JsonName": "rootFolderPath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Tags",
+          "JsonName": "tags",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "ImportListResource",
+      "SchemaName": "ImportListResource",
+      "Fields": [
+        {
+          "Name": "ConfigContract",
+          "JsonName": "configContract",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EnableAutomaticAdd",
+          "JsonName": "enableAutomaticAdd",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Fields",
+          "JsonName": "fields",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "Field"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Implementation",
+          "JsonName": "implementation",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ImplementationName",
+          "JsonName": "implementationName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "InfoLink",
+          "JsonName": "infoLink",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ListOrder",
+          "JsonName": "listOrder",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "ListType",
+          "JsonName": "listType",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ImportListType"
+          }
+        },
+        {
+          "Name": "Message",
+          "JsonName": "message",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ProviderMessage"
+          }
+        },
+        {
+          "Name": "MinRefreshInterval",
+          "JsonName": "minRefreshInterval",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "MonitorNewItems",
+          "JsonName": "monitorNewItems",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "NewItemMonitorTypes"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Presets",
+          "JsonName": "presets",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "ImportListResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "QualityProfileId",
+          "JsonName": "qualityProfileId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "RootFolderPath",
+          "JsonName": "rootFolderPath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SearchForMissingEpisodes",
+          "JsonName": "searchForMissingEpisodes",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SeasonFolder",
+          "JsonName": "seasonFolder",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SeriesType",
+          "JsonName": "seriesType",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesTypes"
+          }
+        },
+        {
+          "Name": "ShouldMonitor",
+          "JsonName": "shouldMonitor",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "MonitorTypes"
+          }
+        },
+        {
+          "Name": "Tags",
+          "JsonName": "tags",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ],
+  "Constants": [
+    {
+      "Name": "ImportListType",
+      "SchemaName": "ImportListType",
+      "Values": [
+        {
+          "Name": "ImportListTypeProgram",
+          "Value": "program"
+        },
+        {
+          "Name": "ImportListTypePlex",
+          "Value": "plex"
+        },
+        {
+          "Name": "ImportListTypeTrakt",
+          "Value": "trakt"
+        },
+        {
+          "Name": "ImportListTypeSimkl",
+          "Value": "simkl"
+        },
+        {
+          "Name": "ImportListTypeOther",
+          "Value": "other"
+        },
+        {
+          "Name": "ImportListTypeAdvanced",
+          "Value": "advanced"
+        }
+      ]
+    }
+  ]
+}

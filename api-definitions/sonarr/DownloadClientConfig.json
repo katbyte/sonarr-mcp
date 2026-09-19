@@ -1,0 +1,120 @@
+{
+  "Name": "DownloadClientConfig",
+  "Tag": "DownloadClientConfig",
+  "Operations": [
+    {
+      "Name": "GetConfigDownloadClient",
+      "Method": "GET",
+      "Path": "/api/v3/config/downloadclient",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "DownloadClientConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetConfigDownloadClientById",
+      "Method": "GET",
+      "Path": "/api/v3/config/downloadclient/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "DownloadClientConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PutConfigDownloadClientById",
+      "Method": "PUT",
+      "Path": "/api/v3/config/downloadclient/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "DownloadClientConfigResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "DownloadClientConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "DownloadClientConfigResource",
+      "SchemaName": "DownloadClientConfigResource",
+      "Fields": [
+        {
+          "Name": "AutoRedownloadFailed",
+          "JsonName": "autoRedownloadFailed",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "AutoRedownloadFailedFromInteractiveSearch",
+          "JsonName": "autoRedownloadFailedFromInteractiveSearch",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "DownloadClientWorkingFolders",
+          "JsonName": "downloadClientWorkingFolders",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EnableCompletedDownloadHandling",
+          "JsonName": "enableCompletedDownloadHandling",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    }
+  ]
+}

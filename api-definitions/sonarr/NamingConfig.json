@@ -1,0 +1,295 @@
+{
+  "Name": "NamingConfig",
+  "Tag": "NamingConfig",
+  "Operations": [
+    {
+      "Name": "GetConfigNaming",
+      "Method": "GET",
+      "Path": "/api/v3/config/naming",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "NamingConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetConfigNamingById",
+      "Method": "GET",
+      "Path": "/api/v3/config/naming/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "NamingConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetConfigNamingExamples",
+      "Method": "GET",
+      "Path": "/api/v3/config/naming/examples",
+      "Options": [
+        {
+          "Name": "renameEpisodes",
+          "Field": "RenameEpisodes",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "replaceIllegalCharacters",
+          "Field": "ReplaceIllegalCharacters",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "colonReplacementFormat",
+          "Field": "ColonReplacementFormat",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "customColonReplacementFormat",
+          "Field": "CustomColonReplacementFormat",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "multiEpisodeStyle",
+          "Field": "MultiEpisodeStyle",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "standardEpisodeFormat",
+          "Field": "StandardEpisodeFormat",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "dailyEpisodeFormat",
+          "Field": "DailyEpisodeFormat",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "animeEpisodeFormat",
+          "Field": "AnimeEpisodeFormat",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "seriesFolderFormat",
+          "Field": "SeriesFolderFormat",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "seasonFolderFormat",
+          "Field": "SeasonFolderFormat",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "specialsFolderFormat",
+          "Field": "SpecialsFolderFormat",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "id",
+          "Field": "Id",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "resourceName",
+          "Field": "ResourceName",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "RawObject"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PutConfigNamingById",
+      "Method": "PUT",
+      "Path": "/api/v3/config/naming/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "NamingConfigResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "NamingConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "NamingConfigResource",
+      "SchemaName": "NamingConfigResource",
+      "Fields": [
+        {
+          "Name": "AnimeEpisodeFormat",
+          "JsonName": "animeEpisodeFormat",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ColonReplacementFormat",
+          "JsonName": "colonReplacementFormat",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "CustomColonReplacementFormat",
+          "JsonName": "customColonReplacementFormat",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "DailyEpisodeFormat",
+          "JsonName": "dailyEpisodeFormat",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "MultiEpisodeStyle",
+          "JsonName": "multiEpisodeStyle",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "RenameEpisodes",
+          "JsonName": "renameEpisodes",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "ReplaceIllegalCharacters",
+          "JsonName": "replaceIllegalCharacters",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SeasonFolderFormat",
+          "JsonName": "seasonFolderFormat",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeriesFolderFormat",
+          "JsonName": "seriesFolderFormat",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SpecialsFolderFormat",
+          "JsonName": "specialsFolderFormat",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "StandardEpisodeFormat",
+          "JsonName": "standardEpisodeFormat",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ]
+}

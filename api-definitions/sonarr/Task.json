@@ -1,0 +1,114 @@
+{
+  "Name": "Task",
+  "Tag": "Task",
+  "Operations": [
+    {
+      "Name": "GetSystemTask",
+      "Method": "GET",
+      "Path": "/api/v3/system/task",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "TaskResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetSystemTaskById",
+      "Method": "GET",
+      "Path": "/api/v3/system/task/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "TaskResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "TaskResource",
+      "SchemaName": "TaskResource",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Interval",
+          "JsonName": "interval",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "LastDuration",
+          "JsonName": "lastDuration",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "LastExecution",
+          "JsonName": "lastExecution",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "LastStartTime",
+          "JsonName": "lastStartTime",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "NextExecution",
+          "JsonName": "nextExecution",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "TaskName",
+          "JsonName": "taskName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "Name": "UpdateLogFile",
+  "Tag": "UpdateLogFile",
+  "Operations": [
+    {
+      "Name": "GetLogFileUpdate",
+      "Method": "GET",
+      "Path": "/api/v3/log/file/update",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "LogFileResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetLogFileUpdateByFilename",
+      "Method": "GET",
+      "Path": "/api/v3/log/file/update/{filename}",
+      "PathParameters": [
+        {
+          "Name": "filename",
+          "Argument": "filename",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "text/plain",
+        "Type": {
+          "Type": "RawFile"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

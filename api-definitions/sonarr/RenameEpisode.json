@@ -1,0 +1,105 @@
+{
+  "Name": "RenameEpisode",
+  "Tag": "RenameEpisode",
+  "Operations": [
+    {
+      "Name": "GetRename",
+      "Method": "GET",
+      "Path": "/api/v3/rename",
+      "Options": [
+        {
+          "Name": "seriesId",
+          "Field": "SeriesId",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "seasonNumber",
+          "Field": "SeasonNumber",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "RenameEpisodeResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "RenameEpisodeResource",
+      "SchemaName": "RenameEpisodeResource",
+      "Fields": [
+        {
+          "Name": "EpisodeFileId",
+          "JsonName": "episodeFileId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "EpisodeNumbers",
+          "JsonName": "episodeNumbers",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ExistingPath",
+          "JsonName": "existingPath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "NewPath",
+          "JsonName": "newPath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeasonNumber",
+          "JsonName": "seasonNumber",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    }
+  ]
+}

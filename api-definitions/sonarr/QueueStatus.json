@@ -1,0 +1,85 @@
+{
+  "Name": "QueueStatus",
+  "Tag": "QueueStatus",
+  "Operations": [
+    {
+      "Name": "GetQueueStatus",
+      "Method": "GET",
+      "Path": "/api/v3/queue/status",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "QueueStatusResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "QueueStatusResource",
+      "SchemaName": "QueueStatusResource",
+      "Fields": [
+        {
+          "Name": "Count",
+          "JsonName": "count",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Errors",
+          "JsonName": "errors",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "TotalCount",
+          "JsonName": "totalCount",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "UnknownCount",
+          "JsonName": "unknownCount",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "UnknownErrors",
+          "JsonName": "unknownErrors",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "UnknownWarnings",
+          "JsonName": "unknownWarnings",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Warnings",
+          "JsonName": "warnings",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ]
+    }
+  ]
+}

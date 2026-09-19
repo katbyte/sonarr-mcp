@@ -1,0 +1,36 @@
+{
+  "Name": "MediaCover",
+  "Tag": "MediaCover",
+  "Operations": [
+    {
+      "Name": "GetMediaCoverBySeriesIdByFilename",
+      "Method": "GET",
+      "Path": "/api/v3/mediacover/{seriesId}/{filename}",
+      "PathParameters": [
+        {
+          "Name": "seriesId",
+          "Argument": "seriesId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "filename",
+          "Argument": "filename",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "image/*",
+        "Type": {
+          "Type": "RawFile"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

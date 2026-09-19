@@ -1,0 +1,3288 @@
+{
+  "Name": "Common",
+  "Models": [
+    {
+      "Name": "AddSeriesOptions",
+      "SchemaName": "AddSeriesOptions",
+      "Fields": [
+        {
+          "Name": "IgnoreEpisodesWithFiles",
+          "JsonName": "ignoreEpisodesWithFiles",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IgnoreEpisodesWithoutFiles",
+          "JsonName": "ignoreEpisodesWithoutFiles",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Monitor",
+          "JsonName": "monitor",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "MonitorTypes"
+          }
+        },
+        {
+          "Name": "SearchForCutoffUnmetEpisodes",
+          "JsonName": "searchForCutoffUnmetEpisodes",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SearchForMissingEpisodes",
+          "JsonName": "searchForMissingEpisodes",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "AlternateTitleResource",
+      "SchemaName": "AlternateTitleResource",
+      "Fields": [
+        {
+          "Name": "Comment",
+          "JsonName": "comment",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SceneOrigin",
+          "JsonName": "sceneOrigin",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SceneSeasonNumber",
+          "JsonName": "sceneSeasonNumber",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeasonNumber",
+          "JsonName": "seasonNumber",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Title",
+          "JsonName": "title",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "CustomFormatResource",
+      "SchemaName": "CustomFormatResource",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "IncludeCustomFormatWhenRenaming",
+          "JsonName": "includeCustomFormatWhenRenaming",
+          "Type": {
+            "Type": "Boolean"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Specifications",
+          "JsonName": "specifications",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "CustomFormatSpecificationSchema"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "CustomFormatSpecificationSchema",
+      "SchemaName": "CustomFormatSpecificationSchema",
+      "Fields": [
+        {
+          "Name": "Fields",
+          "JsonName": "fields",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "Field"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Implementation",
+          "JsonName": "implementation",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ImplementationName",
+          "JsonName": "implementationName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "InfoLink",
+          "JsonName": "infoLink",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Negate",
+          "JsonName": "negate",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Presets",
+          "JsonName": "presets",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "CustomFormatSpecificationSchema"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Required",
+          "JsonName": "required",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "EpisodeFileResource",
+      "SchemaName": "EpisodeFileResource",
+      "Fields": [
+        {
+          "Name": "CustomFormatScore",
+          "JsonName": "customFormatScore",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "CustomFormats",
+          "JsonName": "customFormats",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "CustomFormatResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "DateAdded",
+          "JsonName": "dateAdded",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "IndexerFlags",
+          "JsonName": "indexerFlags",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Languages",
+          "JsonName": "languages",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "Language"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "MediaInfo",
+          "JsonName": "mediaInfo",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "MediaInfoResource"
+          }
+        },
+        {
+          "Name": "Path",
+          "JsonName": "path",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Quality",
+          "JsonName": "quality",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "QualityModel"
+          }
+        },
+        {
+          "Name": "QualityCutoffNotMet",
+          "JsonName": "qualityCutoffNotMet",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "RelativePath",
+          "JsonName": "relativePath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ReleaseGroup",
+          "JsonName": "releaseGroup",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ReleaseType",
+          "JsonName": "releaseType",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ReleaseType"
+          }
+        },
+        {
+          "Name": "SceneName",
+          "JsonName": "sceneName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeasonNumber",
+          "JsonName": "seasonNumber",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Size",
+          "JsonName": "size",
+          "Type": {
+            "Type": "Integer64"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "EpisodeResource",
+      "SchemaName": "EpisodeResource",
+      "Fields": [
+        {
+          "Name": "AbsoluteEpisodeNumber",
+          "JsonName": "absoluteEpisodeNumber",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "AirDate",
+          "JsonName": "airDate",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "AirDateUtc",
+          "JsonName": "airDateUtc",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EndTime",
+          "JsonName": "endTime",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EpisodeFile",
+          "JsonName": "episodeFile",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "EpisodeFileResource"
+          }
+        },
+        {
+          "Name": "EpisodeFileId",
+          "JsonName": "episodeFileId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "EpisodeNumber",
+          "JsonName": "episodeNumber",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "FinaleType",
+          "JsonName": "finaleType",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "GrabDate",
+          "JsonName": "grabDate",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "HasFile",
+          "JsonName": "hasFile",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Images",
+          "JsonName": "images",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "MediaCover"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "LastSearchTime",
+          "JsonName": "lastSearchTime",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Monitored",
+          "JsonName": "monitored",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Overview",
+          "JsonName": "overview",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Runtime",
+          "JsonName": "runtime",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "SceneAbsoluteEpisodeNumber",
+          "JsonName": "sceneAbsoluteEpisodeNumber",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SceneEpisodeNumber",
+          "JsonName": "sceneEpisodeNumber",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SceneSeasonNumber",
+          "JsonName": "sceneSeasonNumber",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeasonNumber",
+          "JsonName": "seasonNumber",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Series",
+          "JsonName": "series",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesResource"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Title",
+          "JsonName": "title",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TvdbId",
+          "JsonName": "tvdbId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "UnverifiedSceneNumbering",
+          "JsonName": "unverifiedSceneNumbering",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "EpisodeResourcePagingResource",
+      "SchemaName": "EpisodeResourcePagingResource",
+      "Fields": [
+        {
+          "Name": "Page",
+          "JsonName": "page",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "PageSize",
+          "JsonName": "pageSize",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Records",
+          "JsonName": "records",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "EpisodeResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SortDirection",
+          "JsonName": "sortDirection",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SortDirection"
+          }
+        },
+        {
+          "Name": "SortKey",
+          "JsonName": "sortKey",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TotalRecords",
+          "JsonName": "totalRecords",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "Field",
+      "SchemaName": "Field",
+      "Fields": [
+        {
+          "Name": "Advanced",
+          "JsonName": "advanced",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "HelpLink",
+          "JsonName": "helpLink",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "HelpText",
+          "JsonName": "helpText",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "HelpTextWarning",
+          "JsonName": "helpTextWarning",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Hidden",
+          "JsonName": "hidden",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "IsFloat",
+          "JsonName": "isFloat",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Label",
+          "JsonName": "label",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Order",
+          "JsonName": "order",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Placeholder",
+          "JsonName": "placeholder",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Privacy",
+          "JsonName": "privacy",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "PrivacyLevel"
+          }
+        },
+        {
+          "Name": "Section",
+          "JsonName": "section",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SelectOptions",
+          "JsonName": "selectOptions",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "SelectOption"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SelectOptionsProviderAction",
+          "JsonName": "selectOptionsProviderAction",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Type",
+          "JsonName": "type",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Unit",
+          "JsonName": "unit",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Value",
+          "JsonName": "value",
+          "Type": {
+            "Type": "Any"
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "Language",
+      "SchemaName": "Language",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "LanguageProfileItemResource",
+      "SchemaName": "LanguageProfileItemResource",
+      "Fields": [
+        {
+          "Name": "Allowed",
+          "JsonName": "allowed",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Language",
+          "JsonName": "language",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "Language"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "LanguageProfileResource",
+      "SchemaName": "LanguageProfileResource",
+      "Fields": [
+        {
+          "Name": "Cutoff",
+          "JsonName": "cutoff",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "Language"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Languages",
+          "JsonName": "languages",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "LanguageProfileItemResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "UpgradeAllowed",
+          "JsonName": "upgradeAllowed",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "LogFileResource",
+      "SchemaName": "LogFileResource",
+      "Fields": [
+        {
+          "Name": "ContentsUrl",
+          "JsonName": "contentsUrl",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "DownloadUrl",
+          "JsonName": "downloadUrl",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Filename",
+          "JsonName": "filename",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "LastWriteTime",
+          "JsonName": "lastWriteTime",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "MediaCover",
+      "SchemaName": "MediaCover",
+      "Fields": [
+        {
+          "Name": "CoverType",
+          "JsonName": "coverType",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "MediaCoverTypes"
+          }
+        },
+        {
+          "Name": "RemoteUrl",
+          "JsonName": "remoteUrl",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Url",
+          "JsonName": "url",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "MediaInfoResource",
+      "SchemaName": "MediaInfoResource",
+      "Fields": [
+        {
+          "Name": "AudioBitrate",
+          "JsonName": "audioBitrate",
+          "Type": {
+            "Type": "Integer64"
+          }
+        },
+        {
+          "Name": "AudioChannels",
+          "JsonName": "audioChannels",
+          "Type": {
+            "Type": "Double"
+          }
+        },
+        {
+          "Name": "AudioCodec",
+          "JsonName": "audioCodec",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "AudioLanguages",
+          "JsonName": "audioLanguages",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "AudioStreamCount",
+          "JsonName": "audioStreamCount",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Resolution",
+          "JsonName": "resolution",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "RunTime",
+          "JsonName": "runTime",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ScanType",
+          "JsonName": "scanType",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Subtitles",
+          "JsonName": "subtitles",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "VideoBitDepth",
+          "JsonName": "videoBitDepth",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "VideoBitrate",
+          "JsonName": "videoBitrate",
+          "Type": {
+            "Type": "Integer64"
+          }
+        },
+        {
+          "Name": "VideoCodec",
+          "JsonName": "videoCodec",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "VideoDynamicRange",
+          "JsonName": "videoDynamicRange",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "VideoDynamicRangeType",
+          "JsonName": "videoDynamicRangeType",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "VideoFps",
+          "JsonName": "videoFps",
+          "Type": {
+            "Type": "Double"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "ProfileFormatItemResource",
+      "SchemaName": "ProfileFormatItemResource",
+      "Fields": [
+        {
+          "Name": "Format",
+          "JsonName": "format",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Score",
+          "JsonName": "score",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "ProviderMessage",
+      "SchemaName": "ProviderMessage",
+      "Fields": [
+        {
+          "Name": "Message",
+          "JsonName": "message",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Type",
+          "JsonName": "type",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ProviderMessageType"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "ProviderTestAllResult",
+      "SchemaName": "ProviderTestAllResult",
+      "Description": "The outcome of testing one provider.",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "IsValid",
+          "JsonName": "isValid",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "ValidationFailures",
+          "JsonName": "validationFailures",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "ValidationFailure"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "Name": "Quality",
+      "SchemaName": "Quality",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Resolution",
+          "JsonName": "resolution",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Source",
+          "JsonName": "source",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "QualitySource"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "QualityModel",
+      "SchemaName": "QualityModel",
+      "Fields": [
+        {
+          "Name": "Quality",
+          "JsonName": "quality",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "Quality"
+          }
+        },
+        {
+          "Name": "Revision",
+          "JsonName": "revision",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "Revision"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "QualityProfileQualityItemResource",
+      "SchemaName": "QualityProfileQualityItemResource",
+      "Fields": [
+        {
+          "Name": "Allowed",
+          "JsonName": "allowed",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Items",
+          "JsonName": "items",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "QualityProfileQualityItemResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Quality",
+          "JsonName": "quality",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "Quality"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "QualityProfileResource",
+      "SchemaName": "QualityProfileResource",
+      "Fields": [
+        {
+          "Name": "Cutoff",
+          "JsonName": "cutoff",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "CutoffFormatScore",
+          "JsonName": "cutoffFormatScore",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "FormatItems",
+          "JsonName": "formatItems",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "ProfileFormatItemResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Items",
+          "JsonName": "items",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "QualityProfileQualityItemResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "MinFormatScore",
+          "JsonName": "minFormatScore",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "MinUpgradeFormatScore",
+          "JsonName": "minUpgradeFormatScore",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "UpgradeAllowed",
+          "JsonName": "upgradeAllowed",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "QueueBulkResource",
+      "SchemaName": "QueueBulkResource",
+      "Fields": [
+        {
+          "Name": "Ids",
+          "JsonName": "ids",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "QueueResource",
+      "SchemaName": "QueueResource",
+      "Fields": [
+        {
+          "Name": "Added",
+          "JsonName": "added",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "CustomFormatScore",
+          "JsonName": "customFormatScore",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "CustomFormats",
+          "JsonName": "customFormats",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "CustomFormatResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "DownloadClient",
+          "JsonName": "downloadClient",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "DownloadClientHasPostImportCategory",
+          "JsonName": "downloadClientHasPostImportCategory",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "DownloadId",
+          "JsonName": "downloadId",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Episode",
+          "JsonName": "episode",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "EpisodeResource"
+          }
+        },
+        {
+          "Name": "EpisodeHasFile",
+          "JsonName": "episodeHasFile",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "EpisodeId",
+          "JsonName": "episodeId",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ErrorMessage",
+          "JsonName": "errorMessage",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EstimatedCompletionTime",
+          "JsonName": "estimatedCompletionTime",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Indexer",
+          "JsonName": "indexer",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Languages",
+          "JsonName": "languages",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "Language"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "OutputPath",
+          "JsonName": "outputPath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Protocol",
+          "JsonName": "protocol",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "DownloadProtocol"
+          }
+        },
+        {
+          "Name": "Quality",
+          "JsonName": "quality",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "QualityModel"
+          }
+        },
+        {
+          "Name": "SeasonNumber",
+          "JsonName": "seasonNumber",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Series",
+          "JsonName": "series",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesResource"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Size",
+          "JsonName": "size",
+          "Type": {
+            "Type": "Double"
+          }
+        },
+        {
+          "Name": "Sizeleft",
+          "JsonName": "sizeleft",
+          "Type": {
+            "Type": "Double"
+          }
+        },
+        {
+          "Name": "Status",
+          "JsonName": "status",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "QueueStatus"
+          }
+        },
+        {
+          "Name": "StatusMessages",
+          "JsonName": "statusMessages",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "TrackedDownloadStatusMessage"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Timeleft",
+          "JsonName": "timeleft",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Title",
+          "JsonName": "title",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TrackedDownloadState",
+          "JsonName": "trackedDownloadState",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "TrackedDownloadState"
+          }
+        },
+        {
+          "Name": "TrackedDownloadStatus",
+          "JsonName": "trackedDownloadStatus",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "TrackedDownloadStatus"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "Ratings",
+      "SchemaName": "Ratings",
+      "Fields": [
+        {
+          "Name": "Value",
+          "JsonName": "value",
+          "Type": {
+            "Type": "Double"
+          }
+        },
+        {
+          "Name": "Votes",
+          "JsonName": "votes",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "ReleaseEpisodeResource",
+      "SchemaName": "ReleaseEpisodeResource",
+      "Fields": [
+        {
+          "Name": "AbsoluteEpisodeNumber",
+          "JsonName": "absoluteEpisodeNumber",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EpisodeNumber",
+          "JsonName": "episodeNumber",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "SeasonNumber",
+          "JsonName": "seasonNumber",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Title",
+          "JsonName": "title",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "ReleaseResource",
+      "SchemaName": "ReleaseResource",
+      "Fields": [
+        {
+          "Name": "AbsoluteEpisodeNumbers",
+          "JsonName": "absoluteEpisodeNumbers",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Age",
+          "JsonName": "age",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "AgeHours",
+          "JsonName": "ageHours",
+          "Type": {
+            "Type": "Double"
+          }
+        },
+        {
+          "Name": "AgeMinutes",
+          "JsonName": "ageMinutes",
+          "Type": {
+            "Type": "Double"
+          }
+        },
+        {
+          "Name": "AirDate",
+          "JsonName": "airDate",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Approved",
+          "JsonName": "approved",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "CommentUrl",
+          "JsonName": "commentUrl",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "CustomFormatScore",
+          "JsonName": "customFormatScore",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "CustomFormats",
+          "JsonName": "customFormats",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "CustomFormatResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "DownloadAllowed",
+          "JsonName": "downloadAllowed",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "DownloadClient",
+          "JsonName": "downloadClient",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "DownloadClientId",
+          "JsonName": "downloadClientId",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "DownloadUrl",
+          "JsonName": "downloadUrl",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EpisodeId",
+          "JsonName": "episodeId",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EpisodeIds",
+          "JsonName": "episodeIds",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EpisodeNumbers",
+          "JsonName": "episodeNumbers",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EpisodeRequested",
+          "JsonName": "episodeRequested",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "FullSeason",
+          "JsonName": "fullSeason",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Guid",
+          "JsonName": "guid",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "ImdbId",
+          "JsonName": "imdbId",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Indexer",
+          "JsonName": "indexer",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "IndexerFlags",
+          "JsonName": "indexerFlags",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "IndexerId",
+          "JsonName": "indexerId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "InfoHash",
+          "JsonName": "infoHash",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "InfoUrl",
+          "JsonName": "infoUrl",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "IsAbsoluteNumbering",
+          "JsonName": "isAbsoluteNumbering",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsDaily",
+          "JsonName": "isDaily",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsPossibleSpecialEpisode",
+          "JsonName": "isPossibleSpecialEpisode",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "LanguageWeight",
+          "JsonName": "languageWeight",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Languages",
+          "JsonName": "languages",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "Language"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Leechers",
+          "JsonName": "leechers",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "MagnetUrl",
+          "JsonName": "magnetUrl",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "MappedAbsoluteEpisodeNumbers",
+          "JsonName": "mappedAbsoluteEpisodeNumbers",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "MappedEpisodeInfo",
+          "JsonName": "mappedEpisodeInfo",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "ReleaseEpisodeResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "MappedEpisodeNumbers",
+          "JsonName": "mappedEpisodeNumbers",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "MappedSeasonNumber",
+          "JsonName": "mappedSeasonNumber",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "MappedSeriesId",
+          "JsonName": "mappedSeriesId",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Protocol",
+          "JsonName": "protocol",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "DownloadProtocol"
+          }
+        },
+        {
+          "Name": "PublishDate",
+          "JsonName": "publishDate",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "Quality",
+          "JsonName": "quality",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "QualityModel"
+          }
+        },
+        {
+          "Name": "QualityWeight",
+          "JsonName": "qualityWeight",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Rejected",
+          "JsonName": "rejected",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Rejections",
+          "JsonName": "rejections",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "String"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ReleaseGroup",
+          "JsonName": "releaseGroup",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ReleaseHash",
+          "JsonName": "releaseHash",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ReleaseWeight",
+          "JsonName": "releaseWeight",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "SceneMapping",
+          "JsonName": "sceneMapping",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "AlternateTitleResource"
+          }
+        },
+        {
+          "Name": "SceneSource",
+          "JsonName": "sceneSource",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SeasonNumber",
+          "JsonName": "seasonNumber",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Seeders",
+          "JsonName": "seeders",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeriesTitle",
+          "JsonName": "seriesTitle",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ShouldOverride",
+          "JsonName": "shouldOverride",
+          "Type": {
+            "Type": "Boolean"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Size",
+          "JsonName": "size",
+          "Type": {
+            "Type": "Integer64"
+          }
+        },
+        {
+          "Name": "Special",
+          "JsonName": "special",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SubGroup",
+          "JsonName": "subGroup",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TemporarilyRejected",
+          "JsonName": "temporarilyRejected",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Title",
+          "JsonName": "title",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TvRageId",
+          "JsonName": "tvRageId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "TvdbId",
+          "JsonName": "tvdbId",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "Revision",
+      "SchemaName": "Revision",
+      "Fields": [
+        {
+          "Name": "IsRepack",
+          "JsonName": "isRepack",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Real",
+          "JsonName": "real",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Version",
+          "JsonName": "version",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "SeasonResource",
+      "SchemaName": "SeasonResource",
+      "Fields": [
+        {
+          "Name": "Images",
+          "JsonName": "images",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "MediaCover"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Monitored",
+          "JsonName": "monitored",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SeasonNumber",
+          "JsonName": "seasonNumber",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Statistics",
+          "JsonName": "statistics",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeasonStatisticsResource"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "SeasonStatisticsResource",
+      "SchemaName": "SeasonStatisticsResource",
+      "Fields": [
+        {
+          "Name": "EpisodeCount",
+          "JsonName": "episodeCount",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "EpisodeFileCount",
+          "JsonName": "episodeFileCount",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "NextAiring",
+          "JsonName": "nextAiring",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "PercentOfEpisodes",
+          "JsonName": "percentOfEpisodes",
+          "Type": {
+            "Type": "Double"
+          }
+        },
+        {
+          "Name": "PreviousAiring",
+          "JsonName": "previousAiring",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ReleaseGroups",
+          "JsonName": "releaseGroups",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "String"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SizeOnDisk",
+          "JsonName": "sizeOnDisk",
+          "Type": {
+            "Type": "Integer64"
+          }
+        },
+        {
+          "Name": "TotalEpisodeCount",
+          "JsonName": "totalEpisodeCount",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "SelectOption",
+      "SchemaName": "SelectOption",
+      "Fields": [
+        {
+          "Name": "Hint",
+          "JsonName": "hint",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Order",
+          "JsonName": "order",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Value",
+          "JsonName": "value",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "SeriesResource",
+      "SchemaName": "SeriesResource",
+      "Fields": [
+        {
+          "Name": "AddOptions",
+          "JsonName": "addOptions",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "AddSeriesOptions"
+          }
+        },
+        {
+          "Name": "Added",
+          "JsonName": "added",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "AirTime",
+          "JsonName": "airTime",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "AlternateTitles",
+          "JsonName": "alternateTitles",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "AlternateTitleResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Certification",
+          "JsonName": "certification",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "CleanTitle",
+          "JsonName": "cleanTitle",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Ended",
+          "JsonName": "ended",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "EpisodesChanged",
+          "JsonName": "episodesChanged",
+          "Type": {
+            "Type": "Boolean"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "FirstAired",
+          "JsonName": "firstAired",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Folder",
+          "JsonName": "folder",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Genres",
+          "JsonName": "genres",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "String"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Images",
+          "JsonName": "images",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "MediaCover"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ImdbId",
+          "JsonName": "imdbId",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "LanguageProfileId",
+          "JsonName": "languageProfileId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "LastAired",
+          "JsonName": "lastAired",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "MonitorNewItems",
+          "JsonName": "monitorNewItems",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "NewItemMonitorTypes"
+          }
+        },
+        {
+          "Name": "Monitored",
+          "JsonName": "monitored",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Network",
+          "JsonName": "network",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "NextAiring",
+          "JsonName": "nextAiring",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "OriginalLanguage",
+          "JsonName": "originalLanguage",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "Language"
+          }
+        },
+        {
+          "Name": "Overview",
+          "JsonName": "overview",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Path",
+          "JsonName": "path",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "PreviousAiring",
+          "JsonName": "previousAiring",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ProfileName",
+          "JsonName": "profileName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "QualityProfileId",
+          "JsonName": "qualityProfileId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Ratings",
+          "JsonName": "ratings",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "Ratings"
+          }
+        },
+        {
+          "Name": "RemotePoster",
+          "JsonName": "remotePoster",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "RootFolderPath",
+          "JsonName": "rootFolderPath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Runtime",
+          "JsonName": "runtime",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "SeasonFolder",
+          "JsonName": "seasonFolder",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Seasons",
+          "JsonName": "seasons",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "SeasonResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeriesType",
+          "JsonName": "seriesType",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesTypes"
+          }
+        },
+        {
+          "Name": "SortTitle",
+          "JsonName": "sortTitle",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Statistics",
+          "JsonName": "statistics",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesStatisticsResource"
+          }
+        },
+        {
+          "Name": "Status",
+          "JsonName": "status",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesStatusType"
+          }
+        },
+        {
+          "Name": "Tags",
+          "JsonName": "tags",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Title",
+          "JsonName": "title",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TitleSlug",
+          "JsonName": "titleSlug",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TmdbId",
+          "JsonName": "tmdbId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "TvMazeId",
+          "JsonName": "tvMazeId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "TvRageId",
+          "JsonName": "tvRageId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "TvdbId",
+          "JsonName": "tvdbId",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "UseSceneNumbering",
+          "JsonName": "useSceneNumbering",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Year",
+          "JsonName": "year",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "SeriesStatisticsResource",
+      "SchemaName": "SeriesStatisticsResource",
+      "Fields": [
+        {
+          "Name": "EpisodeCount",
+          "JsonName": "episodeCount",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "EpisodeFileCount",
+          "JsonName": "episodeFileCount",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "PercentOfEpisodes",
+          "JsonName": "percentOfEpisodes",
+          "Type": {
+            "Type": "Double"
+          }
+        },
+        {
+          "Name": "ReleaseGroups",
+          "JsonName": "releaseGroups",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "String"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeasonCount",
+          "JsonName": "seasonCount",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "SizeOnDisk",
+          "JsonName": "sizeOnDisk",
+          "Type": {
+            "Type": "Integer64"
+          }
+        },
+        {
+          "Name": "TotalEpisodeCount",
+          "JsonName": "totalEpisodeCount",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "TrackedDownloadStatusMessage",
+      "SchemaName": "TrackedDownloadStatusMessage",
+      "Fields": [
+        {
+          "Name": "Messages",
+          "JsonName": "messages",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "String"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Title",
+          "JsonName": "title",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "ValidationFailure",
+      "SchemaName": "ValidationFailure",
+      "Description": "One reason a provider failed its test: the setting at fault and what is wrong with it.",
+      "Fields": [
+        {
+          "Name": "DetailedDescription",
+          "JsonName": "detailedDescription",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ErrorCode",
+          "JsonName": "errorCode",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ErrorMessage",
+          "JsonName": "errorMessage",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "InfoLink",
+          "JsonName": "infoLink",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "IsWarning",
+          "JsonName": "isWarning",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "PropertyName",
+          "JsonName": "propertyName",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Severity",
+          "JsonName": "severity",
+          "Description": "error, warning or info",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "Constants": [
+    {
+      "Name": "ApplyTags",
+      "SchemaName": "ApplyTags",
+      "Values": [
+        {
+          "Name": "ApplyTagsAdd",
+          "Value": "add"
+        },
+        {
+          "Name": "ApplyTagsRemove",
+          "Value": "remove"
+        },
+        {
+          "Name": "ApplyTagsReplace",
+          "Value": "replace"
+        }
+      ]
+    },
+    {
+      "Name": "AuthenticationType",
+      "SchemaName": "AuthenticationType",
+      "Values": [
+        {
+          "Name": "AuthenticationTypeNone",
+          "Value": "none"
+        },
+        {
+          "Name": "AuthenticationTypeBasic",
+          "Value": "basic"
+        },
+        {
+          "Name": "AuthenticationTypeForms",
+          "Value": "forms"
+        },
+        {
+          "Name": "AuthenticationTypeExternal",
+          "Value": "external"
+        }
+      ]
+    },
+    {
+      "Name": "DownloadProtocol",
+      "SchemaName": "DownloadProtocol",
+      "Values": [
+        {
+          "Name": "DownloadProtocolUnknown",
+          "Value": "unknown"
+        },
+        {
+          "Name": "DownloadProtocolUsenet",
+          "Value": "usenet"
+        },
+        {
+          "Name": "DownloadProtocolTorrent",
+          "Value": "torrent"
+        }
+      ]
+    },
+    {
+      "Name": "MediaCoverTypes",
+      "SchemaName": "MediaCoverTypes",
+      "Values": [
+        {
+          "Name": "MediaCoverTypesUnknown",
+          "Value": "unknown"
+        },
+        {
+          "Name": "MediaCoverTypesPoster",
+          "Value": "poster"
+        },
+        {
+          "Name": "MediaCoverTypesBanner",
+          "Value": "banner"
+        },
+        {
+          "Name": "MediaCoverTypesFanart",
+          "Value": "fanart"
+        },
+        {
+          "Name": "MediaCoverTypesScreenshot",
+          "Value": "screenshot"
+        },
+        {
+          "Name": "MediaCoverTypesHeadshot",
+          "Value": "headshot"
+        },
+        {
+          "Name": "MediaCoverTypesClearlogo",
+          "Value": "clearlogo"
+        }
+      ]
+    },
+    {
+      "Name": "MonitorTypes",
+      "SchemaName": "MonitorTypes",
+      "Values": [
+        {
+          "Name": "MonitorTypesUnknown",
+          "Value": "unknown"
+        },
+        {
+          "Name": "MonitorTypesAll",
+          "Value": "all"
+        },
+        {
+          "Name": "MonitorTypesFuture",
+          "Value": "future"
+        },
+        {
+          "Name": "MonitorTypesMissing",
+          "Value": "missing"
+        },
+        {
+          "Name": "MonitorTypesExisting",
+          "Value": "existing"
+        },
+        {
+          "Name": "MonitorTypesFirstSeason",
+          "Value": "firstSeason"
+        },
+        {
+          "Name": "MonitorTypesLastSeason",
+          "Value": "lastSeason"
+        },
+        {
+          "Name": "MonitorTypesLatestSeason",
+          "Value": "latestSeason"
+        },
+        {
+          "Name": "MonitorTypesPilot",
+          "Value": "pilot"
+        },
+        {
+          "Name": "MonitorTypesRecent",
+          "Value": "recent"
+        },
+        {
+          "Name": "MonitorTypesMonitorSpecials",
+          "Value": "monitorSpecials"
+        },
+        {
+          "Name": "MonitorTypesUnmonitorSpecials",
+          "Value": "unmonitorSpecials"
+        },
+        {
+          "Name": "MonitorTypesNone",
+          "Value": "none"
+        },
+        {
+          "Name": "MonitorTypesSkip",
+          "Value": "skip"
+        }
+      ]
+    },
+    {
+      "Name": "NewItemMonitorTypes",
+      "SchemaName": "NewItemMonitorTypes",
+      "Values": [
+        {
+          "Name": "NewItemMonitorTypesAll",
+          "Value": "all"
+        },
+        {
+          "Name": "NewItemMonitorTypesNone",
+          "Value": "none"
+        }
+      ]
+    },
+    {
+      "Name": "PrivacyLevel",
+      "SchemaName": "PrivacyLevel",
+      "Values": [
+        {
+          "Name": "PrivacyLevelNormal",
+          "Value": "normal"
+        },
+        {
+          "Name": "PrivacyLevelPassword",
+          "Value": "password"
+        },
+        {
+          "Name": "PrivacyLevelApiKey",
+          "Value": "apiKey"
+        },
+        {
+          "Name": "PrivacyLevelUserName",
+          "Value": "userName"
+        }
+      ]
+    },
+    {
+      "Name": "ProviderMessageType",
+      "SchemaName": "ProviderMessageType",
+      "Values": [
+        {
+          "Name": "ProviderMessageTypeInfo",
+          "Value": "info"
+        },
+        {
+          "Name": "ProviderMessageTypeWarning",
+          "Value": "warning"
+        },
+        {
+          "Name": "ProviderMessageTypeError",
+          "Value": "error"
+        }
+      ]
+    },
+    {
+      "Name": "QualitySource",
+      "SchemaName": "QualitySource",
+      "Values": [
+        {
+          "Name": "QualitySourceUnknown",
+          "Value": "unknown"
+        },
+        {
+          "Name": "QualitySourceTelevision",
+          "Value": "television"
+        },
+        {
+          "Name": "QualitySourceTelevisionRaw",
+          "Value": "televisionRaw"
+        },
+        {
+          "Name": "QualitySourceWeb",
+          "Value": "web"
+        },
+        {
+          "Name": "QualitySourceWebRip",
+          "Value": "webRip"
+        },
+        {
+          "Name": "QualitySourceDvd",
+          "Value": "dvd"
+        },
+        {
+          "Name": "QualitySourceBluray",
+          "Value": "bluray"
+        },
+        {
+          "Name": "QualitySourceBlurayRaw",
+          "Value": "blurayRaw"
+        }
+      ]
+    },
+    {
+      "Name": "QueueStatus",
+      "SchemaName": "QueueStatus",
+      "Values": [
+        {
+          "Name": "QueueStatusUnknown",
+          "Value": "unknown"
+        },
+        {
+          "Name": "QueueStatusQueued",
+          "Value": "queued"
+        },
+        {
+          "Name": "QueueStatusPaused",
+          "Value": "paused"
+        },
+        {
+          "Name": "QueueStatusDownloading",
+          "Value": "downloading"
+        },
+        {
+          "Name": "QueueStatusCompleted",
+          "Value": "completed"
+        },
+        {
+          "Name": "QueueStatusFailed",
+          "Value": "failed"
+        },
+        {
+          "Name": "QueueStatusWarning",
+          "Value": "warning"
+        },
+        {
+          "Name": "QueueStatusDelay",
+          "Value": "delay"
+        },
+        {
+          "Name": "QueueStatusDownloadClientUnavailable",
+          "Value": "downloadClientUnavailable"
+        },
+        {
+          "Name": "QueueStatusFallback",
+          "Value": "fallback"
+        }
+      ]
+    },
+    {
+      "Name": "ReleaseType",
+      "SchemaName": "ReleaseType",
+      "Values": [
+        {
+          "Name": "ReleaseTypeUnknown",
+          "Value": "unknown"
+        },
+        {
+          "Name": "ReleaseTypeSingleEpisode",
+          "Value": "singleEpisode"
+        },
+        {
+          "Name": "ReleaseTypeMultiEpisode",
+          "Value": "multiEpisode"
+        },
+        {
+          "Name": "ReleaseTypeSeasonPack",
+          "Value": "seasonPack"
+        }
+      ]
+    },
+    {
+      "Name": "SeriesStatusType",
+      "SchemaName": "SeriesStatusType",
+      "Values": [
+        {
+          "Name": "SeriesStatusTypeContinuing",
+          "Value": "continuing"
+        },
+        {
+          "Name": "SeriesStatusTypeEnded",
+          "Value": "ended"
+        },
+        {
+          "Name": "SeriesStatusTypeUpcoming",
+          "Value": "upcoming"
+        },
+        {
+          "Name": "SeriesStatusTypeDeleted",
+          "Value": "deleted"
+        }
+      ]
+    },
+    {
+      "Name": "SeriesTypes",
+      "SchemaName": "SeriesTypes",
+      "Values": [
+        {
+          "Name": "SeriesTypesStandard",
+          "Value": "standard"
+        },
+        {
+          "Name": "SeriesTypesDaily",
+          "Value": "daily"
+        },
+        {
+          "Name": "SeriesTypesAnime",
+          "Value": "anime"
+        }
+      ]
+    },
+    {
+      "Name": "SortDirection",
+      "SchemaName": "SortDirection",
+      "Values": [
+        {
+          "Name": "SortDirectionDefault",
+          "Value": "default"
+        },
+        {
+          "Name": "SortDirectionAscending",
+          "Value": "ascending"
+        },
+        {
+          "Name": "SortDirectionDescending",
+          "Value": "descending"
+        }
+      ]
+    },
+    {
+      "Name": "TrackedDownloadState",
+      "SchemaName": "TrackedDownloadState",
+      "Values": [
+        {
+          "Name": "TrackedDownloadStateDownloading",
+          "Value": "downloading"
+        },
+        {
+          "Name": "TrackedDownloadStateImportBlocked",
+          "Value": "importBlocked"
+        },
+        {
+          "Name": "TrackedDownloadStateImportPending",
+          "Value": "importPending"
+        },
+        {
+          "Name": "TrackedDownloadStateImporting",
+          "Value": "importing"
+        },
+        {
+          "Name": "TrackedDownloadStateImported",
+          "Value": "imported"
+        },
+        {
+          "Name": "TrackedDownloadStateFailedPending",
+          "Value": "failedPending"
+        },
+        {
+          "Name": "TrackedDownloadStateFailed",
+          "Value": "failed"
+        },
+        {
+          "Name": "TrackedDownloadStateIgnored",
+          "Value": "ignored"
+        }
+      ]
+    },
+    {
+      "Name": "TrackedDownloadStatus",
+      "SchemaName": "TrackedDownloadStatus",
+      "Values": [
+        {
+          "Name": "TrackedDownloadStatusOk",
+          "Value": "ok"
+        },
+        {
+          "Name": "TrackedDownloadStatusWarning",
+          "Value": "warning"
+        },
+        {
+          "Name": "TrackedDownloadStatusError",
+          "Value": "error"
+        }
+      ]
+    },
+    {
+      "Name": "UpdateMechanism",
+      "SchemaName": "UpdateMechanism",
+      "Values": [
+        {
+          "Name": "UpdateMechanismBuiltIn",
+          "Value": "builtIn"
+        },
+        {
+          "Name": "UpdateMechanismScript",
+          "Value": "script"
+        },
+        {
+          "Name": "UpdateMechanismExternal",
+          "Value": "external"
+        },
+        {
+          "Name": "UpdateMechanismApt",
+          "Value": "apt"
+        },
+        {
+          "Name": "UpdateMechanismDocker",
+          "Value": "docker"
+        }
+      ]
+    }
+  ]
+}

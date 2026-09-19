@@ -1,0 +1,70 @@
+{
+  "Name": "CalendarFeed",
+  "Tag": "CalendarFeed",
+  "Operations": [
+    {
+      "Name": "GetFeedV3CalendarSonarrIcs",
+      "Method": "GET",
+      "Path": "/feed/v3/calendar/sonarr.ics",
+      "Options": [
+        {
+          "Name": "pastDays",
+          "Field": "PastDays",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "futureDays",
+          "Field": "FutureDays",
+          "In": "Query",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "tags",
+          "Field": "Tags",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "unmonitored",
+          "Field": "Unmonitored",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "premieresOnly",
+          "Field": "PremieresOnly",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "asAllDay",
+          "Field": "AsAllDay",
+          "In": "Query",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "text/calendar",
+        "Type": {
+          "Type": "RawFile"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "Name": "ReleasePush",
+  "Tag": "ReleasePush",
+  "Operations": [
+    {
+      "Name": "PostReleasePush",
+      "Method": "POST",
+      "Path": "/api/v3/release/push",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ReleaseResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "ReleaseResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ]
+}

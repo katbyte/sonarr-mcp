@@ -1,0 +1,110 @@
+{
+  "Name": "SeasonPass",
+  "Tag": "SeasonPass",
+  "Operations": [
+    {
+      "Name": "PostSeasonPass",
+      "Method": "POST",
+      "Path": "/api/v3/seasonpass",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "SeasonPassResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "MonitoringOptions",
+      "SchemaName": "MonitoringOptions",
+      "Fields": [
+        {
+          "Name": "IgnoreEpisodesWithFiles",
+          "JsonName": "ignoreEpisodesWithFiles",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IgnoreEpisodesWithoutFiles",
+          "JsonName": "ignoreEpisodesWithoutFiles",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Monitor",
+          "JsonName": "monitor",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "MonitorTypes"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "SeasonPassResource",
+      "SchemaName": "SeasonPassResource",
+      "Fields": [
+        {
+          "Name": "MonitoringOptions",
+          "JsonName": "monitoringOptions",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "MonitoringOptions"
+          }
+        },
+        {
+          "Name": "Series",
+          "JsonName": "series",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "SeasonPassSeriesResource"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "SeasonPassSeriesResource",
+      "SchemaName": "SeasonPassSeriesResource",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Monitored",
+          "JsonName": "monitored",
+          "Type": {
+            "Type": "Boolean"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Seasons",
+          "JsonName": "seasons",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "SeasonResource"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ]
+}

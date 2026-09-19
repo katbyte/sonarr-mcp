@@ -1,0 +1,55 @@
+{
+  "Name": "IndexerFlag",
+  "Tag": "IndexerFlag",
+  "Operations": [
+    {
+      "Name": "GetIndexerFlag",
+      "Method": "GET",
+      "Path": "/api/v3/indexerflag",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "IndexerFlagResource"
+          }
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "IndexerFlagResource",
+      "SchemaName": "IndexerFlagResource",
+      "Fields": [
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "NameLower",
+          "JsonName": "nameLower",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    }
+  ]
+}

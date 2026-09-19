@@ -1,0 +1,383 @@
+{
+  "Name": "Parse",
+  "Tag": "Parse",
+  "Operations": [
+    {
+      "Name": "GetParse",
+      "Method": "GET",
+      "Path": "/api/v3/parse",
+      "Options": [
+        {
+          "Name": "title",
+          "Field": "Title",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "path",
+          "Field": "Path",
+          "In": "Query",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ParseResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "ParseResource",
+      "SchemaName": "ParseResource",
+      "Fields": [
+        {
+          "Name": "CustomFormatScore",
+          "JsonName": "customFormatScore",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "CustomFormats",
+          "JsonName": "customFormats",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "CustomFormatResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Episodes",
+          "JsonName": "episodes",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "EpisodeResource"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "Languages",
+          "JsonName": "languages",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "Language"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ParsedEpisodeInfo",
+          "JsonName": "parsedEpisodeInfo",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ParsedEpisodeInfo"
+          }
+        },
+        {
+          "Name": "Series",
+          "JsonName": "series",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesResource"
+          }
+        },
+        {
+          "Name": "Title",
+          "JsonName": "title",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "ParsedEpisodeInfo",
+      "SchemaName": "ParsedEpisodeInfo",
+      "Fields": [
+        {
+          "Name": "AbsoluteEpisodeNumbers",
+          "JsonName": "absoluteEpisodeNumbers",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "AirDate",
+          "JsonName": "airDate",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "DailyPart",
+          "JsonName": "dailyPart",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "EpisodeNumbers",
+          "JsonName": "episodeNumbers",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Integer"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "FullSeason",
+          "JsonName": "fullSeason",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsAbsoluteNumbering",
+          "JsonName": "isAbsoluteNumbering",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsDaily",
+          "JsonName": "isDaily",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsMiniSeries",
+          "JsonName": "isMiniSeries",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsMultiSeason",
+          "JsonName": "isMultiSeason",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsPartialSeason",
+          "JsonName": "isPartialSeason",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsPossibleSceneSeasonSpecial",
+          "JsonName": "isPossibleSceneSeasonSpecial",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsPossibleSpecialEpisode",
+          "JsonName": "isPossibleSpecialEpisode",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsSeasonExtra",
+          "JsonName": "isSeasonExtra",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "IsSplitEpisode",
+          "JsonName": "isSplitEpisode",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Languages",
+          "JsonName": "languages",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "Language"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Quality",
+          "JsonName": "quality",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "QualityModel"
+          }
+        },
+        {
+          "Name": "ReleaseGroup",
+          "JsonName": "releaseGroup",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ReleaseHash",
+          "JsonName": "releaseHash",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ReleaseTitle",
+          "JsonName": "releaseTitle",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ReleaseTokens",
+          "JsonName": "releaseTokens",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ReleaseType",
+          "JsonName": "releaseType",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ReleaseType"
+          }
+        },
+        {
+          "Name": "SeasonNumber",
+          "JsonName": "seasonNumber",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "SeasonPart",
+          "JsonName": "seasonPart",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "SeriesTitle",
+          "JsonName": "seriesTitle",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SeriesTitleInfo",
+          "JsonName": "seriesTitleInfo",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "SeriesTitleInfo"
+          }
+        },
+        {
+          "Name": "Special",
+          "JsonName": "special",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SpecialAbsoluteEpisodeNumbers",
+          "JsonName": "specialAbsoluteEpisodeNumbers",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Double"
+            }
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "SeriesTitleInfo",
+      "SchemaName": "SeriesTitleInfo",
+      "Fields": [
+        {
+          "Name": "AllTitles",
+          "JsonName": "allTitles",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "String"
+            }
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Title",
+          "JsonName": "title",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "TitleWithoutYear",
+          "JsonName": "titleWithoutYear",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Year",
+          "JsonName": "year",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ]
+    }
+  ]
+}

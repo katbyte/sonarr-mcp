@@ -1,0 +1,314 @@
+{
+  "Name": "MediaManagementConfig",
+  "Tag": "MediaManagementConfig",
+  "Operations": [
+    {
+      "Name": "GetConfigMediaManagement",
+      "Method": "GET",
+      "Path": "/api/v3/config/mediamanagement",
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "MediaManagementConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "GetConfigMediaManagementById",
+      "Method": "GET",
+      "Path": "/api/v3/config/mediamanagement/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        }
+      ],
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "MediaManagementConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        200
+      ]
+    },
+    {
+      "Name": "PutConfigMediaManagementById",
+      "Method": "PUT",
+      "Path": "/api/v3/config/mediamanagement/{id}",
+      "PathParameters": [
+        {
+          "Name": "id",
+          "Argument": "id",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ],
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "MediaManagementConfigResource"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "MediaManagementConfigResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        202
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "MediaManagementConfigResource",
+      "SchemaName": "MediaManagementConfigResource",
+      "Fields": [
+        {
+          "Name": "AutoUnmonitorPreviouslyDownloadedEpisodes",
+          "JsonName": "autoUnmonitorPreviouslyDownloadedEpisodes",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "ChmodFolder",
+          "JsonName": "chmodFolder",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "ChownGroup",
+          "JsonName": "chownGroup",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "CopyUsingHardlinks",
+          "JsonName": "copyUsingHardlinks",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "CreateEmptySeriesFolders",
+          "JsonName": "createEmptySeriesFolders",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "DeleteEmptyFolders",
+          "JsonName": "deleteEmptyFolders",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "DownloadPropersAndRepacks",
+          "JsonName": "downloadPropersAndRepacks",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "ProperDownloadTypes"
+          }
+        },
+        {
+          "Name": "EnableMediaInfo",
+          "JsonName": "enableMediaInfo",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "EpisodeTitleRequired",
+          "JsonName": "episodeTitleRequired",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "EpisodeTitleRequiredType"
+          }
+        },
+        {
+          "Name": "ExtraFileExtensions",
+          "JsonName": "extraFileExtensions",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "FileDate",
+          "JsonName": "fileDate",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "FileDateType"
+          }
+        },
+        {
+          "Name": "Id",
+          "JsonName": "id",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "ImportExtraFiles",
+          "JsonName": "importExtraFiles",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "MinimumFreeSpaceWhenImporting",
+          "JsonName": "minimumFreeSpaceWhenImporting",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "RecycleBin",
+          "JsonName": "recycleBin",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "RecycleBinCleanupDays",
+          "JsonName": "recycleBinCleanupDays",
+          "Type": {
+            "Type": "Integer"
+          }
+        },
+        {
+          "Name": "RescanAfterRefresh",
+          "JsonName": "rescanAfterRefresh",
+          "Type": {
+            "Type": "Reference",
+            "ReferenceName": "RescanAfterRefreshType"
+          }
+        },
+        {
+          "Name": "ScriptImportPath",
+          "JsonName": "scriptImportPath",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "SetPermissionsLinux",
+          "JsonName": "setPermissionsLinux",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "SkipFreeSpaceCheckWhenImporting",
+          "JsonName": "skipFreeSpaceCheckWhenImporting",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "UseScriptImport",
+          "JsonName": "useScriptImport",
+          "Type": {
+            "Type": "Boolean"
+          }
+        }
+      ]
+    }
+  ],
+  "Constants": [
+    {
+      "Name": "EpisodeTitleRequiredType",
+      "SchemaName": "EpisodeTitleRequiredType",
+      "Values": [
+        {
+          "Name": "EpisodeTitleRequiredTypeAlways",
+          "Value": "always"
+        },
+        {
+          "Name": "EpisodeTitleRequiredTypeBulkSeasonReleases",
+          "Value": "bulkSeasonReleases"
+        },
+        {
+          "Name": "EpisodeTitleRequiredTypeNever",
+          "Value": "never"
+        }
+      ]
+    },
+    {
+      "Name": "FileDateType",
+      "SchemaName": "FileDateType",
+      "Values": [
+        {
+          "Name": "FileDateTypeNone",
+          "Value": "none"
+        },
+        {
+          "Name": "FileDateTypeLocalAirDate",
+          "Value": "localAirDate"
+        },
+        {
+          "Name": "FileDateTypeUtcAirDate",
+          "Value": "utcAirDate"
+        }
+      ]
+    },
+    {
+      "Name": "ProperDownloadTypes",
+      "SchemaName": "ProperDownloadTypes",
+      "Values": [
+        {
+          "Name": "ProperDownloadTypesPreferAndUpgrade",
+          "Value": "preferAndUpgrade"
+        },
+        {
+          "Name": "ProperDownloadTypesDoNotUpgrade",
+          "Value": "doNotUpgrade"
+        },
+        {
+          "Name": "ProperDownloadTypesDoNotPrefer",
+          "Value": "doNotPrefer"
+        }
+      ]
+    },
+    {
+      "Name": "RescanAfterRefreshType",
+      "SchemaName": "RescanAfterRefreshType",
+      "Values": [
+        {
+          "Name": "RescanAfterRefreshTypeAlways",
+          "Value": "always"
+        },
+        {
+          "Name": "RescanAfterRefreshTypeAfterManual",
+          "Value": "afterManual"
+        },
+        {
+          "Name": "RescanAfterRefreshTypeNever",
+          "Value": "never"
+        }
+      ]
+    }
+  ]
+}
