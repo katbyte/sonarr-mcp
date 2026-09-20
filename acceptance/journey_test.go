@@ -211,3 +211,59 @@ func hasSeason(t *testing.T, series string, season int) bool {
 
 	return false
 }
+
+// A folder renamed outside Sonarr: the series has lost its folder, the
+// folder belongs to no series, and both audits name the same fix - point the
+// series at it, rather than add the show a second time.
+func TestJourneyFolderRenamed(t *testing.T) {
+	skipUnlessReady(t)
+
+	from := filepath.Join(tvDir(), cowboyBebop.Folder)
+	renamed := cowboyBebop.Title + " (" + itoa(cowboyBebop.Year) + ")"
+	to := filepath.Join(tvDir(), renamed)
+	if err := os.Rename(from, to); err != nil {
+		t.Fatal(err)
+	}
+	restored := false
+	t.Cleanup(func() {
+		if !restored {
+			_ = os.Rename(to, from)
+		}
+		call(t, "series_edit", map[string]any{"series": cowboyBebop.Title, "path": "/tv/" + cowboyBebop.Folder})
+		call(t, "series_rescan", map[string]any{"series": cowboyBebop.Title})
+	})
+
+	f := only(t, call(t, "audit_missing_folders", nil), "series", cowboyBebop.Title)
+	if str(f["problem"]) != "series folder renamed" || !strings.Contains(str(f["fix"]), `series_edit path "/tv/`+renamed+`"`) {
+		t.Fatalf("the renamed folder = %v", f)
+	}
+	// and from the other side, without offering to add the show again
+	u := only(t, call(t, "audit_unmapped_folders", nil), "subject", "/tv/"+renamed)
+	if str(u["problem"]) != "folder of a series that moved" || !strings.Contains(str(u["fix"]), "series_edit "+cowboyBebop.Title) {
+		t.Fatalf("the folder left behind = %v", u)
+	}
+
+	call(t, "series_edit", map[string]any{"series": cowboyBebop.Title, "path": "/tv/" + renamed})
+	call(t, "series_rescan", map[string]any{"series": cowboyBebop.Title})
+
+	// Sonarr holds the series where it is now, with its files
+	got := call(t, "series_get", map[string]any{"series": cowboyBebop.Title})
+	if str(got["path"]) != "/tv/"+renamed || numOr0(got["episodes_have"]) != cowboyBebop.Files {
+		t.Errorf("after the move = %v at %v", got["episodes_have"], got["path"])
+	}
+	if gone := findings(t, call(t, "audit_missing_files", nil), "series", cowboyBebop.Title); len(gone) != 0 {
+		t.Errorf("files recorded where they are not: %v", gone)
+	}
+	if left := findings(t, call(t, "audit_missing_folders", nil), "series", cowboyBebop.Title); len(left) != 0 {
+		t.Errorf("after the fix = %v", left)
+	}
+	if left := findings(t, call(t, "audit_unmapped_folders", nil), "subject", "/tv/"+renamed); len(left) != 0 {
+		t.Errorf("the folder is still unknown to Sonarr: %v", left)
+	}
+
+	// put the library back the way the rest of the suite expects it
+	if err := os.Rename(to, from); err != nil {
+		t.Fatal(err)
+	}
+	restored = true
+}

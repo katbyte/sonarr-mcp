@@ -68,6 +68,9 @@ const profile = "HD-1080p"
 // unusedTag is a tag the seed creates and nothing carries.
 const unusedTag = "4k"
 
+// scopingTag is the tag TestAuditProfiles puts on an indexer and no series.
+const scopingTag = "test-scope"
+
 // The fakes the container searches and downloads with.
 var (
 	indexer *newznab.Server

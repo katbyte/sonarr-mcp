@@ -68,7 +68,7 @@ var Toolsets = map[string][]string{
 	// of, renaming, re-monitoring, and the profile and tag edits
 	"curation": {
 		"audit_all", "audit_missing_episodes", "audit_cutoff_unmet", "audit_stuck_downloads", "audit_failed_downloads",
-		"audit_unmapped_folders", "audit_untracked_files", "audit_naming", "audit_missing_files", "audit_quality_mismatch",
+		"audit_unmapped_folders", "audit_missing_folders", "audit_untracked_files", "audit_naming", "audit_missing_files", "audit_quality_mismatch",
 		"audit_runtime", "audit_language", "audit_monitoring", "audit_profiles", "audit_series_settings", "audit_health",
 		"episode_search", "season_search", "series_search", "wanted_search",
 		"release_search", "release_grab", "release_parse",

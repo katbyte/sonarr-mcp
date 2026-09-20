@@ -387,3 +387,12 @@ func limitOr(limit, def int) int {
 
 	return limit
 }
+
+// countOf is a count and its noun, pluralised: "1 file", "3 files".
+func countOf(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+
+	return strconv.Itoa(n) + " " + noun + "s"
+}

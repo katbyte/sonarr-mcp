@@ -28,16 +28,20 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"maps"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -243,6 +247,31 @@ func (r *Request) SetBody(body io.Reader, contentType string) error {
 	return nil
 }
 
+// unreached says what a request that never reached the server means, in words
+// its operator can act on: the wrong address, a server that is not running, a
+// name that does not resolve, a certificate it cannot verify. The original
+// error is kept, wrapped, for anything that wants it.
+func unreached(baseURL string, err error) error {
+	at := "cannot reach Sonarr at " + baseURL
+	var dns *net.DNSError
+	var unknown x509.UnknownAuthorityError
+	var hostname x509.HostnameError
+	switch {
+	case errors.Is(err, context.Canceled):
+		return fmt.Errorf("%s: the request was cancelled: %w", at, err)
+	case errors.Is(err, context.DeadlineExceeded), os.IsTimeout(err):
+		return fmt.Errorf("%s: it did not answer in time; a large library can take longer than the timeout: %w", at, err)
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return fmt.Errorf("%s: nothing is listening there; check the address and that Sonarr is running: %w", at, err)
+	case errors.As(err, &dns):
+		return fmt.Errorf("%s: the name %q does not resolve: %w", at, dns.Name, err)
+	case errors.As(err, &unknown), errors.As(err, &hostname):
+		return fmt.Errorf("%s: its certificate cannot be verified; use http, or trust the certificate: %w", at, err)
+	}
+
+	return fmt.Errorf("%s: %w", at, err)
+}
+
 // Execute sends the request. The response is returned whenever the server
 // answered, including with a *StatusError, so the caller can read its status
 // and body. Its body is buffered (and readable again) unless the request
@@ -250,7 +279,7 @@ func (r *Request) SetBody(body io.Reader, contentType string) error {
 func (r *Request) Execute(_ context.Context) (*Response, error) {
 	httpResp, err := r.client.HTTPClient.Do(r.Request) //nolint:bodyclose // buffered and closed below, or a stream handed to the caller to close
 	if err != nil {
-		return nil, err
+		return nil, unreached(r.client.BaseURL, err)
 	}
 	resp := &Response{Response: httpResp}
 

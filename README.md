@@ -13,7 +13,7 @@ An [MCP](https://modelcontextprotocol.io) server, CLI and Go SDK that **audit a
 find** - from Claude Code, Claude Desktop, or any other MCP client.
 
 Sonarr's API is large, and an MCP server that wraps it lets a model list your series and
-read the queue. This one does that too, but the reason it exists is the layer above: **15
+read the queue. This one does that too, but the reason it exists is the layer above: **16
 audits**, each a sweep over the whole library for one specific thing that goes wrong with a
 real Sonarr - episodes that aired and never arrived, files stuck below their profile's
 cutoff, a download blocked from importing since Tuesday, a release that keeps failing, files
@@ -27,12 +27,13 @@ uses - returning a worklist rather than a dump, and naming the tool that fixes i
 |---|---|
 | `audit_all` | every audit in one call, counts only, so one call says where the library needs work - start here |
 | `audit_missing_episodes` | monitored episodes that have aired with no file, by series and season, saying which are already downloading and which Sonarr searched for and did not find; `episode_search`, `season_search` or `wanted_search` fetch them |
-| `audit_cutoff_unmet` | monitored files below their profile's cutoff, by quality or by custom format score, that Sonarr would upgrade; `series_search` or `wanted_search kind=cutoff` go and get them |
+| `audit_cutoff_unmet` | monitored files below their profile's cutoff: below the cutoff quality, or below the custom format score the profile upgrades until - which Sonarr's own Cutoff Unmet list leaves out. Says when a profile has Upgrades Allowed off (Sonarr's built-in profiles do), so nothing would be replaced by itself; `series_search` or `wanted_search kind=cutoff` go and get them |
 | `audit_stuck_downloads` | downloads that need a person: blocked from importing (and Sonarr's reason), waiting to import for hours, failed, paused, warned about, or on a download client Sonarr cannot reach; `import_apply` or `queue_remove` clear them |
 | `audit_failed_downloads` | failures over the last 30 days by episode, flagging episodes whose releases keep failing, and grabs that went nowhere - sent to the client, never imported, never failed, gone from the queue |
 | `audit_missing_files` | files Sonarr records that are no longer on disk, so the episodes show as downloaded when they are not; `series_rescan` drops the records |
 | `audit_untracked_files` | video files in series folders Sonarr is not tracking - copied in by hand, a second copy, a name it cannot parse - with what Sonarr reads from each name and why it has not taken it in; `import_apply` takes them in |
-| `audit_unmapped_folders` | folders in the root folders that are not a series in Sonarr: shows copied in by hand, or left behind by a deleted series; `series_import` adds them where they are |
+| `audit_unmapped_folders` | folders in the root folders that are not a series in Sonarr, and how many video files each holds: shows copied in by hand, or left behind by a deleted series; `series_import` adds them where they are. A folder that goes by the name of a series whose own folder is gone is named as that series moved, to point at rather than add again |
+| `audit_missing_folders` | series whose folder is not on disk: renamed or moved outside Sonarr, or a drive not mounted (reported once for the root folder, not once per series). When a folder Sonarr doesn't know goes by the series' name, the finding names it; `series_edit path` and `series_rescan` fix it |
 | `audit_naming` | series whose files are not named to the naming format, with a sample of the renames; `series_rename` renames them. With Rename Episodes off, Sonarr keeps the names files arrive with and cannot say which differ, and the audit says so |
 | `audit_quality_mismatch` | files recorded as one quality whose video is another: recorded 1080p but really 720p (never upgraded), or labelled SD but really HD (upgraded forever); `file_edit` corrects the record |
 | `audit_runtime` | files whose running time is far off the episode's - a truncated download, a sample imported as the episode, the wrong episode - or that have no running time at all |
@@ -50,7 +51,7 @@ and images inside it; `series_list` rows carry what a list needs).
 
 ### What else is in the box
 
-- **68 tools, in toolsets.** List and inspect series, seasons and episodes, what airs next,
+- **69 tools, in toolsets.** List and inspect series, seasons and episodes, what airs next,
   the queue and history, search and grab, parse a release name, import files and folders,
   rename, rescan and refresh, edit series and files, monitoring, tags, profiles, root folders,
   indexers and download clients (and test them), tasks, commands and logs. Each sits in a
@@ -190,17 +191,17 @@ name.
 | downloads | `queue_list`, `queue_grab` (send what a delay profile holds), `queue_remove` (from the client too, optionally blocklisting), `history_list`, `history_mark_failed`, `blocklist_list`, `blocklist_remove` |
 | settings | `profile_list`, `customformat_list`, `tag_list` (and what uses each tag), `tag_create`, `tag_delete`, `config_get` (naming, media management, host, UI, indexer, download client and import list options), `rootfolder_list`, `rootfolder_add`, `rootfolder_remove` |
 | providers | `indexer_list`, `indexer_test`, `downloadclient_list`, `downloadclient_test` (as Sonarr's Test button, saying what is wrong with each that fails; credentials never shown) |
-| audits | the 15 audits and `audit_all` in [the table above](#the-audits) |
+| audits | the 16 audits and `audit_all` in [the table above](#the-audits) |
 
 `series_delete` (which removes a series, and its files if asked) and `file_delete` (which
 deletes files from disk) are only registered when `--enable-delete` / `SONARR_ENABLE_DELETE` is
-set. `--read-only` registers the 42 read tools and
+set. `--read-only` registers the 43 read tools and
 nothing else, so a write tool is absent from `tools/list` rather than refused when called.
 
 ### Choosing which tools load
 
 **The default is `core`: six read-only tools, about 850 tokens.** The whole surface is around
-9,000 tokens of tool definitions before anyone asks a question, which is a poor way to spend a
+9,200 tokens of tool definitions before anyone asks a question, which is a poor way to spend a
 client's context by default. `--toolsets` / `SONARR_TOOLSETS` loads the groups a session
 actually needs, and `core` comes along with whatever else is asked for, because nothing else
 can find a series.
@@ -214,12 +215,12 @@ tools are `admin`. `SONARR_TOOLSETS=all` restores every tool.
 | `core` *(default)* | 6 | 6 | 850 |
 | `library` | 5 | 11 | 1,500 |
 | `admin` | 11 (13 with `--enable-delete`) | 17 (19) | 1,700 (1,950) |
-| `curation` | 44 | 50 | 7,500 |
-| `all` | 66 (68 with `--enable-delete`) | 66 (68) | 9,000 (9,200) |
+| `curation` | 45 | 51 | 7,700 |
+| `all` | 67 (69 with `--enable-delete`) | 67 (69) | 9,200 (9,400) |
 
 Tokens are what the model sees: each tool's name, description and input schema, measured over
 a real `tools/list` at four bytes a token. Every tool also carries an output schema, another
-15,000 tokens across `all`, but clients keep that to themselves to validate results rather than
+15,500 tokens across `all`, but clients keep that to themselves to validate results rather than
 sending it to the model.
 
 `--toolsets` also takes a resource family - `series`, `episode`, `season`, `file`, `queue`,
@@ -267,7 +268,9 @@ tool.
    is removed with `queue_remove blocklist=true`, and Sonarr searches for another.
 4. `audit_untracked_files` and `audit_unmapped_folders` find what is on disk and not in
    Sonarr; `import_apply` and `series_import` take it in where it is.
-   `audit_missing_files` finds the reverse, and `series_rescan` drops the dead records.
+   `audit_missing_files` and `audit_missing_folders` find the reverse - records with
+   nothing behind them - and say whether a folder simply moved, which `series_edit path`
+   and `series_rescan` put right, or is gone, which `series_rescan` clears.
 5. `audit_quality_mismatch` finds files recorded at the wrong quality; `file_edit` corrects
    them, so Sonarr upgrades what it should and stops chasing what it should not.
 6. `audit_naming` shows what does not match the naming format; `series_rename dry_run=true`
@@ -348,9 +351,14 @@ The generated `lib/sonarr` is left out of the number and reported on a line of i
 one mechanical method per operation, and what proves it is that the integration suite calls
 224 of its 228 operations against a real Sonarr, not a line count.
 
-**Every tool is exercised.** Tool coverage is enforced rather than claimed: the acceptance
-suite records every tool it calls and fails if the server registered one nothing called, so a
-new tool cannot ship untested. Nothing in either suite talks to a real indexer or download
+**Every tool is exercised, and every audit's findings with it.** Coverage is enforced rather
+than claimed: the acceptance suite records every tool it calls and fails if the server
+registered one nothing called, so a new tool cannot ship untested. The same goes for what the
+audits report - each audit declares the kinds of finding it can make, and a run fails if the
+seeded library never produces one of them and nothing says why. The few that a real Sonarr
+cannot be made to produce (a download stuck for a day, a disk nearly full, a folder the
+scan will not account for) are listed with their reason and the unit test that covers them
+instead. Nothing in either suite talks to a real indexer or download
 client: a fake Newznab indexer and a fake SABnzbd (`internal/fakes`) run inside the test
 process, serve releases for the fixture series and write a finished download's files when the
 test says so. Sonarr's own calls out to TheTVDB (through SkyHook), services.sonarr.tv, XEM and

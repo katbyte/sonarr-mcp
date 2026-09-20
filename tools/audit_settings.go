@@ -30,24 +30,24 @@ func (*registry) auditMonitoring(_ context.Context, s *snapshot, limit int) (aud
 
 		switch {
 		case continuing && !boolv(series.Monitored):
-			f.Problem = "continuing series not monitored"
+			f.Problem = problemSeriesUnmonitored
 			f.Detail = fmt.Sprintf("%s is still %s, and Sonarr will not grab any new episode of it", series.Title, series.Status)
 			f.Fix = "series_edit monitored true, if it is still wanted"
 			out.report(limit, f)
 		case boolv(series.Monitored) && len(seasons) > 0 && !anyMonitored:
-			f.Problem = "nothing monitored"
+			f.Problem = problemNothingMonitored
 			f.Detail = "the series is monitored but every season is not, so Sonarr searches for nothing"
 			f.Fix = "season_monitor the seasons wanted"
 			out.report(limit, f)
 		case continuing && boolv(series.Monitored) && series.MonitorNewItems == sonarr.NewItemMonitorTypesNone:
-			f.Problem = "new seasons will not be monitored"
+			f.Problem = problemNewSeasonsIgnored
 			f.Detail = "the series is still airing, and a season that appears later will be added unmonitored and never searched for"
 			f.Fix = "series_edit monitor_new_items all"
 			out.report(limit, f)
 		case continuing && boolv(series.Monitored) && anyMonitored && !boolv(seasons[len(seasons)-1].Monitored):
 			latest := seasons[len(seasons)-1].SeasonNumber
 			f.Subject = fmt.Sprintf("season %d", latest)
-			f.Problem = "latest season not monitored"
+			f.Problem = problemLatestSeasonUnmonitored
 			f.Detail = fmt.Sprintf("earlier seasons are monitored, the latest (season %d) is not", latest)
 			f.Fix = fmt.Sprintf("season_monitor season %d", latest)
 			out.report(limit, f)
@@ -85,14 +85,14 @@ func (r *registry) auditSeriesSettings(ctx context.Context, s *snapshot, limit i
 
 		if looksAnime(series) && series.SeriesType != sonarr.SeriesTypesAnime {
 			f := base
-			f.Problem = "anime not typed anime"
+			f.Problem = problemNotTypedAnime
 			f.Detail = fmt.Sprintf("its genres are %s and it is typed %s, so Sonarr will not read the absolute episode numbers anime releases use", strings.Join(series.Genres, ", "), series.SeriesType)
 			f.Fix = "series_edit series_type anime"
 			out.report(limit, f)
 		}
 		if hasGenre(series, "talk show", "news") && series.SeriesType != sonarr.SeriesTypesDaily {
 			f := base
-			f.Problem = "daily show not typed daily"
+			f.Problem = problemNotTypedDaily
 			f.Detail = fmt.Sprintf("its genres are %s and it is typed %s, so Sonarr will not match releases named by air date", strings.Join(series.Genres, ", "), series.SeriesType)
 			f.Fix = "series_edit series_type daily"
 			out.report(limit, f)
@@ -100,7 +100,7 @@ func (r *registry) auditSeriesSettings(ctx context.Context, s *snapshot, limit i
 		if !slices.ContainsFunc(roots.Model, func(root sonarr.RootFolderResource) bool { return inFolder(series.Path, root.Path) }) {
 			f := base
 			f.Subject = series.Path
-			f.Problem = "outside every root folder"
+			f.Problem = problemOutsideRootFolders
 			f.Detail = "the series' folder is in none of Sonarr's root folders, so it is missed by everything that works root folder by root folder"
 			f.Fix = "series_edit path into a root folder, with move_files"
 			out.report(limit, f)
@@ -119,7 +119,7 @@ func (r *registry) auditSeriesSettings(ctx context.Context, s *snapshot, limit i
 		if have := path.Base(strings.TrimRight(series.Path, "/")); want.Folder != "" && have != want.Folder {
 			f := base
 			f.Subject = series.Path
-			f.Problem = "folder not named to the format"
+			f.Problem = problemFolderOffFormat
 			f.Detail = fmt.Sprintf("the folder is %q, the series folder format makes %q", have, want.Folder)
 			f.Fix = fmt.Sprintf("series_edit path %s with move_files", path.Join(path.Dir(strings.TrimRight(series.Path, "/")), want.Folder))
 			out.report(limit, f)
@@ -160,7 +160,7 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 	for _, p := range profiles {
 		if onSeries[p.Id] == 0 {
 			out.report(limit, finding{
-				Subject: p.Name, Problem: "quality profile unused",
+				Subject: p.Name, Problem: problemProfileUnused,
 				Detail: fmt.Sprintf("no series is on the %s profile", p.Name), Fix: "leave it, or delete it in Sonarr if it will not be wanted",
 			})
 		}
@@ -178,7 +178,7 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 		switch {
 		case used == 0:
 			out.report(limit, finding{
-				Subject: d.Label, Problem: "tag unused",
+				Subject: d.Label, Problem: problemTagUnused,
 				Detail: fmt.Sprintf("nothing carries the tag %q", d.Label), Fix: "tag_delete " + d.Label,
 			})
 		case len(d.SeriesIds) == 0:
@@ -193,7 +193,7 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 			}
 			slices.Sort(what)
 			out.report(limit, finding{
-				Subject: d.Label, Problem: "tag scopes settings but no series",
+				Subject: d.Label, Problem: problemTagScopesNothing,
 				Detail: fmt.Sprintf("%s apply only to series tagged %q, and no series is, so they apply to nothing", strings.Join(what, " and "), d.Label),
 				Fix:    fmt.Sprintf("series_edit add_tags %s on the series they are meant for", d.Label),
 			})
@@ -211,7 +211,7 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 	for _, cf := range formats.Model {
 		if !scored[cf.Id] {
 			out.report(limit, finding{
-				Subject: cf.Name, Problem: "custom format scored nowhere",
+				Subject: cf.Name, Problem: problemFormatUnscored,
 				Detail: fmt.Sprintf("no quality profile gives %q a score, so matching it changes nothing", cf.Name),
 				Fix:    "score it in a quality profile in Sonarr, or delete it",
 			})
@@ -225,7 +225,7 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 				name = fmt.Sprintf("release profile %d", p.Id)
 			}
 			out.report(limit, finding{
-				Subject: name, Problem: "release profile disabled",
+				Subject: name, Problem: problemReleaseProfileOff,
 				Detail: "the release profile is switched off, so its required and ignored terms do nothing", Fix: "enable or delete it in Sonarr",
 			})
 		}
@@ -261,7 +261,7 @@ func (r *registry) auditHealth(ctx context.Context, _ *snapshot, limit int) (aud
 	slices.SortStableFunc(checks, func(a, b sonarr.HealthResource) int { return healthRank(string(a.Type)) - healthRank(string(b.Type)) })
 	out := auditOut{Scanned: len(checks) + len(roots.Model)}
 	for _, h := range checks {
-		f := finding{Subject: h.Source, Problem: "health " + string(h.Type), Detail: h.Message}
+		f := finding{Subject: h.Source, Problem: problemHealthCheck + " " + string(h.Type), Detail: h.Message}
 		if h.WikiUrl != "" {
 			f.Fix = "see " + h.WikiUrl
 		}
@@ -271,7 +271,7 @@ func (r *registry) auditHealth(ctx context.Context, _ *snapshot, limit int) (aud
 	for _, root := range roots.Model {
 		if !boolv(root.Accessible) {
 			out.report(limit, finding{
-				Subject: root.Path, Problem: "root folder unreachable",
+				Subject: root.Path, Problem: problemRootUnreachable,
 				Detail: "Sonarr cannot reach the root folder: a mount gone, or permissions", Fix: "check the mount or the permissions Sonarr runs with",
 			})
 			continue
@@ -294,7 +294,7 @@ func (r *registry) auditHealth(ctx context.Context, _ *snapshot, limit int) (aud
 				detail += fmt.Sprintf(" of %s (%d%%)", humanSize(total), free*100/total)
 			}
 			out.report(limit, finding{
-				Subject: root.Path, Problem: "root folder low on space", Detail: detail + ": imports will start failing when it fills",
+				Subject: root.Path, Problem: problemRootLowOnSpace, Detail: detail + ": imports will start failing when it fills",
 				Fix: "free space, or add another root folder with rootfolder_add and move series with series_edit",
 			})
 		}

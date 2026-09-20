@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/katbyte/sonarr-mcp/lib/sonarr"
 )
 
 // The audits against the library as seeded: each finds what its fixture
@@ -101,8 +103,42 @@ func TestAuditUnmappedFolders(t *testing.T) {
 	if str(f["problem"]) != "folder not in Sonarr" || !strings.Contains(str(f["fix"]), "series_import") {
 		t.Errorf("The Expanse = %v", f)
 	}
+	// what is in it, so a model can tell a show from an empty folder
+	if !strings.Contains(str(f["detail"]), strconv.Itoa(theExpanse.Files)+" video files") {
+		t.Errorf("The Expanse detail = %v", f["detail"])
+	}
 	// a series' own folder is mapped
 	none(t, out, "subject", "/tv/"+firefly.Folder)
+}
+
+// Every seeded series' folder is where Sonarr thinks it is.
+func TestAuditMissingFolders(t *testing.T) {
+	out := audit(t, "audit_missing_folders", nil)
+
+	if n := num(t, out["total_findings"], "total_findings"); n != 0 {
+		t.Errorf("audit_missing_folders found %d, want none", n)
+	}
+	if n := num(t, out["scanned"], "scanned"); n < len(importedSeed) {
+		t.Errorf("audit_missing_folders scanned %d series", n)
+	}
+
+	// a folder renamed to something no show goes by: the series has lost it,
+	// and nothing on disk says where it went
+	skipUnlessReady(t)
+	from := filepath.Join(tvDir(), chernobyl.Folder)
+	to := filepath.Join(tvDir(), "zzz-not-a-show")
+	if err := os.Rename(from, to); err != nil {
+		t.Fatal(err)
+	}
+	gone := audit(t, "audit_missing_folders", map[string]any{"series": chernobyl.Title})
+	if err := os.Rename(to, from); err != nil {
+		t.Fatal(err)
+	}
+	f := only(t, gone, "series", chernobyl.Title)
+	if str(f["problem"]) != "series folder missing" || !strings.Contains(str(f["detail"]), "records 5 files there") ||
+		!strings.Contains(str(f["fix"]), "series_edit path") {
+		t.Errorf("the folder that went = %v", f)
+	}
 }
 
 func TestAuditNaming(t *testing.T) {
@@ -150,6 +186,34 @@ func TestAuditMonitoring(t *testing.T) {
 	for _, s := range []seriesFixture{firefly, chernobyl, breakingBad} {
 		none(t, out, "series", s.Title)
 	}
+
+	// a continuing series nobody monitors will never grab anything
+	call(t, "series_edit", map[string]any{"series": severance.Title, "monitored": false})
+	t.Cleanup(func() { call(t, "series_edit", map[string]any{"series": severance.Title, "monitored": true}) })
+	off := audit(t, "audit_monitoring", nil)
+	if f := only(t, off, "series", severance.Title); str(f["problem"]) != "continuing series not monitored" ||
+		!strings.Contains(str(f["fix"]), "series_edit monitored true") {
+		t.Errorf("Severance unmonitored = %v", f)
+	}
+	call(t, "series_edit", map[string]any{"series": severance.Title, "monitored": true})
+
+	// and a monitored series with every season turned off searches for
+	// nothing, which no other finding would say
+	var seasons []any
+	for _, s := range rows(t, call(t, "series_get", map[string]any{"series": severance.Title})["seasons"], "seasons") {
+		if n := num(t, s["season"], "season"); n > 0 {
+			seasons = append(seasons, n)
+		}
+	}
+	call(t, "season_monitor", map[string]any{"series": severance.Title, "seasons": seasons, "monitored": false})
+	t.Cleanup(func() {
+		call(t, "season_monitor", map[string]any{"series": severance.Title, "seasons": seasons, "monitored": true})
+	})
+	none := audit(t, "audit_monitoring", nil)
+	if f := only(t, none, "series", severance.Title); str(f["problem"]) != "nothing monitored" ||
+		!strings.Contains(str(f["fix"]), "season_monitor") {
+		t.Errorf("Severance with no season monitored = %v", f)
+	}
 }
 
 func TestAuditSeriesSettings(t *testing.T) {
@@ -181,6 +245,54 @@ func TestAuditProfiles(t *testing.T) {
 	}
 	// anime is on Cowboy Bebop
 	none(t, out, "subject", "anime")
+
+	// a release profile switched off does nothing at all
+	off, err := api.PostReleaseProfile(ctx, sonarr.ReleaseProfileResource{
+		Name: "Test switched off", Enabled: new(false), Required: []string{"x264"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = api.DeleteReleaseProfileById(ctx, off.Model.Id) })
+
+	// and a tag that scopes a setting but no series scopes nothing
+	call(t, "tag_create", map[string]any{"label": scopingTag})
+	// the test deletes it as the fix; the cleanup is for a run that stops first
+	t.Cleanup(func() { _, _ = invoke("tag_delete", map[string]any{"label": scopingTag}) })
+	tagID := num(t, findRow(t, rows(t, call(t, "tag_list", nil)["tags"], "tags"), "label", scopingTag)["id"], "id")
+	indexers, err := api.GetIndexer(ctx)
+	if err != nil || len(indexers.Model) == 0 {
+		t.Fatalf("reading the indexers: %v", err)
+	}
+	indexer := indexers.Model[0]
+	indexer.Tags = []int{tagID}
+	if _, err := api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOperationOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		indexer.Tags = nil
+		_, _ = api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOperationOptions{})
+	})
+
+	again := audit(t, "audit_profiles", nil)
+	if f := only(t, again, "subject", "Test switched off"); str(f["problem"]) != "release profile disabled" {
+		t.Errorf("the disabled release profile = %v", f)
+	}
+	scoped := only(t, again, "subject", scopingTag)
+	if str(scoped["problem"]) != "tag scopes settings but no series" || !strings.Contains(str(scoped["detail"]), "indexer") {
+		t.Errorf("the tag that scopes an indexer = %v", scoped)
+	}
+
+	// the fix the findings name: take the tag off the indexer and delete it,
+	// and the audit has nothing more to say about it
+	indexer.Tags = nil
+	if _, err := api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOperationOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	call(t, "tag_delete", map[string]any{"label": scopingTag})
+	if left := findings(t, audit(t, "audit_profiles", nil), "subject", scopingTag); len(left) != 0 {
+		t.Errorf("after deleting the tag = %v", left)
+	}
 }
 
 func TestAuditRuntime(t *testing.T) {
@@ -213,6 +325,21 @@ func TestAuditLanguage(t *testing.T) {
 	if len(findings(t, jpn, "problem", "no audio in the language")) != 2 {
 		t.Errorf("Cowboy Bebop against English = %v", jpn["findings"])
 	}
+
+	// every fixture file has a language on its audio track, so a file
+	// recorded in one language with nothing to say either way is the
+	// unit tests' business (TestAuditLanguageEdges); what the library can
+	// show is the fix: recorded French, the audio still English
+	e01 := fireflyFile(t, 1)
+	t.Cleanup(func() { call(t, "file_edit", map[string]any{"file_ids": []any{e01}, "languages": []any{"English"}}) })
+	call(t, "file_edit", map[string]any{"file_ids": []any{e01}, "languages": []any{"French"}})
+	if f := findings(t, audit(t, "audit_language", map[string]any{"series": firefly.Title, "language": "French"}), "problem", "no audio in the language"); len(f) != 1 {
+		t.Errorf("recorded French with English audio, asked about French = %v", f)
+	}
+	call(t, "file_edit", map[string]any{"file_ids": []any{e01}, "languages": []any{"English"}})
+	if f := findings(t, audit(t, "audit_language", map[string]any{"series": firefly.Title}), "series", firefly.Title); len(f) != 0 {
+		t.Errorf("after putting the language back = %v", f)
+	}
 }
 
 func TestAuditQualityMismatch(t *testing.T) {
@@ -230,6 +357,16 @@ func TestAuditQualityMismatch(t *testing.T) {
 	if str(f["problem"]) != "labelled better than it is" || !strings.Contains(str(f["detail"]), "640x360") || !strings.Contains(str(f["fix"]), "file_edit file "+strconv.Itoa(e04)) {
 		t.Errorf("E04 recorded as 1080p = %v", f)
 	}
+
+	// the other way round: an HD file recorded as SD, which Sonarr would
+	// keep trying to upgrade for ever
+	e01 := fireflyFile(t, 1)
+	call(t, "file_edit", map[string]any{"file_ids": []any{e01}, "quality": "SDTV"})
+	t.Cleanup(func() { call(t, "file_edit", map[string]any{"file_ids": []any{e01}, "quality": "WEBDL-1080p"}) })
+	worse := only(t, audit(t, "audit_quality_mismatch", map[string]any{"series": firefly.Title}), "problem", "labelled worse than it is")
+	if !strings.Contains(str(worse["detail"]), "1920x1080") || !strings.Contains(str(worse["fix"]), "stops trying to upgrade") {
+		t.Errorf("E01 recorded as SDTV = %v", worse)
+	}
 }
 
 func TestAuditUntrackedAndMissingFiles(t *testing.T) {
@@ -240,7 +377,9 @@ func TestAuditUntrackedAndMissingFiles(t *testing.T) {
 	season := filepath.Join(tvDir(), firefly.Folder, "Season 1")
 	dropped := filepath.Join(season, "Firefly.S01E07.Safe.1080p.WEB-DL.DD5.1.H.264-FAKE.mkv")
 	mystery := filepath.Join(season, "bonus footage.mkv")
-	for _, p := range []string{dropped, mystery} {
+	// and a worse copy of an episode already there, which Sonarr refuses
+	worse := filepath.Join(season, "Firefly.S01E01.The.Train.Job.480p.HDTV.x264-FAKE.mkv")
+	for _, p := range []string{dropped, mystery, worse} {
 		if err := fakeVideo(p, 45, "1920x1080"); err != nil {
 			t.Fatal(err)
 		}
@@ -253,6 +392,7 @@ func TestAuditUntrackedAndMissingFiles(t *testing.T) {
 	t.Cleanup(func() {
 		_ = os.Remove(dropped)
 		_ = os.Remove(mystery)
+		_ = os.Remove(worse)
 		_ = os.Rename(hostPath(e03)+".away", hostPath(e03))
 	})
 
@@ -265,6 +405,11 @@ func TestAuditUntrackedAndMissingFiles(t *testing.T) {
 	if str(odd["problem"]) != "cannot tell which episode" {
 		t.Errorf("the unnamed file = %v", odd)
 	}
+	spare := only(t, untracked, "subject", "Season 1/Firefly.S01E01")
+	if str(spare["problem"]) != "rejected" || !strings.Contains(str(spare["detail"]), "Sonarr says:") ||
+		!strings.Contains(str(spare["fix"]), "import_apply to import it anyway") {
+		t.Errorf("the worse copy = %v", spare)
+	}
 
 	missing := audit(t, "audit_missing_files", map[string]any{"series": firefly.Title})
 	gone := only(t, missing, "problem", "files gone from disk")
@@ -272,7 +417,37 @@ func TestAuditUntrackedAndMissingFiles(t *testing.T) {
 		t.Errorf("the deleted file = %v", gone)
 	}
 
-	// the whole library sees the same, and nothing more
+	// the fix the finding names: import the file Sonarr was ready to take,
+	// and the audit stops reporting it
+	call(t, "import_apply", map[string]any{"files": []any{map[string]any{"path": "/tv/" + firefly.Folder + "/Season 1/" + filepath.Base(dropped)}}})
+	eventually(t, "audit_untracked_files", map[string]any{"series": firefly.Title}, "the imported file to leave the audit", func(out map[string]any) bool {
+		return len(findings(t, out, "subject", "Season 1/Firefly.S01E07")) == 0
+	})
+	t.Cleanup(func() {
+		for _, f := range rowsOf(call(t, "file_list", map[string]any{"series": firefly.Title, "season": 1})["files"]) {
+			if str(f["episodes"]) == "S01E07" {
+				call(t, "file_delete", map[string]any{"file_ids": []any{numOr0(f["id"])}})
+			}
+		}
+	})
+
+	// a folder that is there and empty, which is not the same as a folder
+	// that has gone
+	bebop := filepath.Join(tvDir(), cowboyBebop.Folder)
+	aside := filepath.Join(tvDir(), ".aside")
+	if err := os.Rename(filepath.Join(bebop, "Season 1"), aside); err != nil {
+		t.Fatal(err)
+	}
+	empty := only(t, audit(t, "audit_missing_files", map[string]any{"series": cowboyBebop.Title}), "problem", "folder holds no files")
+	if err := os.Rename(aside, filepath.Join(bebop, "Season 1")); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(str(empty["detail"]), "records 2 files") || !strings.Contains(str(empty["fix"]), "series_rescan") {
+		t.Errorf("the empty folder = %v", empty)
+	}
+
+	// the whole library sees the same, and nothing more: the two left after
+	// the import above, and no other series
 	all := audit(t, "audit_untracked_files", nil)
 	if n := len(findings(t, all, "series", firefly.Title)); n != 2 {
 		t.Errorf("library-wide untracked for Firefly = %d, want 2", n)

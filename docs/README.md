@@ -97,6 +97,16 @@ each found by the live suites.
 - **Quality comes from the name, resolution from the video.** Sonarr records
   what the file name claims and reads the resolution from the file's streams.
   `audit_quality_mismatch` compares the two; Sonarr itself never does.
+- **Cutoff Unmet is quality alone.** Sonarr's own list compares each file's
+  quality with its profile's cutoff and never looks at custom format scores,
+  so a file good enough on quality and short of the score its profile
+  upgrades until is in no list Sonarr shows. `audit_cutoff_unmet` sweeps for
+  those itself.
+- **The built-in quality profiles do not allow upgrades.** Sonarr creates
+  Any, SD, HD-720p, HD-1080p, Ultra-HD and HD - 720p/1080p with Upgrades
+  Allowed off, and with it off the Cutoff Unmet list is measured against the
+  profile's *lowest* allowed quality instead of its cutoff. The audit says so
+  in the finding, because Sonarr will replace none of those files by itself.
 - **Disk scans do not check for samples.** A five-minute file dropped into a
   series folder is taken as the episode on the next rescan, which is what
   `audit_runtime` is for.

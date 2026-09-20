@@ -61,17 +61,20 @@ type snapshot struct {
 	// covering a library that happens to hold only one
 	named bool
 
-	mu       sync.Mutex
-	files    map[int][]sonarr.EpisodeFileResource
-	episodes map[int][]sonarr.EpisodeResource
-	disk     map[int][]string
-	profiles []sonarr.QualityProfileResource
+	mu          sync.Mutex
+	files       map[int][]sonarr.EpisodeFileResource
+	episodes    map[int][]sonarr.EpisodeResource
+	disk        map[int][]string
+	folders     map[string]map[string]string
+	folderState *folders
+	profiles    []sonarr.QualityProfileResource
 }
 
 // snap reads the series an audit covers: one, when named, or every one.
 func (r *registry) snap(ctx context.Context, series string) (*snapshot, error) {
 	s := &snapshot{
 		r: r, files: map[int][]sonarr.EpisodeFileResource{}, episodes: map[int][]sonarr.EpisodeResource{}, disk: map[int][]string{},
+		folders: map[string]map[string]string{},
 	}
 	if series != "" {
 		one, err := r.resolveSeries(ctx, series)
@@ -137,16 +140,67 @@ func (s *snapshot) episodesOf(ctx context.Context, seriesID int) ([]sonarr.Episo
 	return eps, nil
 }
 
+// foldersIn lists the folders really in a parent folder, as Sonarr sees them,
+// by lower case name: one call answers for every series in a root folder, and
+// tells a folder that is gone from one that is merely empty.
+func (s *snapshot) foldersIn(ctx context.Context, parent string) (map[string]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	parent = strings.TrimRight(parent, "/")
+	if f, ok := s.folders[parent]; ok {
+		return f, nil
+	}
+	// Sonarr lists the contents of a path ending in a separator, and the
+	// parent's contents otherwise
+	res, err := s.r.client.GetFileSystem(ctx, sonarr.GetFileSystemOperationOptions{Path: parent + "/"})
+	if err != nil {
+		return nil, err
+	}
+	var listing struct {
+		Directories []struct {
+			Name string `json:"name"`
+			Path string `json:"path"`
+		} `json:"directories"`
+	}
+	if err := unmarshalRaw(res.Model, &listing); err != nil {
+		return nil, fmt.Errorf("reading the folders in %s: %w", parent, err)
+	}
+	out := make(map[string]string, len(listing.Directories))
+	for _, d := range listing.Directories {
+		out[strings.ToLower(d.Name)] = strings.TrimRight(d.Path, "/")
+	}
+	s.folders[parent] = out
+
+	return out, nil
+}
+
 // diskOf lists the video files really in a series' folder, as Sonarr sees
 // them: empty when the folder is gone.
 func (s *snapshot) diskOf(ctx context.Context, series *sonarr.SeriesResource) ([]string, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if d, ok := s.disk[series.Id]; ok {
+		defer s.mu.Unlock()
 		return d, nil
 	}
-	res, err := s.r.client.GetFileSystemMediaFiles(ctx, sonarr.GetFileSystemMediaFilesOperationOptions{Path: series.Path})
+	s.mu.Unlock()
+
+	out, err := s.videoFiles(ctx, series.Path)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	s.disk[series.Id] = out
+	s.mu.Unlock()
+
+	return out, nil
+}
+
+// videoFiles are the video files in a folder, as Sonarr sees them, without
+// the extras and specials folders it skips itself. A folder that is not
+// there has none.
+func (s *snapshot) videoFiles(ctx context.Context, folder string) ([]string, error) {
+	res, err := s.r.client.GetFileSystemMediaFiles(ctx, sonarr.GetFileSystemMediaFilesOperationOptions{Path: folder})
 	if err != nil {
 		return nil, err
 	}
@@ -154,15 +208,14 @@ func (s *snapshot) diskOf(ctx context.Context, series *sonarr.SeriesResource) ([
 		Path string `json:"path"`
 	}
 	if err := unmarshalRaw(res.Model, &files); err != nil {
-		return nil, fmt.Errorf("reading the files in %s: %w", series.Path, err)
+		return nil, fmt.Errorf("reading the files in %s: %w", folder, err)
 	}
 	var out []string
 	for _, f := range files {
-		if !excludedPath(series.Path, f.Path) {
+		if !excludedPath(folder, f.Path) {
 			out = append(out, f.Path)
 		}
 	}
-	s.disk[series.Id] = out
 
 	return out, nil
 }
@@ -209,6 +262,110 @@ func excludedPath(root, p string) bool {
 	return excludedFolders.MatchString("/"+rel) || excludedFiles.MatchString(path.Base(p))
 }
 
+// The kinds of finding the audits report: a finding's Problem, a short fixed
+// phrase a worklist can be grouped by. Each is named here and listed in
+// AuditProblems, so the live suite can check the library it seeds produces
+// every one of them (acceptance/coverage_test.go).
+const (
+	// audit_missing_episodes
+	problemEpisodesMissing    = "episodes missing"
+	problemWholeSeasonMissing = "whole season missing"
+	// audit_cutoff_unmet
+	problemBelowQualityCutoff = "below quality cutoff"
+	problemBelowFormatCutoff  = "below custom format cutoff"
+	// audit_stuck_downloads
+	problemCannotImport      = "cannot import"
+	problemDownloadFailed    = "download failed"
+	problemWaitingToImport   = "waiting to import"
+	problemClientUnreachable = "download client unreachable"
+	problemPausedInClient    = "paused in the download client"
+	problemDownloadError     = "error"
+	problemDownloadWarning   = "warning"
+	problemNotStarting       = "not starting"
+	// audit_failed_downloads
+	problemRepeatedFailures = "repeated failures"
+	problemGrabWentNowhere  = "grab went nowhere"
+	// audit_unmapped_folders
+	problemFolderUnknown       = "folder not in Sonarr"
+	problemFolderOfMovedSeries = "folder of a series that moved"
+	// audit_missing_folders
+	problemSeriesFolderRenamed = "series folder renamed"
+	problemSeriesFolderMissing = "series folder missing"
+	problemRootFolderEmpty     = "root folder holds none of its series"
+	// audit_untracked_files
+	problemUnreadableName = "cannot tell which episode"
+	problemNotImported    = "not imported"
+	problemImportRejected = "rejected"
+	problemFileNotTracked = "file not tracked"
+	// audit_missing_files
+	problemFilesGone   = "files gone from disk"
+	problemFolderEmpty = "folder holds no files"
+	// audit_naming
+	problemNamesOffFormat = "files not named to the format"
+	problemRenamingOff    = "renaming is off"
+	// audit_quality_mismatch
+	problemLabelledBetter = "labelled better than it is"
+	problemLabelledWorse  = "labelled worse than it is"
+	// audit_runtime
+	problemRuntimeShort = "shorter than it should be"
+	problemRuntimeLong  = "longer than it should be"
+	problemNoRuntime    = "no running time"
+	// audit_language
+	problemNoAudioInLanguage     = "no audio in the language"
+	problemRecordedOtherLanguage = "recorded in another language"
+	problemLanguageUnknown       = "language unknown"
+	// audit_monitoring
+	problemSeriesUnmonitored       = "continuing series not monitored"
+	problemNothingMonitored        = "nothing monitored"
+	problemNewSeasonsIgnored       = "new seasons will not be monitored"
+	problemLatestSeasonUnmonitored = "latest season not monitored"
+	// audit_series_settings
+	problemNotTypedAnime      = "anime not typed anime"
+	problemNotTypedDaily      = "daily show not typed daily"
+	problemFolderOffFormat    = "folder not named to the format"
+	problemOutsideRootFolders = "outside every root folder"
+	// audit_profiles
+	problemProfileUnused     = "quality profile unused"
+	problemTagUnused         = "tag unused"
+	problemFormatUnscored    = "custom format scored nowhere"
+	problemReleaseProfileOff = "release profile disabled"
+	problemTagScopesNothing  = "tag scopes settings but no series"
+	// audit_health: the check's level follows, as "health error"
+	problemHealthCheck     = "health"
+	problemRootUnreachable = "root folder unreachable"
+	problemRootLowOnSpace  = "root folder low on space"
+)
+
+// AuditProblems is every kind of finding each audit can report. A run of the
+// live suite fails when one of them is never reported, so an audit's branch
+// cannot go untested (acceptance/coverage_test.go); audit_health's kinds are
+// the prefix of a finding that ends in the check's own level.
+var AuditProblems = map[string][]string{
+	"audit_missing_episodes": {problemEpisodesMissing, problemWholeSeasonMissing},
+	"audit_cutoff_unmet":     {problemBelowQualityCutoff, problemBelowFormatCutoff},
+	"audit_stuck_downloads": {
+		problemCannotImport, problemDownloadFailed, problemWaitingToImport, problemClientUnreachable,
+		problemPausedInClient, problemDownloadError, problemDownloadWarning, problemNotStarting,
+	},
+	"audit_failed_downloads": {problemRepeatedFailures, problemDownloadFailed, problemGrabWentNowhere},
+	"audit_unmapped_folders": {problemFolderUnknown, problemFolderOfMovedSeries},
+	"audit_missing_folders":  {problemSeriesFolderRenamed, problemSeriesFolderMissing, problemRootFolderEmpty},
+	"audit_untracked_files":  {problemUnreadableName, problemNotImported, problemImportRejected, problemFileNotTracked},
+	"audit_missing_files":    {problemFilesGone, problemFolderEmpty},
+	"audit_naming":           {problemNamesOffFormat, problemRenamingOff},
+	"audit_quality_mismatch": {problemLabelledBetter, problemLabelledWorse},
+	"audit_runtime":          {problemRuntimeShort, problemRuntimeLong, problemNoRuntime},
+	"audit_language":         {problemNoAudioInLanguage, problemRecordedOtherLanguage, problemLanguageUnknown},
+	"audit_monitoring": {
+		problemSeriesUnmonitored, problemNothingMonitored, problemNewSeasonsIgnored, problemLatestSeasonUnmonitored,
+	},
+	"audit_series_settings": {problemNotTypedAnime, problemNotTypedDaily, problemFolderOffFormat, problemOutsideRootFolders},
+	"audit_profiles": {
+		problemProfileUnused, problemTagUnused, problemFormatUnscored, problemReleaseProfileOff, problemTagScopesNothing,
+	},
+	"audit_health": {problemHealthCheck, problemRootUnreachable, problemRootLowOnSpace},
+}
+
 // auditSpec is one audit: its tool, and the sweep behind it that audit_all
 // runs too.
 type auditSpec struct {
@@ -231,7 +388,7 @@ func (r *registry) auditSpecs() []auditSpec {
 		},
 		{
 			name: "audit_cutoff_unmet", run: r.auditCutoffUnmet,
-			description: "Monitored episode files below their quality profile's cutoff - by quality, or by custom format score - that Sonarr would upgrade, grouped by series with each file's current quality. Fix with series_search or episode_search, or wanted_search kind cutoff; profile_list shows the cutoffs.",
+			description: "Monitored episode files below their quality profile's cutoff, grouped by series with each file's current quality: below the cutoff quality, or below the custom format score the profile upgrades until - which Sonarr's own Cutoff Unmet list does not count. Says when a profile has Upgrades Allowed off, which Sonarr's own default profiles do, so nothing is replaced by itself. Fix with series_search or episode_search, or wanted_search kind cutoff; profile_list shows the cutoffs.",
 		},
 		{
 			name: "audit_stuck_downloads", run: r.auditStuckDownloads,
@@ -243,15 +400,19 @@ func (r *registry) auditSpecs() []auditSpec {
 		},
 		{
 			name: "audit_unmapped_folders", run: r.auditUnmappedFolders,
-			description: "Folders in the root folders that Sonarr does not know as a series: shows copied in by hand, or left behind when a series was deleted. Fix with series_import, which matches each folder to a show and adds it with its files.",
+			description: "Folders in the root folders that Sonarr does not know as a series, and how many video files each holds: shows copied in by hand, or left behind when a series was deleted. A folder that goes by the name of a series whose own folder is gone is named as that series moved, to be pointed at rather than added again. Fix with series_import, which matches each folder to a show and adds it with its files.",
 		},
 		{
 			name: "audit_untracked_files", run: r.auditUntrackedFiles,
 			description: "Video files in series folders that Sonarr is not tracking - copied in by hand, a second copy of an episode, a name it cannot parse - with what Sonarr reads from each name and why it has not imported it. Fix with import_apply (import_scan shows one folder), or series_rescan after fixing a name.",
 		},
 		{
+			name: "audit_missing_folders", run: r.auditMissingFolders,
+			description: "Series whose folder is not on disk although Sonarr records files in it: renamed or moved outside Sonarr, or on a drive that is not mounted (reported once for the root folder, not once for each series under it). When a folder Sonarr does not know goes by the series' name, the finding says so and names it, so the series can be pointed at it rather than added again. A series with no files has no folder until Sonarr imports one, and is not a finding. Fix with series_edit path and series_rescan.",
+		},
+		{
 			name: "audit_missing_files", run: r.auditMissingFiles,
-			description: "Episode files Sonarr records that are no longer on disk - deleted or moved outside Sonarr, or a series folder that is gone - so the episodes show as downloaded when they are not. Fix with series_rescan, which drops the records and makes the episodes missing again.",
+			description: "Episode files Sonarr records that are no longer on disk - deleted or moved outside Sonarr - so the episodes show as downloaded when they are not. A series folder that is gone is audit_missing_folders' finding. Fix with series_rescan, which drops the records and makes the episodes missing again.",
 		},
 		{
 			name: "audit_quality_mismatch", run: r.auditQualityMismatch,

@@ -113,9 +113,9 @@ func (r *registry) auditMissingEpisodes(ctx context.Context, s *snapshot, limit 
 	out := auditOut{Scanned: len(s.series)}
 	for _, k := range order {
 		g := groups[k]
-		problem := "episodes missing"
+		problem := problemEpisodesMissing
 		if len(g.labels) == g.allAired && g.allAired > 1 {
-			problem = "whole season missing"
+			problem = problemWholeSeasonMissing
 		}
 		detail := fmt.Sprintf("%d missing: %s", len(g.labels), shortList(g.labels, 12))
 		if g.oldest != "" {
@@ -176,6 +176,10 @@ func (r *registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int)
 		labels                 []string
 		byQuality              map[string]int
 		lowScore               int
+		// noUpgrades is a profile with Upgrades Allowed off - which Sonarr's
+		// own default profiles are - so Sonarr lists these files and will
+		// never replace one by itself
+		noUpgrades bool
 	}
 	groups := map[int]*group{}
 	var order []int
@@ -190,7 +194,7 @@ func (r *registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int)
 			if e.Series != nil {
 				g.title = e.Series.Title
 				if p := byID[e.Series.QualityProfileId]; p != nil {
-					g.profile, g.cutoff = p.Name, cutoffName(p)
+					g.profile, g.cutoff, g.noUpgrades = p.Name, cutoffName(p), !boolv(p.UpgradeAllowed)
 					if p.CutoffFormatScore > 0 {
 						g.cutoff += fmt.Sprintf(" and custom format score %d", p.CutoffFormatScore)
 					}
@@ -213,6 +217,51 @@ func (r *registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int)
 		g.labels = append(g.labels, label)
 	}
 
+	// Sonarr's own list is quality alone: its cutoff query compares each
+	// file's quality with the profile's cutoff and never looks at custom
+	// format scores, so a file good enough on quality and short of the score
+	// the profile upgrades until is in no list Sonarr shows. Those are found
+	// here, series by series.
+	for i := range s.series {
+		series := &s.series[i]
+		p := byID[series.QualityProfileId]
+		if p == nil || p.CutoffFormatScore <= 0 {
+			continue
+		}
+		files, err := s.filesOf(ctx, series.Id)
+		if err != nil {
+			return auditOut{}, err
+		}
+		eps, err := s.episodesOf(ctx, series.Id)
+		if err != nil {
+			return auditOut{}, err
+		}
+		monitored := map[int]bool{}
+		numbers := episodeNumbers(eps)
+		for j := range eps {
+			if eps[j].EpisodeFileId > 0 && boolv(eps[j].Monitored) {
+				monitored[eps[j].EpisodeFileId] = true
+			}
+		}
+		for _, f := range files {
+			if !monitored[f.Id] || boolv(f.QualityCutoffNotMet) || f.CustomFormatScore >= p.CutoffFormatScore {
+				continue // unwanted, already listed for its quality, or scored high enough
+			}
+			g := groups[series.Id]
+			if g == nil {
+				g = &group{
+					title: series.Title, profile: p.Name, noUpgrades: !boolv(p.UpgradeAllowed),
+					cutoff: fmt.Sprintf("custom format score %d", p.CutoffFormatScore), byQuality: map[string]int{},
+				}
+				groups[series.Id] = g
+				order = append(order, series.Id)
+			}
+			g.byQuality[qualityName(f.Quality)]++
+			g.lowScore++
+			g.labels = append(g.labels, fmt.Sprintf("%s %s (score %d)", episodeLabel(f.SeasonNumber, numbers[f.Id]...), qualityName(f.Quality), f.CustomFormatScore))
+		}
+	}
+
 	slices.SortStableFunc(order, func(a, b int) int { return strings.Compare(groups[a].title, groups[b].title) })
 	out := auditOut{Scanned: len(s.series)}
 	for _, id := range order {
@@ -223,13 +272,18 @@ func (r *registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int)
 		}
 		slices.Sort(qualities)
 		detail := fmt.Sprintf("%d below %s's cutoff of %s (%s): %s", len(g.labels), g.profile, g.cutoff, strings.Join(qualities, ", "), shortList(g.labels, 10))
-		problem := "below quality cutoff"
+		problem := problemBelowQualityCutoff
 		if g.lowScore == len(g.labels) {
-			problem = "below custom format cutoff"
+			problem = problemBelowFormatCutoff
+		}
+		fix := "series_search, or episode_search for the ones that matter"
+		if g.noUpgrades {
+			detail += "; the profile has Upgrades Allowed off, so Sonarr will not replace them on its own"
+			fix = "turn Upgrades Allowed on in the profile if they should be replaced by themselves, or " + fix
 		}
 		out.report(limit, finding{
 			Series: g.title, SeriesID: id, Subject: fmt.Sprintf("%d files", len(g.labels)), Problem: problem, Detail: detail,
-			Fix: "series_search, or episode_search for the ones that matter",
+			Fix: fix,
 		})
 	}
 

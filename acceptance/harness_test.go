@@ -138,6 +138,25 @@ func testMain(m *testing.M) {
 			fmt.Fprintln(os.Stderr, "every tool needs a test; add one or remove the tool")
 			code = 1
 		}
+
+		// and every kind of finding an audit can report must have been
+		// reported, so no branch of an audit goes untested
+		missing, stale := unreportedFindings()
+		if len(missing) > 0 {
+			fmt.Fprintf(os.Stderr, "\n%d kind(s) of finding are never reported by this suite:\n", len(missing))
+			for _, kind := range missing {
+				fmt.Fprintln(os.Stderr, "  "+kind)
+			}
+			fmt.Fprintln(os.Stderr, "seed the library so the audit reports it, or name it in notReported with the reason")
+			code = 1
+		}
+		if len(stale) > 0 {
+			fmt.Fprintf(os.Stderr, "\n%d kind(s) in notReported were reported after all:\n", len(stale))
+			for _, kind := range stale {
+				fmt.Fprintln(os.Stderr, "  "+kind)
+			}
+			code = 1
+		}
 	}
 
 	// drift is only collected under SONARR_TEST_VERIFY: the providers still
@@ -328,6 +347,7 @@ func invoke(name string, args map[string]any) (map[string]any, error) {
 	if !ok {
 		return nil, fmt.Errorf("%s: structured content is %T", name, res.StructuredContent)
 	}
+	recordFindings(name, out)
 
 	return out, nil
 }

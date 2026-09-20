@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 const testToken = "tok-123"
@@ -332,5 +334,88 @@ func TestListHelpers(t *testing.T) {
 	}
 	if got := JSONObject(map[string]string{"a": "b"}); got != `{"a":"b"}` {
 		t.Errorf("JSONObject = %q", got)
+	}
+}
+
+// A Sonarr behind a reverse proxy is reached at a URL base - http://nas/sonarr
+// - which every request has to keep, or it lands on the proxy's own 404.
+func TestURLBase(t *testing.T) {
+	t.Parallel()
+
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if !strings.HasPrefix(r.URL.Path, "/sonarr/") {
+			http.NotFound(w, r) // the proxy serves something else here
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"version":"4.0.20.3014"}`)
+	}))
+	t.Cleanup(srv.Close)
+
+	c, err := New(srv.URL+"/sonarr/", APIKey(testToken))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.HTTPClient = srv.Client()
+
+	resp, err := execute(t, c, RequestOptions{
+		HttpMethod: http.MethodGet, Path: "/api/v3/system/status", ExpectedStatusCodes: []int{http.StatusOK},
+	}, nil)
+	if err != nil {
+		t.Fatalf("a request under a URL base: %v", err)
+	}
+	var status struct {
+		Version string `json:"version"`
+	}
+	if err := resp.Unmarshal(&status); err != nil || status.Version == "" {
+		t.Fatalf("decoding = %v, %v", status, err)
+	}
+	if len(paths) != 1 || paths[0] != "/sonarr/api/v3/system/status" {
+		t.Errorf("requests went to %v", paths)
+	}
+}
+
+// A request that never reaches Sonarr says what went wrong in words its
+// operator can act on, rather than Go's own.
+func TestUnreachableServer(t *testing.T) {
+	t.Parallel()
+
+	// a port nothing listens on, found by closing a listener
+	var lc net.ListenConfig
+	l, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := l.Addr().String()
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range []struct {
+		name, url, want string
+	}{
+		{"nothing listening", "http://" + addr, "nothing is listening there"},
+		{"a name that does not resolve", "http://sonarr.invalid:8989", "does not resolve"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			client, err := New(c.url, APIKey(testToken))
+			if err != nil {
+				t.Fatal(err)
+			}
+			client.HTTPClient = &http.Client{Timeout: 5 * time.Second}
+			_, err = execute(t, client, RequestOptions{
+				HttpMethod: http.MethodGet, Path: "/api/v3/system/status", ExpectedStatusCodes: []int{http.StatusOK},
+			}, nil)
+			if err == nil {
+				t.Fatal("a request to nothing succeeded")
+			}
+			if !strings.Contains(err.Error(), "cannot reach Sonarr at "+c.url) || !strings.Contains(err.Error(), c.want) {
+				t.Errorf("= %v", err)
+			}
+		})
 	}
 }

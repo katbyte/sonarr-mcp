@@ -81,10 +81,10 @@ func (*registry) auditQualityMismatch(ctx context.Context, s *snapshot, limit in
 				Detail: fmt.Sprintf("recorded as %s, the video is %s (%dp)", qualityName(f.Quality), f.MediaInfo.Resolution, actual),
 			}
 			if actual < claimed {
-				found.Problem = "labelled better than it is"
+				found.Problem = problemLabelledBetter
 				found.Fix = fmt.Sprintf("file_edit file %d to its real quality, so Sonarr upgrades it", f.Id)
 			} else {
-				found.Problem = "labelled worse than it is"
+				found.Problem = problemLabelledWorse
 				found.Fix = fmt.Sprintf("file_edit file %d to its real quality, so Sonarr stops trying to upgrade it", f.Id)
 			}
 			out.report(limit, found)
@@ -146,7 +146,7 @@ func (*registry) auditRuntime(ctx context.Context, s *snapshot, limit, tolerance
 			actual, ok := runtimeMinutes(f.MediaInfo.RunTime)
 			if !ok || actual <= 0 {
 				out.report(limit, finding{
-					Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: "no running time",
+					Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: problemNoRuntime,
 					Detail: "Sonarr could not read a running time from the file: it may be damaged or not a video",
 					Fix:    fmt.Sprintf("episode_search to replace it (with file %d deleted first)", f.Id),
 				})
@@ -157,9 +157,9 @@ func (*registry) auditRuntime(ctx context.Context, s *snapshot, limit, tolerance
 			if pct <= tolerance || diff < minRuntimeDiffMinutes {
 				continue
 			}
-			problem := "shorter than it should be"
+			problem := problemRuntimeShort
 			if actual > float64(expected) {
-				problem = "longer than it should be"
+				problem = problemRuntimeLong
 			}
 			out.report(limit, finding{
 				Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: problem,
@@ -253,19 +253,19 @@ func (*registry) auditLanguage(ctx context.Context, s *snapshot, limit int, lang
 			switch {
 			case tagged && !hasAudio:
 				out.report(limit, finding{
-					Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: "no audio in the language",
+					Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: problemNoAudioInLanguage,
 					Detail: fmt.Sprintf("audio tracks are %s, none of them %s; recorded as %s", audio, want, strings.Join(langs, ", ")),
 					Fix:    "release_search for the episode and grab a release in " + want,
 				})
 			case !recorded && !hasAudio && !unknown:
 				out.report(limit, finding{
-					Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: "recorded in another language",
+					Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: problemRecordedOtherLanguage,
 					Detail: fmt.Sprintf("recorded as %s, not %s, and its audio tracks are not tagged", strings.Join(langs, ", "), want),
 					Fix:    fmt.Sprintf("file_edit file %d if the recording is wrong; otherwise release_search for a %s release", f.Id, want),
 				})
 			case unknown && !hasAudio:
 				out.report(limit, finding{
-					Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: "language unknown",
+					Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: problemLanguageUnknown,
 					Detail: "Sonarr could not tell the file's language from its name, and its audio tracks are not tagged",
 					Fix:    fmt.Sprintf("file_edit file %d to record its language", f.Id),
 				})

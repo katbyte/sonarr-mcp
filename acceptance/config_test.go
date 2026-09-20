@@ -97,6 +97,34 @@ func TestCustomFormatList(t *testing.T) {
 	if f := findings(t, call(t, "audit_profiles", nil), "subject", "Test HEVC"); len(f) != 0 {
 		t.Errorf("a scored format is still reported: %v", f)
 	}
+
+	// a profile that upgrades until a custom format score has every file
+	// below that score as an upgrade, whatever its quality, which is the
+	// other half of audit_cutoff_unmet. Sonarr refuses a score its formats
+	// cannot reach, so the format is worth more than the score first
+	for j := range p.FormatItems {
+		if p.FormatItems[j].Format == made.Model.Id {
+			p.FormatItems[j].Score = 20
+		}
+	}
+	p.CutoffFormatScore = 10
+	if _, err := api.PutQualityProfileById(ctx, strconv.Itoa(p.Id), p); err != nil {
+		t.Fatal(err)
+	}
+	restore := func() {
+		p.CutoffFormatScore = 0
+		if _, err := api.PutQualityProfileById(ctx, strconv.Itoa(p.Id), p); err != nil {
+			t.Error(err)
+		}
+	}
+	t.Cleanup(restore)
+	below := findings(t, call(t, "audit_cutoff_unmet", nil), "problem", "below custom format cutoff")
+	restore()
+	if len(below) == 0 {
+		t.Error("no file is below the custom format score the profile upgrades until, with every file scoring 0 of 10")
+	} else if !strings.Contains(str(below[0]["detail"]), "custom format score") {
+		t.Errorf("below the format cutoff = %v", below[0])
+	}
 }
 
 func TestTags(t *testing.T) {
@@ -180,6 +208,18 @@ func TestRootFolders(t *testing.T) {
 	}
 	if msg := callErr(t, "rootfolder_remove", map[string]any{"path": "/nowhere"}); !strings.Contains(msg, "no root folder") {
 		t.Errorf("removing an unknown path = %s", msg)
+	}
+
+	// with the library's own root folder gone, every series sits outside one:
+	// what removing a root folder by mistake looks like, and what the series
+	// audit says about it
+	call(t, "rootfolder_remove", map[string]any{"path": "/tv"})
+	loose := findings(t, call(t, "audit_series_settings", nil), "problem", "outside every root folder")
+	call(t, "rootfolder_add", map[string]any{"path": "/tv"})
+	if len(loose) < len(importedSeed) {
+		t.Errorf("%d series are outside every root folder, want all %d", len(loose), len(importedSeed))
+	} else if !strings.Contains(str(loose[0]["fix"]), "series_edit path") {
+		t.Errorf("a loose series = %v", loose[0])
 	}
 }
 

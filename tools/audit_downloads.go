@@ -75,22 +75,22 @@ func stuckProblem(q *sonarr.QueueResource, age time.Duration) (problem, fix stri
 	// match), which is where Sonarr 4 leaves most of them
 	case q.TrackedDownloadState == sonarr.TrackedDownloadStateImportBlocked,
 		q.TrackedDownloadState == sonarr.TrackedDownloadStateImportPending && q.TrackedDownloadStatus != sonarr.TrackedDownloadStatusOk:
-		return "cannot import", "import_scan its output path to see why, then import_apply naming the series and episodes; or " + remove
+		return problemCannotImport, "import_scan its output path to see why, then import_apply naming the series and episodes; or " + remove
 	case q.TrackedDownloadState == sonarr.TrackedDownloadStateFailedPending, q.TrackedDownloadState == sonarr.TrackedDownloadStateFailed,
 		q.Status == sonarr.QueueStatusFailed:
-		return "download failed", remove
+		return problemDownloadFailed, remove
 	case q.TrackedDownloadState == sonarr.TrackedDownloadStateImportPending && age > importWaitHours*time.Hour:
-		return "waiting to import", "import_scan its output path, then import_apply"
+		return problemWaitingToImport, "import_scan its output path, then import_apply"
 	case q.Status == sonarr.QueueStatusDownloadClientUnavailable:
-		return "download client unreachable", "downloadclient_test"
+		return problemClientUnreachable, "downloadclient_test"
 	case q.Status == sonarr.QueueStatusPaused:
-		return "paused in the download client", "resume it in the client, or " + remove
+		return problemPausedInClient, "resume it in the client, or " + remove
 	case q.TrackedDownloadStatus == sonarr.TrackedDownloadStatusError:
-		return "error", remove
+		return problemDownloadError, remove
 	case q.TrackedDownloadStatus == sonarr.TrackedDownloadStatusWarning, q.Status == sonarr.QueueStatusWarning:
-		return "warning", "read the messages; " + remove
+		return problemDownloadWarning, "read the messages; " + remove
 	case q.Status == sonarr.QueueStatusQueued && q.Size > 0 && q.Sizeleft >= q.Size && age > notStartingHours*time.Hour:
-		return "not starting", "check the download client, or " + remove
+		return problemNotStarting, "check the download client, or " + remove
 	}
 
 	return "", ""
@@ -185,9 +185,9 @@ func (r *registry) auditFailedDownloads(ctx context.Context, s *snapshot, limit 
 	})
 	for _, id := range order {
 		f := byEpisode[id]
-		problem := "download failed"
+		problem := problemDownloadFailed
 		if f.count > 1 {
-			problem = "repeated failures"
+			problem = problemRepeatedFailures
 		}
 		detail := fmt.Sprintf("%d failed in %d days: %s", f.count, failedDays, shortList(f.titles, 4))
 		if f.last != "" {
@@ -213,7 +213,7 @@ func (r *registry) auditFailedDownloads(ctx context.Context, s *snapshot, limit 
 		seen[id] = true
 		row := projectHistory(h)
 		out.report(limit, finding{
-			Series: row.Series, SeriesID: h.SeriesId, Subject: strings.TrimSpace(row.Episode + " " + h.SourceTitle), Problem: "grab went nowhere",
+			Series: row.Series, SeriesID: h.SeriesId, Subject: strings.TrimSpace(row.Episode + " " + h.SourceTitle), Problem: problemGrabWentNowhere,
 			Detail: fmt.Sprintf("grabbed %s from %s, sent to %s, and never imported or failed; it is not in the queue", day(h.Date), row.Indexer, row.Client),
 			Fix:    fmt.Sprintf("history_mark_failed %d to blocklist it and search again, or episode_search", h.Id),
 		})

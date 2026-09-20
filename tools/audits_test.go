@@ -3,6 +3,9 @@ package tools
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -472,5 +475,399 @@ func TestFirstLineAndCommandDone(t *testing.T) {
 		if got := commandDone(s); got != want {
 			t.Errorf("commandDone(%q) = %v", s, got)
 		}
+	}
+}
+
+// dirs answers Sonarr's folder listing for a parent folder, and its video
+// file listing for any folder in it.
+func dirs(t *testing.T, f *fakeServer, parent string, folders map[string]int) {
+	t.Helper()
+
+	listing := make([]map[string]any, 0, len(folders))
+	for name := range folders {
+		listing = append(listing, map[string]any{"type": "folder", "name": name, "path": parent + "/" + name})
+	}
+	f.answer(t, "GET /api/v3/filesystem", map[string]any{"parent": "/", "directories": listing, "files": []any{}})
+	f.mux.HandleFunc("GET /api/v3/filesystem/mediafiles", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Query().Get("path")
+		files := []map[string]any{}
+		for name, n := range folders {
+			if path != parent+"/"+name {
+				continue
+			}
+			for i := range n {
+				file := fmt.Sprintf("%s/S01E%02d.mkv", path, i+1)
+				files = append(files, map[string]any{"path": file, "name": fmt.Sprintf("S01E%02d.mkv", i+1)})
+			}
+		}
+		writeJSON(t, w, files)
+	})
+}
+
+// rootFolder answers the root folder list with the folders Sonarr does not
+// know as a series.
+//
+//nolint:unparam // the path is the library's, and named at each call for what it is
+func rootFolder(t *testing.T, f *fakeServer, path string, accessible bool, unmapped ...string) {
+	t.Helper()
+
+	folders := make([]map[string]any, 0, len(unmapped))
+	for _, name := range unmapped {
+		folders = append(folders, map[string]any{"name": name, "path": path + "/" + name})
+	}
+	f.answer(t, "GET /api/v3/rootfolder", []map[string]any{
+		{"id": 1, "path": path, "accessible": accessible, "freeSpace": int64(500) << 30, "unmappedFolders": folders},
+	})
+}
+
+// A folder renamed outside Sonarr shows up from both sides: the series has
+// lost its folder, and the folder belongs to no series. Both name the same
+// fix, and neither offers to add the show again.
+func TestAuditFoldersRenamed(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f,
+		map[string]any{"id": 1, "title": "Firefly", "year": 2002, "path": "/tv/Firefly", "statistics": map[string]any{"episodeFileCount": 6}},
+		map[string]any{"id": 2, "title": "Cowboy Bebop", "year": 1998, "path": "/tv/Cowboy Bebop", "statistics": map[string]any{"episodeFileCount": 2}},
+		map[string]any{"id": 3, "title": "Severance", "year": 2022, "path": "/tv/Severance", "statistics": map[string]any{"episodeFileCount": 9}},
+		// added, never downloaded: Sonarr makes its folder when it imports
+		map[string]any{"id": 4, "title": "Breaking Bad", "year": 2008, "path": "/tv/Breaking Bad"},
+	)
+	rootFolder(t, f, "/tv", true, "Cowboy Bebop (1998)", "The Expanse")
+	dirs(t, f, "/tv", map[string]int{"Firefly": 6, "Cowboy Bebop (1998)": 2, "The Expanse": 3})
+	f.answer(t, "GET /api/v3/episodefile", []any{})
+	f.answer(t, "GET /api/v3/episode", []any{})
+	cs := session(t, f, Options{})
+
+	missing := mustCall(t, cs, "audit_missing_folders", nil)
+	if got := problems(missing); !slices.Equal(got, []string{"series folder renamed", "series folder missing"}) {
+		t.Fatalf("audit_missing_folders = %v", missing)
+	}
+	rows := rowsOf(missing["findings"])
+	if text(rows[0]["series"]) != "Cowboy Bebop" || !strings.Contains(text(rows[0]["detail"]), "/tv/Cowboy Bebop (1998)") ||
+		!strings.Contains(text(rows[0]["fix"]), `series_edit path "/tv/Cowboy Bebop (1998)"`) {
+		t.Errorf("the renamed folder = %v", rows[0])
+	}
+	if text(rows[1]["series"]) != "Severance" || !strings.Contains(text(rows[1]["detail"]), "no folder Sonarr does not know") ||
+		!strings.Contains(text(rows[1]["detail"]), "records 9 files there") {
+		t.Errorf("the missing folder = %v", rows[1])
+	}
+
+	unmapped := mustCall(t, cs, "audit_unmapped_folders", nil)
+	if got := problems(unmapped); !slices.Equal(got, []string{"folder of a series that moved", "folder not in Sonarr"}) {
+		t.Fatalf("audit_unmapped_folders = %v", unmapped)
+	}
+	rows = rowsOf(unmapped["findings"])
+	if !strings.Contains(text(rows[0]["fix"]), "series_edit Cowboy Bebop") || strings.Contains(text(rows[0]["fix"]), "series_import with") {
+		t.Errorf("the moved folder's fix = %v", rows[0]["fix"])
+	}
+	if text(rows[1]["subject"]) != "/tv/The Expanse" || !strings.Contains(text(rows[1]["detail"]), "3 video files") ||
+		!strings.Contains(text(rows[1]["fix"]), "series_import") {
+		t.Errorf("the unknown folder = %v", rows[1])
+	}
+
+	// the files of a series whose folder is gone are not reported twice
+	files := mustCall(t, cs, "audit_missing_files", nil)
+	if number(files["total_findings"]) != 0 {
+		t.Errorf("audit_missing_files = %v", files)
+	}
+}
+
+// A root folder Sonarr can read that holds none of its series is one
+// finding, not one per series: a drive that is not mounted.
+func TestAuditFoldersEmptyRoot(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f,
+		map[string]any{"id": 1, "title": "Firefly", "year": 2002, "path": "/tv/Firefly", "statistics": map[string]any{"episodeFileCount": 6}},
+		map[string]any{"id": 2, "title": "Severance", "year": 2022, "path": "/tv/Severance", "statistics": map[string]any{"episodeFileCount": 9}},
+	)
+	rootFolder(t, f, "/tv", true)
+	dirs(t, f, "/tv", map[string]int{})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "audit_missing_folders", nil)
+	if got := problems(out); !slices.Equal(got, []string{"root folder holds none of its series"}) {
+		t.Fatalf("audit_missing_folders = %v", out)
+	}
+	if row := rowsOf(out["findings"])[0]; !strings.Contains(text(row["detail"]), "2 series folders") ||
+		!strings.Contains(text(row["detail"]), "a drive not mounted") {
+		t.Errorf("the empty root = %v", row)
+	}
+}
+
+// A root folder Sonarr cannot read at all says nothing about the series
+// under it: audit_health reports the root folder itself.
+func TestAuditFoldersUnreachableRoot(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f, map[string]any{"id": 1, "title": "Firefly", "year": 2002, "path": "/tv/Firefly", "statistics": map[string]any{"episodeFileCount": 6}})
+	rootFolder(t, f, "/tv", false)
+	f.answer(t, "GET /api/v3/health", []any{})
+	f.answer(t, "GET /api/v3/diskspace", []any{})
+	cs := session(t, f, Options{})
+
+	if out := mustCall(t, cs, "audit_missing_folders", nil); number(out["total_findings"]) != 0 {
+		t.Errorf("audit_missing_folders = %v", out)
+	}
+	if got := problems(mustCall(t, cs, "audit_health", nil)); !slices.Equal(got, []string{"root folder unreachable"}) {
+		t.Errorf("audit_health = %v", got)
+	}
+	if n := len(f.requests("/api/v3/filesystem")); n != 0 {
+		t.Errorf("%d folder listings for a root folder Sonarr cannot read", n)
+	}
+}
+
+// Every kind of finding is a named constant listed in AuditProblems: the
+// live suite checks the seeded library reports each one, and a kind written
+// as a bare string in an audit would slip past that check. These read the
+// package's own source, because that is where the mistake would be.
+func TestFindingKindsAreRegistered(t *testing.T) {
+	t.Parallel()
+
+	files, err := filepath.Glob("audit*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := map[string]bool{}
+	for _, kinds := range AuditProblems {
+		for _, kind := range kinds {
+			listed[kind] = true
+		}
+	}
+	declared := regexp.MustCompile(`(?m)^\s*(problem[A-Za-z]+)\s*=\s*"([^"]+)"`)
+	// a Problem set to something in quotes, rather than to one of the constants
+	inline := regexp.MustCompile(`(?:Problem:|\.Problem\s*=|\.Problem, \w+\.\w+ =|problem\s*:?=|return)\s*"([^"]+)"`)
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(file) //nolint:gosec // a path from this package's own directory listing
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range declared.FindAllStringSubmatch(string(src), -1) {
+			if !listed[m[2]] {
+				t.Errorf("%s: %s (%q) is not in AuditProblems, so no test has to report it", file, m[1], m[2])
+			}
+		}
+		for _, m := range inline.FindAllStringSubmatch(string(src), -1) {
+			t.Errorf("%s: a finding's problem is written as %q; name it as a problem constant and list it in AuditProblems", file, m[1])
+		}
+	}
+}
+
+// Each audit tool registered is in AuditProblems, and nothing else is.
+func TestAuditProblemsCoverTheAudits(t *testing.T) {
+	t.Parallel()
+
+	registered := map[string]bool{}
+	for _, name := range register(t, Options{Toolsets: []string{"all"}}) {
+		if strings.HasPrefix(name, "audit_") && name != "audit_all" {
+			registered[name] = true
+		}
+	}
+	for name := range registered {
+		if len(AuditProblems[name]) == 0 {
+			t.Errorf("%s reports no kind of finding in AuditProblems", name)
+		}
+	}
+	for name := range AuditProblems {
+		if !registered[name] {
+			t.Errorf("AuditProblems has %s, which is not an audit this server registers", name)
+		}
+	}
+}
+
+// The runtime audit against files the seeded library cannot hold: one far
+// longer than its episode, and one Sonarr could read no running time from.
+func TestAuditRuntimeEdges(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f, map[string]any{
+		"id": 1, "title": "Firefly", "year": 2002, "path": "/tv/Firefly", "runtime": 45,
+		"statistics": map[string]any{"episodeFileCount": 3},
+	})
+	file := func(id, episode int, runTime string) map[string]any {
+		return map[string]any{
+			"id": id, "seriesId": 1, "seasonNumber": 1, "path": fmt.Sprintf("/tv/Firefly/S01E%02d.mkv", episode),
+			"mediaInfo": map[string]any{"runTime": runTime, "resolution": "1920x1080"},
+		}
+	}
+	f.answer(t, "GET /api/v3/episodefile", []map[string]any{
+		file(11, 1, "00:45:03"), file(12, 2, "01:31:00"), file(13, 3, ""),
+	})
+	f.answer(t, "GET /api/v3/episode", []map[string]any{
+		{"id": 1, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 1, "episodeFileId": 11, "runtime": 45, "hasFile": true},
+		{"id": 2, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 2, "episodeFileId": 12, "runtime": 45, "hasFile": true},
+		{"id": 3, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 3, "episodeFileId": 13, "runtime": 45, "hasFile": true},
+	})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "audit_runtime", nil)
+	if got := problems(out); !slices.Equal(got, []string{"longer than it should be", "no running time"}) {
+		t.Fatalf("audit_runtime = %v", out)
+	}
+	rows := rowsOf(out["findings"])
+	if !strings.Contains(text(rows[0]["detail"]), "runs 91 minutes, the episode is 45") {
+		t.Errorf("the long file = %v", rows[0]["detail"])
+	}
+	if !strings.Contains(text(rows[1]["detail"]), "could not read a running time") {
+		t.Errorf("the file with no runtime = %v", rows[1]["detail"])
+	}
+}
+
+// A video file in a series folder that Sonarr's own scan will not account
+// for: the audit says so rather than guessing why.
+func TestAuditUntrackedFileSonarrIgnores(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f, map[string]any{
+		"id": 1, "title": "Firefly", "year": 2002, "path": "/tv/Firefly",
+		"statistics": map[string]any{"episodeFileCount": 1},
+	})
+	f.answer(t, "GET /api/v3/episodefile", []map[string]any{
+		{"id": 11, "seriesId": 1, "seasonNumber": 1, "path": "/tv/Firefly/S01E01.mkv"},
+	})
+	f.answer(t, "GET /api/v3/filesystem/mediafiles", []map[string]any{
+		{"path": "/tv/Firefly/S01E01.mkv", "name": "S01E01.mkv"},
+		{"path": "/tv/Firefly/stray.mkv", "name": "stray.mkv"},
+	})
+	// Sonarr's manual import says nothing about the stray file
+	f.answer(t, "GET /api/v3/manualimport", []any{})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "audit_untracked_files", nil)
+	if got := problems(out); !slices.Equal(got, []string{"file not tracked"}) {
+		t.Fatalf("audit_untracked_files = %v", out)
+	}
+	if row := rowsOf(out["findings"])[0]; text(row["subject"]) != "stray.mkv" || !strings.Contains(text(row["fix"]), "import_scan") {
+		t.Errorf("the file Sonarr ignores = %v", row)
+	}
+}
+
+// A talk show typed as a standard series: Sonarr numbers daily shows by air
+// date, and the audit says which ones are set up the other way.
+func TestAuditSeriesSettingsDaily(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f,
+		map[string]any{
+			"id": 1, "title": "The Daily Show", "year": 1996, "path": "/tv/The Daily Show", "seriesType": "standard",
+			"genres": []string{"Comedy", "Talk Show"},
+		},
+		map[string]any{
+			"id": 2, "title": "The Late Show", "year": 2015, "path": "/tv/The Late Show", "seriesType": "daily",
+			"genres": []string{"Talk Show"},
+		},
+	)
+	rootFolder(t, f, "/tv", true)
+	dirs(t, f, "/tv", map[string]int{"The Daily Show": 1, "The Late Show": 1})
+	f.answer(t, "GET /api/v3/config/naming", map[string]any{"id": 1, "renameEpisodes": true, "seriesFolderFormat": "{Series Title}"})
+	// the folder each series would have under the naming format
+	f.mux.HandleFunc("GET /api/v3/series/{id}/folder", func(w http.ResponseWriter, r *http.Request) {
+		folder := map[string]string{"1": "The Daily Show", "2": "The Late Show"}[r.PathValue("id")]
+		writeJSON(t, w, map[string]any{"folder": folder})
+	})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "audit_series_settings", nil)
+	if got := problems(out); !slices.Equal(got, []string{"daily show not typed daily"}) {
+		t.Fatalf("audit_series_settings = %v", out)
+	}
+	if row := rowsOf(out["findings"])[0]; text(row["series"]) != "The Daily Show" || !strings.Contains(text(row["fix"]), "series_edit series_type daily") {
+		t.Errorf("the talk show = %v", row)
+	}
+}
+
+// The language audit on files whose audio says nothing: recorded in another
+// language, and recorded as a language Sonarr could not tell.
+func TestAuditLanguageEdges(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f, map[string]any{
+		"id": 1, "title": "Firefly", "year": 2002, "path": "/tv/Firefly",
+		"originalLanguage": map[string]any{"id": 1, "name": "English"},
+		"statistics":       map[string]any{"episodeFileCount": 3},
+	})
+	file := func(id int, languages []map[string]any, audio string) map[string]any {
+		return map[string]any{
+			"id": id, "seriesId": 1, "seasonNumber": 1, "path": fmt.Sprintf("/tv/Firefly/S01E%02d.mkv", id),
+			"languages": languages, "mediaInfo": map[string]any{"runTime": "00:45:00", "audioLanguages": audio},
+		}
+	}
+	english := []map[string]any{{"id": 1, "name": "English"}}
+	french := []map[string]any{{"id": 2, "name": "French"}}
+	unknown := []map[string]any{{"id": 0, "name": "Unknown"}}
+	f.answer(t, "GET /api/v3/episodefile", []map[string]any{
+		file(1, english, ""), file(2, french, ""), file(3, unknown, ""),
+	})
+	f.answer(t, "GET /api/v3/episode", []map[string]any{
+		{"id": 1, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 1, "episodeFileId": 1, "hasFile": true},
+		{"id": 2, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 2, "episodeFileId": 2, "hasFile": true},
+		{"id": 3, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 3, "episodeFileId": 3, "hasFile": true},
+	})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "audit_language", nil)
+	// the English one is left alone: nothing says it is not what it claims
+	if got := problems(out); !slices.Equal(got, []string{"recorded in another language", "language unknown"}) {
+		t.Fatalf("audit_language = %v", out)
+	}
+	rows := rowsOf(out["findings"])
+	if !strings.Contains(text(rows[0]["detail"]), "recorded as French, not English") ||
+		!strings.Contains(text(rows[0]["fix"]), "file_edit file 2") {
+		t.Errorf("the French recording = %v", rows[0])
+	}
+	if !strings.Contains(text(rows[1]["fix"]), "file_edit") {
+		t.Errorf("the unknown recording = %v", rows[1])
+	}
+}
+
+// A file good enough on quality and short of the custom format score its
+// profile upgrades until: Sonarr's own Cutoff Unmet list is quality alone,
+// so the audit sweeps for these itself.
+func TestAuditCutoffFormatScore(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f, map[string]any{
+		"id": 1, "title": "Chernobyl", "year": 2019, "path": "/tv/Chernobyl", "qualityProfileId": 4,
+		"statistics": map[string]any{"episodeFileCount": 2},
+	})
+	f.answer(t, "GET /api/v3/qualityprofile", []map[string]any{{
+		"id": 4, "name": "HD-1080p", "upgradeAllowed": false, "cutoff": 3, "cutoffFormatScore": 10,
+		"items": []map[string]any{{"quality": map[string]any{"id": 3, "name": "WEBDL-1080p"}, "allowed": true}},
+	}})
+	// Sonarr lists nothing as cutoff unmet: both files are 1080p
+	f.answer(t, "GET /api/v3/wanted/cutoff", page())
+	f.answer(t, "GET /api/v3/episodefile", []map[string]any{
+		{"id": 11, "seriesId": 1, "seasonNumber": 1, "path": "/tv/Chernobyl/S01E01.mkv", "customFormatScore": 0, "qualityCutoffNotMet": false, "quality": map[string]any{"quality": map[string]any{"id": 3, "name": "WEBDL-1080p"}}},
+		{"id": 12, "seriesId": 1, "seasonNumber": 1, "path": "/tv/Chernobyl/S01E02.mkv", "customFormatScore": 25, "qualityCutoffNotMet": false, "quality": map[string]any{"quality": map[string]any{"id": 3, "name": "WEBDL-1080p"}}},
+	})
+	f.answer(t, "GET /api/v3/episode", []map[string]any{
+		{"id": 1, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 1, "episodeFileId": 11, "monitored": true, "hasFile": true},
+		{"id": 2, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 2, "episodeFileId": 12, "monitored": true, "hasFile": true},
+	})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "audit_cutoff_unmet", nil)
+	if got := problems(out); !slices.Equal(got, []string{"below custom format cutoff"}) {
+		t.Fatalf("audit_cutoff_unmet = %v", out)
+	}
+	row := rowsOf(out["findings"])[0]
+	// only the file scoring under 10, and the profile's own setting is said
+	if !strings.Contains(text(row["detail"]), "S01E01 WEBDL-1080p (score 0)") || strings.Contains(text(row["detail"]), "S01E02") {
+		t.Errorf("the files below the score = %v", row["detail"])
+	}
+	if !strings.Contains(text(row["detail"]), "Upgrades Allowed off") || !strings.Contains(text(row["fix"]), "series_search") {
+		t.Errorf("the finding = %v", row)
 	}
 }

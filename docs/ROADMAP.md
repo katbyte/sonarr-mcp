@@ -16,15 +16,17 @@ Design rules, in priority order:
 6. **Reads are cheap, writes are explicit, destructive is opt-in.** Every tool carries MCP
    annotations; anything that changes Sonarr says so in its description; anything that
    deletes series or files is disabled unless the operator sets `--enable-delete`.
-7. **Every audit names its fix.** A finding says which tool fixes it, and the acceptance
-   suite runs that fix and the audit again.
+7. **Every audit names its fix, and every kind of finding is tested.** A finding says which
+   tool fixes it; the live suite has to report every kind of finding an audit can make, or
+   name the reason it cannot (`acceptance/coverage_test.go`), and where the fix is a tool it
+   runs the fix and the audit again.
 
 ## Done
 
 | Area | Tools | Answers |
 |---|---|---|
 | know the library | `server_info`, `series_list`, `series_get`, `episode_list`, `calendar_list`, `file_list`, `profile_list`, `customformat_list`, `tag_list`, `rootfolder_list`, `config_get` | "what do I have, and how is it set up" |
-| curation | `audit_all` + 15 audits, `release_parse`, `file_edit`, `series_edit`, `season_monitor`, `episode_monitor`, `series_rename`, `series_rescan`, `series_refresh`, `import_scan` → `import_apply`, `series_import`, `tag_create`, `tag_delete` | "what is wrong, and fix it" |
+| curation | `audit_all` + 16 audits, `release_parse`, `file_edit`, `series_edit`, `season_monitor`, `episode_monitor`, `series_rename`, `series_rescan`, `series_refresh`, `import_scan` → `import_apply`, `series_import`, `tag_create`, `tag_delete` | "what is wrong, and fix it" |
 | getting episodes | `episode_search`, `season_search`, `series_search`, `wanted_search`, `release_search` → `release_grab`, `queue_list`, `queue_grab`, `queue_remove`, `history_list`, `history_mark_failed`, `blocklist_list`, `blocklist_remove` | "go and get what is missing, and see it arrive" |
 | growing the library | `series_lookup`, `series_add`, `rootfolder_add`, `rootfolder_remove` | "add this show" |
 | admin | `server_health`, `task_list`, `task_run`, `command_list`, `log_list`, `indexer_list`, `indexer_test`, `downloadclient_list`, `downloadclient_test`, `series_delete`, `file_delete` | "keep it healthy" |
@@ -38,6 +40,7 @@ Design rules, in priority order:
 | `series_bulk_edit` | `PUT /api/v3/series/editor` | one change across many series: a profile, a root folder, tags (today it is one `series_edit` per series) |
 | `importlist_list` | `/api/v3/importlist`, `/api/v3/importlistexclusion/paged` | what adds series on its own, and what it has been told never to add |
 | `episode_history` | `GET /api/v3/history/series` | one series' or episode's history without paging the whole library's |
+| audits that read in parallel | - | an audit reads each series' files, episodes and folder one series at a time, which is fine for a few hundred series and slow for a few thousand; `audit_all` on a big library is minutes, and naming a series is seconds |
 
 ## Guarded / deliberately excluded
 

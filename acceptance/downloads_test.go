@@ -263,6 +263,30 @@ func TestDownloadFails(t *testing.T) {
 		t.Errorf("the blocklist after removing = %v", left)
 	}
 	callErr(t, "blocklist_remove", map[string]any{"ids": []any{}})
+
+	// off the blocklist, the release can be grabbed again - and fail again,
+	// which is what a bad rip or a dead server looks like and what the audit
+	// calls out as worth a different release. The first job leaves the
+	// client first, or the second grab would find it by name
+	clearDownload(t, job.ID)
+	second := grabEpisode(t, breakingBad.Title, "S01E02")
+	if err := sab.Fail(second.ID, "Unpacking failed, CRC error"); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "audit_failed_downloads", map[string]any{"series": breakingBad.Title}, "the second failure", func(out map[string]any) bool {
+		if len(findings(t, out, "problem", "repeated failures")) > 0 {
+			return true
+		}
+		refreshDownloads(t)
+		return false
+	})
+	twice := only(t, call(t, "audit_failed_downloads", map[string]any{"series": breakingBad.Title}), "subject", "S01E02")
+	if !strings.Contains(str(twice["detail"]), "2 failed in 30 days") || !strings.Contains(str(twice["fix"]), "release_search") {
+		t.Errorf("two failures = %v", twice)
+	}
+	for _, e := range rows(t, call(t, "blocklist_list", map[string]any{"series": breakingBad.Title})["entries"], "entries") {
+		call(t, "blocklist_remove", map[string]any{"ids": []any{num(t, e["id"], "id")}})
+	}
 }
 
 // A download that completes with only a sample in it: Sonarr will not import
