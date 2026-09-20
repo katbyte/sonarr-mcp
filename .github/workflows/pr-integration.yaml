@@ -45,7 +45,9 @@ jobs:
   integration:
     name: integration (lib/sonarr against a real Sonarr)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # a runner is far slower than a developer's machine at this: the suite
+    # takes a minute here and twenty there, most of it waiting on Sonarr
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -80,7 +82,7 @@ jobs:
   acceptance:
     name: acceptance (tools against a real Sonarr)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
