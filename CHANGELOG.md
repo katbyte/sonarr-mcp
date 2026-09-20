@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 (2026-09-19)
 
 The first release: an MCP server, CLI and Go SDK for running and auditing a Sonarr library.
 
