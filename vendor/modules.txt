@@ -19,7 +19,7 @@ github.com/inconshreveable/mousetrap
 ## explicit; go 1.26
 github.com/katbyte/go-kt/clog
 github.com/katbyte/go-kt/version
-# github.com/modelcontextprotocol/go-sdk v1.7.0
+# github.com/modelcontextprotocol/go-sdk v1.8.0
 ## explicit; go 1.25.0
 github.com/modelcontextprotocol/go-sdk/auth
 github.com/modelcontextprotocol/go-sdk/internal/authutil
