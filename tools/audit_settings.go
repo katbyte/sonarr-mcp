@@ -3,9 +3,11 @@ package tools
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
@@ -311,4 +313,102 @@ func lowOnSpace(free, total int64) bool {
 	}
 
 	return total > 0 && free*100/total < lowSpacePercent
+}
+
+// backupStale is how old the newest backup may be before the audit says
+// so: Sonarr backs itself up every seven days unless told otherwise, so a
+// newest backup older than that means the schedule is off or failing.
+const backupStale = 8 * 24 * time.Hour
+
+// logErrorsSince is how far back the audit reads the log for errors.
+const logErrorsSince = 24 * time.Hour
+
+// auditServer reports what is wrong with Sonarr itself rather than the
+// library: no backup worth restoring, a release newer than the one running,
+// and the errors it has logged in the last day, grouped by what logged them.
+func (r *registry) auditServer(ctx context.Context, _ *snapshot, limit int) (auditOut, error) {
+	backups, err := r.client.GetSystemBackup(ctx)
+	if err != nil {
+		return auditOut{}, err
+	}
+	updates, err := r.client.GetUpdate(ctx)
+	if err != nil {
+		return auditOut{}, err
+	}
+	errors, err := r.client.GetLog(ctx, sonarr.GetLogOperationOptions{Page: new(1), PageSize: new(logErrorsPage), SortKey: "time", SortDirection: sonarr.SortDirectionDescending, Level: "error"})
+	if err != nil {
+		return auditOut{}, err
+	}
+
+	out := auditOut{Scanned: 3}
+	var newest time.Time
+	for _, b := range backups.Model {
+		if t := parseTime(b.Time); t.After(newest) {
+			newest = t
+		}
+	}
+	switch {
+	case newest.IsZero():
+		out.report(limit, finding{Subject: "backups", Problem: problemNoRecentBackup, Detail: "Sonarr holds no backup of its database and settings", Fix: "backup_create (in the admin toolset) makes one now; Sonarr makes one on its own every seven days unless backupInterval in the host section says otherwise"})
+	case time.Since(newest) > backupStale:
+		out.report(limit, finding{Subject: "backups", Problem: problemNoRecentBackup, Detail: fmt.Sprintf("the newest backup is from %s, %d days ago", day(newest.Format(time.RFC3339)), int(time.Since(newest).Hours()/24)), Fix: "backup_create (in the admin toolset) makes one now; check backupInterval in the host section, and the log for the Backup task failing"})
+	}
+
+	for _, u := range updates.Model {
+		if !boolv(u.Latest) || boolv(u.Installed) || u.InstalledOn != "" {
+			continue
+		}
+		fix := "server_updates lists what it changes"
+		if boolv(u.Installable) {
+			fix += "; Sonarr installs it from its own System page, or on its schedule when Updates are set to automatic in the host section"
+		} else {
+			fix += "; this Sonarr runs in a container, so it is updated by replacing the image"
+		}
+		out.report(limit, finding{Subject: u.Version, Problem: problemUpdateAvailable, Detail: fmt.Sprintf("%s was released %s; %s is running", u.Version, day(u.ReleaseDate), runningVersion(updates.Model)), Fix: fix})
+	}
+
+	type logged struct {
+		count   int
+		newest  sonarr.LogResource
+		message string
+	}
+	byLogger := map[string]*logged{}
+	for _, e := range errors.Model.Records {
+		if time.Since(parseTime(e.Time)) > logErrorsSince {
+			continue
+		}
+		l := byLogger[e.Logger]
+		if l == nil {
+			l = &logged{newest: e, message: e.Message}
+			byLogger[e.Logger] = l
+		}
+		l.count++
+	}
+	for _, logger := range slices.Sorted(maps.Keys(byLogger)) {
+		l := byLogger[logger]
+		detail := fmt.Sprintf("%d in the last day, the newest at %s: %s", l.count, l.newest.Time, l.message)
+		if l.newest.Exception != "" {
+			detail += " (" + firstLine(l.newest.Exception) + ")"
+		}
+		out.report(limit, finding{Subject: logger, Problem: problemLogErrors, Detail: detail, Fix: "log_list with level error (in the admin toolset) shows each; audit_health, audit_stuck_downloads and audit_failed_downloads say what to do about the ones they know"})
+	}
+
+	return out, nil
+}
+
+// logErrorsPage is how many of the newest errors the audit reads: enough
+// for a day of them, and a page Sonarr answers at once.
+const logErrorsPage = 500
+
+// runningVersion is the version an update list says is installed, or
+// words for one it does not name.
+func runningVersion(updates []sonarr.UpdateResource) string {
+	running := "an older release"
+	for _, u := range updates {
+		if boolv(u.Installed) || u.InstalledOn != "" {
+			running = u.Version
+		}
+	}
+
+	return running
 }

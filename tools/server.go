@@ -287,6 +287,7 @@ func registerServerTools(r *registry) {
 	})
 
 	registerConfigEdit(r)
+	registerNamingPreview(r)
 }
 
 // logLevels are Sonarr's log levels, least severe first.

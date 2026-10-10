@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
@@ -175,5 +176,124 @@ func TestLogFileRead(t *testing.T) {
 	}
 	if msg := mustFail(t, cs, "logfile_read", map[string]any{"filename": "gone.txt"}); !strings.Contains(msg, "no log file") {
 		t.Errorf("a file there is not = %q", msg)
+	}
+}
+
+// Sonarr itself: no backup or a stale one, a release newer than the one
+// running, and the last day's errors grouped by what logged them, the
+// older errors left out.
+func TestAuditServer(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f)
+	f.answer(t, "GET /api/v3/system/backup", []any{map[string]any{"id": 1, "name": "sonarr_backup_v4.0.20.3014_2026.09.01.zip", "type": "scheduled", "size": 1 << 20, "time": ago(30 * 24 * time.Hour)}})
+	f.answer(t, "GET /api/v3/update", []any{
+		map[string]any{"version": "4.0.21.3100", "branch": "main", "releaseDate": "2026-10-01T00:00:00Z", "latest": true, "installed": false, "installable": false, "changes": map[string]any{"new": []any{"a thing"}, "fixed": []any{}}},
+		map[string]any{"version": "4.0.20.3014", "branch": "main", "releaseDate": "2026-09-16T00:00:00Z", "latest": false, "installed": true, "installable": false},
+	})
+	f.answer(t, "GET /api/v3/log", page(
+		map[string]any{"id": 3, "time": ago(time.Hour), "level": "error", "logger": "Newznab", "message": "An error occurred while processing feed", "exception": "HttpException: 500\n   at ..."},
+		map[string]any{"id": 2, "time": ago(2 * time.Hour), "level": "error", "logger": "Newznab", "message": "An error occurred while processing feed"},
+		map[string]any{"id": 1, "time": ago(3 * 24 * time.Hour), "level": "error", "logger": "ImportApprovedEpisodes", "message": "Couldn't import episode"},
+	))
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "audit_server", nil)
+	rows := rowsOf(out["findings"])
+	if len(rows) != 3 || number(out["total_findings"]) != 3 {
+		t.Fatalf("findings = %v", rows)
+	}
+	if backup := rows[0]; text(backup["problem"]) != "no recent backup" || !strings.Contains(text(backup["detail"]), "30 days ago") || !strings.Contains(text(backup["fix"]), "backup_create") {
+		t.Errorf("the backup finding = %v", backup)
+	}
+	if update := rows[1]; text(update["problem"]) != "update available" || text(update["subject"]) != "4.0.21.3100" || !strings.Contains(text(update["detail"]), "4.0.20.3014 is running") || !strings.Contains(text(update["fix"]), "replacing the image") {
+		t.Errorf("the update finding = %v", update)
+	}
+	if errs := rows[2]; text(errs["problem"]) != "errors in the log" || text(errs["subject"]) != "Newznab" || !strings.HasPrefix(text(errs["detail"]), "2 in the last day") || !strings.Contains(text(errs["detail"]), "(HttpException: 500)") {
+		t.Errorf("the log finding = %v", errs)
+	}
+	if q := f.requests("/api/v3/log"); len(q) != 1 || !strings.Contains(q[0].Query, "level=error") {
+		t.Errorf("the log was read with %v, want the errors alone", q)
+	}
+
+	// nothing wrong: a fresh backup, the newest release running, no errors
+	g := newFakeServer(t)
+	library(t, g)
+	g.answer(t, "GET /api/v3/system/backup", []any{map[string]any{"id": 1, "name": "fresh.zip", "type": "scheduled", "size": 1 << 20, "time": ago(time.Hour)}})
+	g.answer(t, "GET /api/v3/update", []any{map[string]any{"version": "4.0.20.3014", "latest": true, "installed": true}})
+	g.answer(t, "GET /api/v3/log", page())
+	if out := mustCall(t, session(t, g, Options{}), "audit_server", nil); number(out["total_findings"]) != 0 {
+		t.Errorf("a server with nothing wrong = %v", out)
+	}
+}
+
+// The same seasons across many series go to Sonarr as one season pass, each
+// series checked for the seasons first so that none is sent when one is
+// refused.
+func TestSeasonBulkMonitor(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f,
+		map[string]any{"id": 1, "title": "Firefly", "year": 2002, "tvdbId": 78874, "seasons": []any{map[string]any{"seasonNumber": 0, "monitored": false}, map[string]any{"seasonNumber": 1, "monitored": true}}},
+		map[string]any{"id": 2, "title": "Chernobyl", "year": 2019, "tvdbId": 360893, "seasons": []any{map[string]any{"seasonNumber": 1, "monitored": true}}},
+	)
+	f.mux.HandleFunc("POST /api/v3/seasonpass", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) })
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "season_bulk_monitor", map[string]any{"series": []any{"Firefly", "tvdb:360893"}, "seasons": []any{1}, "monitored": false})
+	rows := rowsOf(out["series"])
+	if len(rows) != 2 || text(rows[0]["series"]) != "Firefly" || text(rows[1]["series"]) != "Chernobyl" {
+		t.Errorf("season_bulk_monitor = %v", out)
+	}
+	sent := f.sent(http.MethodPost, "/api/v3/seasonpass")
+	if len(sent) != 1 {
+		t.Fatalf("%d season passes were sent, want one", len(sent))
+	}
+	var pass sonarr.SeasonPassResource
+	if err := json.Unmarshal([]byte(sent[0]), &pass); err != nil {
+		t.Fatal(err)
+	}
+	if len(pass.Series) != 2 || pass.Series[0].Id != 1 || pass.Series[1].Id != 2 || len(pass.Series[0].Seasons) != 1 || pass.Series[0].Seasons[0].SeasonNumber != 1 || boolv(pass.Series[0].Seasons[0].Monitored) {
+		t.Errorf("the season pass sent = %+v", pass)
+	}
+
+	// a season one of them does not have refuses the whole call before
+	// anything is sent
+	if msg := mustFail(t, cs, "season_bulk_monitor", map[string]any{"series": []any{"Firefly", "Chernobyl"}, "seasons": []any{0}, "monitored": true}); !strings.Contains(msg, "Chernobyl has no season 0") {
+		t.Errorf("a season one series lacks = %q", msg)
+	}
+	if n := len(f.sent(http.MethodPost, "/api/v3/seasonpass")); n != 1 {
+		t.Errorf("%d season passes were sent in all, want still the one", n)
+	}
+}
+
+// The naming preview asks Sonarr for examples under the current naming
+// settings with the changes tried over them, and sends nothing to keep.
+func TestConfigNamingPreview(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	f.answer(t, "GET /api/v3/config/naming", map[string]any{"id": 1, "renameEpisodes": true, "replaceIllegalCharacters": true, "colonReplacementFormat": 4, "multiEpisodeStyle": 5, "standardEpisodeFormat": "{Series Title} - S{season:00}E{episode:00}", "dailyEpisodeFormat": "{Series Title} - {Air-Date}", "animeEpisodeFormat": "{Series Title} - {absolute:000}", "seriesFolderFormat": "{Series Title}", "seasonFolderFormat": "Season {season:00}", "specialsFolderFormat": "Specials"})
+	f.answer(t, "GET /api/v3/config/naming/examples", map[string]any{"singleEpisodeExample": "The Series Title's! (2010) - S01E01", "seriesFolderExample": "The Series Title's! (2010)"})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "config_naming_preview", map[string]any{"set": map[string]any{"series_folder_format": "{Series TitleYear}", "renameEpisodes": false}})
+	if examples := asObject(out["examples"]); text(examples["seriesFolderExample"]) == "" {
+		t.Errorf("the examples = %v", out)
+	}
+	if settings := asObject(out["settings"]); text(settings["seriesFolderFormat"]) != "{Series TitleYear}" || flag(settings["renameEpisodes"]) || settings["id"] != nil {
+		t.Errorf("the settings tried = %v", settings)
+	}
+	q := f.requests("/api/v3/config/naming/examples")
+	if len(q) != 1 || !strings.Contains(q[0].Query, "seriesFolderFormat=%7BSeries+TitleYear%7D") || !strings.Contains(q[0].Query, "renameEpisodes=false") || !strings.Contains(q[0].Query, "multiEpisodeStyle=5") || !strings.Contains(q[0].Query, "id=1") {
+		t.Errorf("the examples were asked with %v, want the current settings with the changes over them", q)
+	}
+	if n := len(f.sent(http.MethodPut, "/api/v3/config/naming/1")); n != 0 {
+		t.Error("a preview saved the naming settings")
+	}
+	if msg := mustFail(t, cs, "config_naming_preview", map[string]any{"set": map[string]any{"colour": "red"}}); !strings.Contains(msg, `no setting "colour"`) {
+		t.Errorf("a setting there is not = %q", msg)
 	}
 }

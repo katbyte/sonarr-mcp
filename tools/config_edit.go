@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"reflect"
@@ -228,5 +229,81 @@ func registerConfigEdit(r *registry) {
 		out.Settings = withoutSecrets(after)
 
 		return nil, out, nil
+	})
+}
+
+// namingExampleOptions are what the naming examples are asked with: a
+// naming section, as config_get shows one, with any changes over it.
+func namingExampleOptions(settings map[string]any) sonarr.GetConfigNamingExamplesOperationOptions {
+	flag := func(name string) *bool {
+		v, ok := settings[name].(bool)
+		if !ok {
+			return nil
+		}
+
+		return new(v)
+	}
+	number := func(name string) *int {
+		v, ok := settings[name].(float64)
+		if !ok {
+			return nil
+		}
+
+		return new(int(v))
+	}
+
+	// Sonarr answers for its saved settings when no id comes with them,
+	// whatever else does
+	return sonarr.GetConfigNamingExamplesOperationOptions{
+		Id: number("id"), RenameEpisodes: flag("renameEpisodes"), ReplaceIllegalCharacters: flag("replaceIllegalCharacters"),
+		ColonReplacementFormat: number("colonReplacementFormat"), CustomColonReplacementFormat: asString(settings["customColonReplacementFormat"]), MultiEpisodeStyle: number("multiEpisodeStyle"),
+		StandardEpisodeFormat: asString(settings["standardEpisodeFormat"]), DailyEpisodeFormat: asString(settings["dailyEpisodeFormat"]), AnimeEpisodeFormat: asString(settings["animeEpisodeFormat"]),
+		SeriesFolderFormat: asString(settings["seriesFolderFormat"]), SeasonFolderFormat: asString(settings["seasonFolderFormat"]), SpecialsFolderFormat: asString(settings["specialsFolderFormat"]),
+	}
+}
+
+func registerNamingPreview(r *registry) {
+	type previewIn struct {
+		Set map[string]any `json:"set,omitempty" jsonschema:"naming settings to try over the current ones, by the names config_get shows for the naming section (standardEpisodeFormat, seriesFolderFormat...); none shows the names the current settings produce"`
+	}
+	type previewOut struct {
+		Settings map[string]any `json:"settings" jsonschema:"the naming settings the examples were made with"`
+		Examples map[string]any `json:"examples" jsonschema:"what Sonarr would name a standard, a daily, an anime and a multi-episode file, a series folder and a season folder, for an example of each"`
+	}
+	add(r, readTool, &mcp.Tool{
+		Name:        "config_naming_preview",
+		Description: "What files and folders would be named under the naming settings, as Sonarr's own naming page previews them: the current settings, or with changes tried over them before config_edit makes them. Changes nothing.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in previewIn) (*mcp.CallToolResult, previewOut, error) {
+		sec, err := r.findSection("naming")
+		if err != nil {
+			return nil, previewOut{}, err
+		}
+		cur, err := sec.read(ctx)
+		if err != nil {
+			return nil, previewOut{}, err
+		}
+		next := maps.Clone(cur)
+		for _, key := range slices.Sorted(maps.Keys(in.Set)) {
+			i := slices.IndexFunc(sec.names, func(n string) bool { return fold(n) == fold(key) })
+			if i < 0 {
+				return nil, previewOut{}, fmt.Errorf("the naming section has no setting %q (it has: %s)", key, strings.Join(sec.names, ", "))
+			}
+			next[sec.names[i]] = in.Set[key]
+		}
+		shaped, err := sec.shape(next)
+		if err != nil {
+			return nil, previewOut{}, err
+		}
+		res, err := r.client.GetConfigNamingExamples(ctx, namingExampleOptions(shaped))
+		if err != nil {
+			return nil, previewOut{}, err
+		}
+		examples := map[string]any{}
+		if err := json.Unmarshal(res.Model, &examples); err != nil {
+			return nil, previewOut{}, fmt.Errorf("the naming examples are not an object: %w", err)
+		}
+		delete(shaped, "id")
+
+		return nil, previewOut{Settings: shaped, Examples: examples}, nil
 	})
 }

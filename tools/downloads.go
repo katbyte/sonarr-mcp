@@ -323,14 +323,16 @@ func registerQueueTools(r *registry) {
 			i := slices.IndexFunc(all, func(q sonarr.QueueResource) bool { return q.Id == id })
 			switch {
 			case i < 0:
-				return nil, out, fmt.Errorf("no download %d in the queue", id)
+				return nil, grabOut{}, fmt.Errorf("no download %d in the queue", id)
 			case all[i].Status != sonarr.QueueStatusDelay:
-				return nil, out, fmt.Errorf("%s is %s, not held by a delay profile; only a delayed download can be grabbed early", all[i].Title, all[i].Status)
-			}
-			if _, err := client.PostQueueGrabById(ctx, id); err != nil {
-				return nil, out, err
+				return nil, grabOut{}, fmt.Errorf("%s is %s, not held by a delay profile; only a delayed download can be grabbed early", all[i].Title, all[i].Status)
 			}
 			out.Grabbed = append(out.Grabbed, all[i].Title)
+		}
+		// every one checked first, then all of them in one call: none is
+		// grabbed when one of them is refused
+		if _, err := client.PostQueueGrabBulk(ctx, sonarr.QueueBulkResource{Ids: in.IDs}); err != nil {
+			return nil, grabOut{}, err
 		}
 
 		return nil, out, nil

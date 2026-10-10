@@ -33,7 +33,7 @@ Design rules, in priority order:
 | getting episodes | `episode_search`, `season_search`, `series_search`, `wanted_search`, `release_search` → `release_grab`, `queue_list`, `queue_grab`, `queue_remove`, `history_list`, `history_mark_failed`, `blocklist_list`, `blocklist_remove` | "go and get what is missing, and see it arrive" |
 | growing the library | `series_lookup`, `series_add`, `rootfolder_add`, `rootfolder_remove` | "add this show" |
 | admin | `server_health`, `server_disk_space`, `server_updates`, `server_restart`, `server_shutdown`, `task_list`, `task_run`, `command_list`, `command_cancel`, `log_list`, `logfile_list`, `logfile_read`, `filesystem_list`, `backup_list`, `backup_create`, `backup_restore`, `backup_delete`, `indexer_list`, `indexer_test`, `downloadclient_list`, `downloadclient_test`, `series_delete`, `file_delete` | "keep it healthy" |
-| settings | `config_get`, `config_edit`; add, edit and delete for indexers, download clients, notifications, import lists, delay and release profiles, remote path mappings, custom formats, auto tags and saved filters, with `_kinds` and `_test` for the providers; `exclusion_list`, `exclusion_add`, `exclusion_remove`; `metadata_list`, `metadata_edit`; `profile_create`, `profile_edit`, `profile_delete`; `qualitydefinition_list`, `qualitydefinition_edit`; `language_list`; `tag_rename` | "set it up" |
+| settings | `config_get`, `config_edit`; add, edit and delete for indexers, download clients, notifications, import lists, delay and release profiles, remote path mappings, custom formats, auto tags and saved filters, with `_kinds` and `_test` for the providers; `exclusion_list`, `exclusion_add`, `exclusion_remove`; `metadata_list`, `metadata_edit`; `profile_create`, `profile_edit`, `profile_delete`; `qualitydefinition_list`, `qualitydefinition_edit`; `language_list`; `tag_rename`; `config_naming_preview`; `season_bulk_monitor` | "set it up" |
 
 ## Candidates
 
@@ -58,3 +58,5 @@ Design rules, in priority order:
 - Sonarr's bulk forms of what a tool already does one at a time: editing or deleting several indexers, download clients or import lists in one call, and deleting several series at once. Several calls do the same, each answering for itself, and a delete of many series in one call is the one mistake that is hardest to take back.
 - What its settings pages ask a provider while a form is being filled in (the `action` endpoints: a device list, an OAuth start): they answer a form, not a caller.
 - Reordering delay profiles, and the lists of indexer flags and of the limits a quality's size may be set within.
+
+A test holds this list to the code: every operation the Go client has is called by some tool, or is named in `notWrapped` (tools/tools_test.go) with its reason, and an operation a tool comes to call is reported there as a reason gone stale.

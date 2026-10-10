@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/katbyte/go-kt/mcp/acctest"
+	"github.com/katbyte/go-kt/test/services/arrserver"
 	"github.com/katbyte/go-kt/test/services/newznab"
 	"github.com/katbyte/sonarr-mcp/lib/testenv"
 )
@@ -500,6 +501,20 @@ func TestConfigEdit(t *testing.T) {
 	if now := acctest.Object(t, call(t, "config_get", map[string]any{"section": "mediamanagement"})["settings"], "settings"); acctest.NumOr0(now["recycleBinCleanupDays"]) != was+3 {
 		t.Errorf("the setting read back = %v", now["recycleBinCleanupDays"])
 	}
+
+	// a naming format is tried before it is set: the examples follow the
+	// change, and the settings do not
+	preview := call(t, "config_naming_preview", map[string]any{"set": map[string]any{"seriesFolderFormat": "{Series TitleYear} [preview]"}})
+	examples := acctest.Object(t, preview["examples"], "examples")
+	if folder := acctest.Str(examples["seriesFolderExample"]); !strings.HasSuffix(folder, "[preview]") || acctest.Str(examples["singleEpisodeExample"]) == "" {
+		t.Errorf("config_naming_preview = %v", preview)
+	}
+	if naming := acctest.Object(t, call(t, "config_get", map[string]any{"section": "naming"})["settings"], "settings"); strings.Contains(acctest.Str(naming["seriesFolderFormat"]), "[preview]") {
+		t.Errorf("the preview was kept: %v", naming["seriesFolderFormat"])
+	}
+	if plain := acctest.Object(t, call(t, "config_naming_preview", nil)["examples"], "examples"); strings.Contains(acctest.Str(plain["seriesFolderExample"]), "[preview]") {
+		t.Errorf("the current settings' examples = %v", plain)
+	}
 	if msg := callErr(t, "config_edit", map[string]any{"section": "mediamanagement", "set": map[string]any{"recycleDays": 3}}); !strings.Contains(msg, "recycleBinCleanupDays") {
 		t.Errorf("a setting it does not have = %s", msg)
 	}
@@ -600,6 +615,32 @@ func TestSeriesBulkEdit(t *testing.T) {
 	}
 }
 
+// Sonarr itself: this one has never been backed up, the suite's broken
+// indexer has it logging errors, and a release is offered to it.
+func TestAuditServer(t *testing.T) {
+	// an indexer nothing listens on: Sonarr logs a refused connection as an
+	// error, where one that answers 500 gets only a warning
+	t.Cleanup(func() { _, _ = invoke("indexer_delete", map[string]any{"which": "Silent Indexer", "confirm": true}) })
+	call(t, "indexer_add", map[string]any{"kind": "Newznab", "name": "Silent Indexer", "settings": map[string]any{"baseUrl": "http://127.0.0.1:9", "apiKey": "x"}, "force": true})
+	call(t, "task_run", map[string]any{"task": "RssSync"})
+
+	out := audit(t, "audit_server", nil)
+	if f := only(t, out, "problem", "no recent backup"); !strings.Contains(acctest.Str(f["detail"]), "no backup") || !strings.Contains(acctest.Str(f["fix"]), "backup_create") {
+		t.Errorf("no backup = %v", f)
+	}
+	if f := only(t, out, "subject", "Newznab"); acctest.Str(f["problem"]) != "errors in the log" || !strings.Contains(acctest.Str(f["detail"]), "in the last day") || !strings.Contains(acctest.Str(f["detail"]), "refused") {
+		t.Errorf("the silent indexer's errors = %v", f)
+	}
+	none(t, out, "problem", "update available")
+
+	testenv.OfferUpdates(arrserver.Update{Version: "99.0.0.1", New: []string{"everything"}})
+	t.Cleanup(func() { testenv.OfferUpdates() })
+	offered := audit(t, "audit_server", nil)
+	if f := only(t, offered, "problem", "update available"); acctest.Str(f["subject"]) != "99.0.0.1" || !strings.Contains(acctest.Str(f["detail"]), testenv.SonarrVersion()+" is running") || !strings.Contains(acctest.Str(f["fix"]), "server_updates") {
+		t.Errorf("the release offered = %v", f)
+	}
+}
+
 func TestBackups(t *testing.T) {
 	made := call(t, "backup_create", nil)
 	backup := acctest.Object(t, made["backup"], "backup")
@@ -638,8 +679,7 @@ func TestSystemTools(t *testing.T) {
 		t.Errorf("server_disk_space = %v", disks)
 	}
 
-	// the update list is the stand-in service's, which has none on offer
-	// the releases Sonarr's update server lists, the one running among them
+	// the releases the stand-in update server lists, the one running among them
 	updates := acctest.Rows(t, call(t, "server_updates", nil)["updates"], "updates")
 	at := slices.IndexFunc(updates, func(u map[string]any) bool { return u["installed"] == true })
 	if at < 0 {

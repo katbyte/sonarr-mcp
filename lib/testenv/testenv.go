@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/katbyte/go-kt/test/env"
@@ -107,21 +108,52 @@ func ListenProxy(ctx context.Context, tvdbIDs ...int) (*Proxy, error) {
 	// update: it asks only once its build is two weeks old, so a recording
 	// made in a release's first fortnight has no answer, and an unanswered
 	// one ends the whole run of health checks. go-kt's stand-in answers both,
-	// the time as it is and no update on offer; the rest of the host - the
-	// scene mappings, the release notes, the daily series - is replayed.
+	// the time as it is and the releases there are (the one running, and
+	// what a test offers); the rest of the host - the scene mappings, the
+	// daily series - is replayed.
 	home := arrserver.New()
 	for _, path := range homePaths {
 		p.Serve(homeHost+path, home)
 	}
+	Updates = home
+	OfferUpdates()
 
 	return p, nil
+}
+
+// Updates is the stand-in Sonarr asks what releases there are and whether
+// one is newer than the running one; it is set when the proxy is started.
+// It knows of the release running (SonarrVersion), so the list Sonarr
+// answers is never empty, and of whatever a test offers beside it
+// (OfferUpdates).
+var Updates *arrserver.Server
+
+// OfferUpdates has the stand-in know of the release running and of extra,
+// in place of whatever it knew: a test offers a newer release with it, and
+// takes it back with none.
+func OfferUpdates(extra ...arrserver.Update) {
+	Updates.Offer(append([]arrserver.Update{{Version: SonarrVersion(), Fixed: []string{"the release running in the test container"}}}, extra...)...)
+}
+
+// defaultVersion is the Sonarr release scripts/testenv.sh runs unless
+// SONARR_TEST_IMAGE names another.
+const defaultVersion = "4.0.20.3014"
+
+// SonarrVersion is the release the test container runs, from the image's
+// tag (lscr.io/linuxserver/sonarr:version-4.0.20.3014).
+func SonarrVersion() string {
+	if _, v, ok := strings.Cut(os.Getenv("SONARR_TEST_IMAGE"), ":version-"); ok && v != "" {
+		return v
+	}
+
+	return defaultVersion
 }
 
 // homeHost is where Sonarr calls home to, and homePaths are what the suite
 // answers there itself rather than from a recording.
 const homeHost = "services.sonarr.tv"
 
-var homePaths = []string{"/v1/time", "/v1/update/main"}
+var homePaths = []string{"/v1/time", "/v1/update/main", "/v1/update/main/changes"}
 
 // IndexerName is the name the fake indexer is served under, which its
 // address ends in: one listener serves any number of them.

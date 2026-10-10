@@ -392,6 +392,10 @@ const (
 	problemHealthCheck     = "health"
 	problemRootUnreachable = "root folder unreachable"
 	problemRootLowOnSpace  = "root folder low on space"
+	// audit_server
+	problemNoRecentBackup  = "no recent backup"
+	problemUpdateAvailable = "update available"
+	problemLogErrors       = "errors in the log"
 )
 
 // AuditProblems is every kind of finding each audit can report. A run of the
@@ -422,6 +426,7 @@ var AuditProblems = map[string][]string{
 		problemProfileUnused, problemTagUnused, problemFormatUnscored, problemReleaseProfileOff, problemTagScopesNothing,
 	},
 	"audit_health": {problemHealthCheck, problemRootUnreachable, problemRootLowOnSpace},
+	"audit_server": {problemNoRecentBackup, problemUpdateAvailable, problemLogErrors},
 }
 
 // auditSpec is one audit: its tool, and the sweep behind it that audit_all
@@ -495,6 +500,10 @@ func (r *registry) auditSpecs() []auditSpec {
 		{
 			name: "audit_health", run: r.auditHealth,
 			description: "Sonarr's own health checks - indexers and download clients failing, root folders missing, remote path mappings wrong - and root folders running out of space.",
+		},
+		{
+			name: "audit_server", run: r.auditServer,
+			description: "Sonarr itself rather than the library: no backup, or none for over a week; a release newer than the one running; and the errors it has logged in the last day, grouped by what logged them with the newest of each.",
 		},
 	}
 }

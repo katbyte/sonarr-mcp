@@ -301,6 +301,49 @@ func registerEpisodeTools(r *registry) {
 		return nil, out, nil
 	})
 
+	type seasonBulkIn struct {
+		Series    []string `json:"series"    jsonschema:"the series, each a title, Sonarr id or tvdb:<id>"`
+		Seasons   []int    `json:"seasons"   jsonschema:"the season numbers, the same for every series; 0 is the specials. A series without one of them is refused"`
+		Monitored bool     `json:"monitored" jsonschema:"true to monitor the seasons and every episode in them, false to stop"`
+	}
+	type seasonBulkRow struct {
+		Series  string `json:"series"`
+		Seasons []int  `json:"seasons" jsonschema:"the seasons set as asked"`
+	}
+	type seasonBulkOut struct {
+		Series []seasonBulkRow `json:"series"`
+	}
+	add(r, writeTool, &mcp.Tool{
+		Name:        "season_bulk_monitor",
+		Description: "Monitor or unmonitor the same seasons across many series in one call, the way Sonarr's Season Pass page does: season 1 of every show listed, or the specials of all of them. season_monitor does one series.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in seasonBulkIn) (*mcp.CallToolResult, seasonBulkOut, error) {
+		if len(in.Series) == 0 || len(in.Seasons) == 0 {
+			return nil, seasonBulkOut{}, errors.New("name the series and the seasons")
+		}
+		pass := sonarr.SeasonPassResource{}
+		out := seasonBulkOut{Series: make([]seasonBulkRow, 0, len(in.Series))}
+		for _, ref := range in.Series {
+			s, err := r.resolveSeries(ctx, ref)
+			if err != nil {
+				return nil, seasonBulkOut{}, err
+			}
+			one := sonarr.SeasonPassSeriesResource{Id: s.Id}
+			for _, n := range in.Seasons {
+				if !slices.ContainsFunc(s.Seasons, func(season sonarr.SeasonResource) bool { return season.SeasonNumber == n }) {
+					return nil, seasonBulkOut{}, noSeason(s, n)
+				}
+				one.Seasons = append(one.Seasons, sonarr.SeasonResource{SeasonNumber: n, Monitored: new(in.Monitored)})
+			}
+			pass.Series = append(pass.Series, one)
+			out.Series = append(out.Series, seasonBulkRow{Series: s.Title, Seasons: in.Seasons})
+		}
+		if _, err := client.PostSeasonPass(ctx, pass); err != nil {
+			return nil, seasonBulkOut{}, err
+		}
+
+		return nil, out, nil
+	})
+
 	type searchIn struct {
 		Series   string   `json:"series"                 jsonschema:"the series: title, Sonarr id or tvdb:<id>"`
 		Episodes []string `json:"episodes"               jsonschema:"the episodes: S01E02, 1x02 or episode ids"`

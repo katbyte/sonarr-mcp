@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -102,8 +104,8 @@ func TestSurfaceSize(t *testing.T) {
 	for _, kind := range kinds(t) {
 		count[kind]++
 	}
-	if total := count["read"] + count["write"] + count["delete"]; total != 138 || count["read"] != 66 || count["write"] != 57 || count["delete"] != 15 {
-		t.Errorf("surface = %d tools: %v, want 138 with 66 read, 57 write, 15 delete", total, count)
+	if total := count["read"] + count["write"] + count["delete"]; total != 141 || count["read"] != 68 || count["write"] != 58 || count["delete"] != 15 {
+		t.Errorf("surface = %d tools: %v, want 141 with 68 read, 58 write, 15 delete", total, count)
 	}
 	for _, want := range []string{"series_list", "series_get", "calendar_list", "queue_list", "series_search"} {
 		if !slices.Contains(EssentialTools, want) {
@@ -501,4 +503,86 @@ func TestAPanicInAToolIsAnErrorNotACrash(t *testing.T) {
 		t.Error("a write tool that panicked left the series index standing")
 	}
 	mustCall(t, cs, "zzyzx_fine", map[string]any{})
+}
+
+// notWrapped are the SDK operations no tool calls, each with why: a read a
+// list tool covers, a bulk form of what a tool does one at a time, the web
+// interface's own plumbing. Every other operation is called by some tool,
+// and one here that a tool comes to call is reported, so the list cannot go
+// stale. docs/ROADMAP.md says the same in words.
+var notWrapped = map[string]string{
+	// by-id reads: the list tool reads them all and finds the one asked for
+	"GetAutoTaggingById": "autotag_list", "GetCalendarById": "calendar_list", "GetCustomFilterById": "filter_list", "GetCustomFormatById": "customformat_list",
+	"GetDelayProfileById": "delayprofile_list", "GetDownloadClientById": "downloadclient_list", "GetEpisodeById": "episode_list", "GetImportListById": "importlist_list",
+	"GetImportListExclusionById": "exclusion_list", "GetIndexerById": "indexer_list", "GetLanguageById": "language_list", "GetMetadataById": "metadata_list",
+	"GetNotificationById": "notification_list", "GetQualityDefinitionById": "qualitydefinition_list", "GetQualityProfileById": "profile_list", "GetReleaseProfileById": "releaseprofile_list",
+	"GetRemotePathMappingById": "remotepathmapping_list", "GetRootFolderById": "rootfolder_list", "GetSystemTaskById": "task_list", "GetTagById": "tag_list", "GetTagDetailById": "tag_list",
+	"GetConfigDownloadClientById": "config_get", "GetConfigHostById": "config_get", "GetConfigImportListById": "config_get", "GetConfigIndexerById": "config_get",
+	"GetConfigMediaManagementById": "config_get", "GetConfigNamingById": "config_get", "GetConfigUiById": "config_get",
+	"GetWantedCutoff": "audit_cutoff_unmet reads the episodes and files themselves", "GetWantedCutoffById": "audit_cutoff_unmet", "GetWantedMissing": "audit_missing_episodes", "GetWantedMissingById": "audit_missing_episodes",
+	"GetImportListExclusion": "exclusion_list reads the paged form", "GetImportListExclusionPaged": "exclusion_list reads the paged form by another name",
+	"GetHistoryComplete": "history_list pages", "GetHistorySeries": "history_list takes a series", "GetLogComplete": "log_list pages", "GetQueue": "queue_list reads the paged form with details", "GetQueueStatus": "queue_list counts",
+	"GetBlocklist": "blocklist_list reads the paged form by another name", "GetFileSystemType": "filesystem_list says what each entry is",
+	// what the server answers about itself that a tool has no use for
+	"GetApi": "server_info reads the status", "GetPing": "server_info reads the status", "GetIndexerFlag": "a fixed list of flag names a release carries", "GetQualityDefinitionLimits": "the bounds a size may be set within; Sonarr refuses one outside them",
+	"GetLocalization": "the web interface's translations", "GetLocalizationById": "the web interface's translations", "GetLocalizationLanguage": "the web interface's translations",
+	"GetSystemRoutes": "the routing graph, for Sonarr's own developers", "GetSystemRoutesDuplicate": "the routing graph, for Sonarr's own developers",
+	"GetFeedV3CalendarSonarrIcs":        "a link for a calendar application, carrying the API key; calendar_list answers the same episodes",
+	"GetMediaCoverBySeriesIdByFilename": "an image; series_get gives the address", "GetLogFileUpdate": "a container is updated by replacing its image, so there is no update log", "GetLogFileUpdateByFilename": "no update log in a container",
+	// bulk forms of what a tool does one at a time, each answering for itself
+	"DeleteBlocklistBulk": "blocklist_remove", "DeleteCustomFormatBulk": "customformat_delete", "DeleteDownloadClientBulk": "downloadclient_delete", "DeleteEpisodeFileBulk": "file_delete",
+	"DeleteImportListBulk": "importlist_delete", "DeleteImportListExclusionBulk": "exclusion_remove", "DeleteIndexerBulk": "indexer_delete", "DeleteQueueBulk": "queue_remove",
+	"DeleteSeriesEditor":  "series_delete, one at a time: a delete of many series in one call is the mistake hardest to take back",
+	"PutCustomFormatBulk": "customformat_edit", "PutDownloadClientBulk": "downloadclient_edit", "PutImportListBulk": "importlist_edit", "PutIndexerBulk": "indexer_edit",
+	"PutQualityDefinitionUpdate": "qualitydefinition_edit, one at a time", "PutEpisodeFileEditor": "file_edit sends each file", "PutEpisodeFileById": "file_edit uses the bulk form, which takes one as well",
+	"PutEpisodeById": "episode_monitor uses the monitor form", "PostQueueGrabById": "queue_grab uses the bulk form, which takes one as well", "PutImportListExclusionById": "exclusion_remove and exclusion_add; an exclusion has nothing else to change",
+	// the settings pages' own helpers, which answer a form
+	"PostDownloadClientActionByName": "a device list or an OAuth start for a form being filled in", "PostImportListActionByName": "a form's helper", "PostIndexerActionByName": "a form's helper",
+	"PostMetadataActionByName": "a form's helper", "PostNotificationActionByName": "a form's helper", "PutDelayProfileReorderById": "delayprofile_edit sets order",
+	// metadata consumers are a fixed few, turned on and set, never added, deleted or tested
+	"PostMetadata": "metadata_edit", "DeleteMetadataById": "metadata_edit turns one off", "GetMetadataSchema": "metadata_list shows what each takes", "PostMetadataTest": "writing files beside the library is not tested", "PostMetadataTestAll": "not tested",
+	// kept by Sonarr 4 for old clients and no longer used
+	"GetLanguageProfile": "language profiles are gone from Sonarr 4", "GetLanguageProfileById": "gone", "GetLanguageProfileSchema": "gone", "PostLanguageProfile": "gone", "PutLanguageProfileById": "gone", "DeleteLanguageProfileById": "gone",
+	// for other programs, not a caller
+	"PostReleasePush": "an indexer pushes a release to Sonarr; a caller grabs one with release_grab", "PostManualImport": "import_apply sends the files to the import command, which reprocesses them itself",
+	"PostSystemBackupRestoreUpload": "backup_restore restores one Sonarr holds; a model has no file to hand over",
+}
+
+// Every operation the Go client has is called by a tool, or is in
+// notWrapped with the reason; and nothing in notWrapped is called by a tool
+// after all.
+func TestEveryOperationHasAToolOrAReason(t *testing.T) {
+	t.Parallel()
+
+	var source strings.Builder
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		raw, err := os.ReadFile(e.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		source.Write(raw)
+	}
+
+	client := reflect.TypeFor[sonarr.Client]()
+	for method := range client.Methods() {
+		name := method.Name
+		if !strings.HasPrefix(name, "Get") && !strings.HasPrefix(name, "Post") && !strings.HasPrefix(name, "Put") && !strings.HasPrefix(name, "Delete") {
+			continue
+		}
+		called := strings.Contains(source.String(), "."+name+"(")
+		_, excused := notWrapped[name]
+		switch {
+		case !called && !excused:
+			t.Errorf("%s: no tool calls it and notWrapped gives no reason; wrap it, or say why not", name)
+		case called && excused:
+			t.Errorf("%s: a tool calls it, so take it out of notWrapped", name)
+		}
+	}
 }

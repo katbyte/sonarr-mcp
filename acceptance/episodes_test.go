@@ -3,6 +3,7 @@
 package acceptance
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -118,6 +119,25 @@ func TestEpisodeAndSeasonMonitor(t *testing.T) {
 		t.Errorf("a season it does not have = %s", msg)
 	}
 	callErr(t, "season_monitor", map[string]any{"series": breakingBad.Title, "seasons": []any{}, "monitored": true})
+
+	// the same season across several series goes as one season pass
+	bulk := call(t, "season_bulk_monitor", map[string]any{"series": []any{firefly.Title, "tvdb:" + itoa(cowboyBebop.TvdbID)}, "seasons": []any{1}, "monitored": false})
+	t.Cleanup(func() {
+		call(t, "season_bulk_monitor", map[string]any{"series": []any{firefly.Title, cowboyBebop.Title}, "seasons": []any{1}, "monitored": true})
+	})
+	if rows := acctest.Rows(t, bulk["series"], "series"); len(rows) != 2 || acctest.Str(rows[1]["series"]) != cowboyBebop.Title {
+		t.Errorf("season_bulk_monitor = %v", bulk)
+	}
+	for _, title := range []string{firefly.Title, cowboyBebop.Title} {
+		seasons := acctest.Rows(t, call(t, "series_get", map[string]any{"series": title})["seasons"], "seasons")
+		at := slices.IndexFunc(seasons, func(s map[string]any) bool { return acctest.NumOr0(s["season"]) == 1 })
+		if at < 0 || seasons[at]["monitored"] != false {
+			t.Errorf("%s season 1 after the season pass = %v", title, seasons)
+		}
+	}
+	if msg := callErr(t, "season_bulk_monitor", map[string]any{"series": []any{firefly.Title, chernobyl.Title}, "seasons": []any{3}, "monitored": true}); !strings.Contains(msg, "has no season 3") {
+		t.Errorf("a season one of them lacks = %s", msg)
+	}
 }
 
 func TestCalendarList(t *testing.T) {

@@ -827,7 +827,7 @@ func TestAuditAllKeepsWhatRanAndNamesWhatDidNot(t *testing.T) {
 		switch p := strings.TrimPrefix(r.URL.Path, "/api/v3/"); {
 		case strings.HasPrefix(p, "config/"):
 			writeJSON(t, w, map[string]any{"id": 1})
-		case p == "queue" || p == "history" || p == "blocklist" || strings.HasPrefix(p, "wanted/"):
+		case p == "queue" || p == "history" || p == "blocklist" || p == "log" || strings.HasPrefix(p, "wanted/"):
 			writeJSON(t, w, page())
 		default:
 			writeJSON(t, w, []any{})

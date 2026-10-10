@@ -78,12 +78,12 @@ var Toolsets = map[string][]string{
 	"curation": {
 		"audit_all", "audit_missing_episodes", "audit_cutoff_unmet", "audit_stuck_downloads", "audit_failed_downloads",
 		"audit_unmapped_folders", "audit_missing_folders", "audit_untracked_files", "audit_naming", "audit_missing_files", "audit_quality_mismatch",
-		"audit_runtime", "audit_language", "audit_monitoring", "audit_profiles", "audit_series_settings", "audit_health",
+		"audit_runtime", "audit_language", "audit_monitoring", "audit_profiles", "audit_series_settings", "audit_health", "audit_server",
 		"episode_search", "season_search", "series_search", "wanted_search",
 		"release_search", "release_grab", "release_parse",
 		"queue_remove", "queue_grab", "history_list", "history_mark_failed", "blocklist_list", "blocklist_remove",
 		"import_scan", "import_apply", "series_import", "series_rename",
-		"file_list", "file_edit", "series_edit", "series_bulk_edit", "season_monitor", "episode_monitor", "series_refresh", "series_rescan",
+		"file_list", "file_edit", "series_edit", "series_bulk_edit", "season_monitor", "season_bulk_monitor", "episode_monitor", "series_refresh", "series_rescan",
 		"profile_list", "tag_list", "tag_create", "tag_delete",
 	},
 	// grow the library: find a show and add it, and the root folders it goes in
@@ -107,7 +107,7 @@ var Toolsets = map[string][]string{
 	// behind them, custom formats, delay and release profiles, path
 	// mappings, auto tags and saved filters
 	"settings": {
-		"config_get", "config_edit",
+		"config_get", "config_edit", "config_naming_preview",
 		"indexer_kinds", "indexer_add", "indexer_edit", "indexer_delete",
 		"downloadclient_kinds", "downloadclient_add", "downloadclient_edit", "downloadclient_delete",
 		"notification_list", "notification_kinds", "notification_add", "notification_edit", "notification_delete", "notification_test",
@@ -199,8 +199,9 @@ var toolHints = map[string]mcpregistry.Hints{
 	// path
 	"rootfolder_remove": {Idempotent: true},
 	// a flag written over, the same again the second time
-	"episode_monitor": {Idempotent: true},
-	"season_monitor":  {Idempotent: true},
+	"episode_monitor":     {Idempotent: true},
+	"season_monitor":      {Idempotent: true},
+	"season_bulk_monitor": {Idempotent: true},
 	// what a search grabs is imported over the file an episode had when it
 	// is an upgrade, and a second search can grab another release
 	"episode_search": {},
