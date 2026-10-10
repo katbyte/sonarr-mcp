@@ -22,6 +22,7 @@ Design rules, in priority order:
    runs the fix and the audit again.
 8. **One way to page.** Every list takes `limit` and `offset` and answers `total`, `offset` and `next_offset`, whatever it lists and whether Sonarr pages it or the tool does. A test holds every `_list` tool to it.
 9. **`confirm` before what cannot be put back.** A tool that deletes a series or files changes nothing without `confirm`, and says what it would do: `would_delete`. The same test holds every delete tool to it.
+10. **Nothing hidden in an answer.** Text that came from outside - a release's name, a title, a message - is cleaned of what does not show and cut to a length, once, around every tool, so a new tool cannot forget to. What a later call hands back (a path, a guid, a download's id) is left as Sonarr holds it, and a test holds that list to fields the answers really have.
 
 ## Done
 

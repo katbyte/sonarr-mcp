@@ -295,3 +295,19 @@ func TestCommandListFollowsOneByID(t *testing.T) {
 		t.Errorf("every command = %v", all)
 	}
 }
+
+// An argument a tool does not take is refused, and the refusal names the
+// ones it does: a caller that mistyped offset is shown limit and offset,
+// rather than left to conclude the list cannot be paged.
+func TestAnUnknownArgumentIsToldTheToolsOwn(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	cs := session(t, f, Options{})
+	if msg := mustFail(t, cs, "tag_list", map[string]any{"ofset": 5}); !strings.Contains(msg, "ofset") || !strings.Contains(msg, "tag_list takes limit and offset") {
+		t.Errorf("the refusal = %q", msg)
+	}
+	if len(f.requests("/api/v3/tag")) != 0 {
+		t.Error("Sonarr was asked though the call was refused")
+	}
+}

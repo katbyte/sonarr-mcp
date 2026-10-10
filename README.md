@@ -87,7 +87,7 @@ All options can be passed as command-line flags, environment variables, or via a
 | `SONARR_TOOLSETS` | `--toolsets` | groups of tools to register, default `core`: `all`, `core`, `curation`, `library`, `admin`, or a resource family like `series` (`core` is always included) |
 | `SONARR_ALLOW_TOOLS` | `--allow-tools` | register these tools by name (names, `series_*` globs, or `essential`): on its own only these, beside `--toolsets` these as well as the sets |
 | `SONARR_DENY_TOOLS` | `--deny-tools` | never register these tools, whatever asked for them (names or globs such as `*_delete`) |
-| `SONARR_LOG` | | log level (`WARN` default; `DEBUG`, `TRACE`, ...) |
+| `SONARR_LOG` | | log level (`WARN` default; `INFO` adds one line for every call of a write or delete tool, `TRACE` every request and answer) |
 | `SONARR_LISTEN` | `--listen` | serve MCP over HTTP on this address (e.g. `:8080`) instead of stdio |
 | `SONARR_AUTH_TOKEN` | `--auth-token` | bearer token required on the HTTP endpoint (required with `--listen`) |
 | `SONARR_ALLOW_NO_AUTH` | `--allow-no-auth` | serve HTTP with no bearer token at all: anyone who can reach the port can use every tool |
@@ -196,6 +196,10 @@ name.
 Every list is paged the same way: it takes `limit` (100 unless given, 1000 at most) and `offset`, and answers `total`, `offset` and, while there is another page, the `next_offset` to pass back.
 
 `series_delete` (which removes a series, and its files if asked) and `file_delete` (which deletes files from disk) are only registered when `--enable-delete` / `SONARR_ENABLE_DELETE` is set, and even then change nothing without `confirm`: called without it, each answers `would_delete`, what a confirmed call would remove. `file_delete` also names every episode each file holds and warns when Sonarr still monitors them, since it downloads those again once the files are gone, or stops monitoring them when it is set to unmonitor what is deleted. `--read-only` registers the 43 read tools and nothing else, so a write tool is absent from `tools/list` rather than refused when called.
+
+Most of what a tool answers was written by someone else: a release's name as a public indexer gave it, a title and plot from TheTVDB, a download client's message. Every piece of text in an answer or a refusal has what does not show taken out of it (control and zero-width characters, the ones that change the direction text runs in) and is cut at 2000 characters, so nothing is hidden in a name and nothing is buried in a page of text. A path, a folder, a release's `guid` and a download's id are left as Sonarr holds them, since a later call hands them back. It is still someone else's text: a client that connects is told to treat it as data, along with the rules above for the tools it was given.
+
+With `SONARR_LOG=info`, every call of a write or delete tool is written to the log as one line: the tool, its arguments, and whether it was refused, failed or answered.
 
 ### Choosing which tools load
 

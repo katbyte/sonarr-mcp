@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/katbyte/go-kt/outside"
+
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
@@ -59,7 +61,9 @@ func (r *registry) auditStuckDownloads(ctx context.Context, s *snapshot, limit i
 		} else if q.ErrorMessage != "" {
 			detail += ": " + q.ErrorMessage
 		}
-		out.report(limit, finding{Series: row.Series, SeriesID: q.SeriesId, Subject: subject, Problem: problem, Detail: detail, Fix: fix})
+		// a download's subject is its release's name, which an indexer wrote:
+		// cleaned here, since a subject is otherwise a path and left alone
+		out.report(limit, finding{Series: row.Series, SeriesID: q.SeriesId, Subject: outside.Text(subject, answerLength), Problem: problem, Detail: detail, Fix: fix})
 	}
 
 	return out, nil
@@ -213,7 +217,7 @@ func (r *registry) auditFailedDownloads(ctx context.Context, s *snapshot, limit 
 		seen[id] = true
 		row := projectHistory(h)
 		out.report(limit, finding{
-			Series: row.Series, SeriesID: h.SeriesId, Subject: strings.TrimSpace(row.Episode + " " + h.SourceTitle), Problem: problemGrabWentNowhere,
+			Series: row.Series, SeriesID: h.SeriesId, Subject: outside.Text(strings.TrimSpace(row.Episode+" "+h.SourceTitle), answerLength), Problem: problemGrabWentNowhere,
 			Detail: fmt.Sprintf("grabbed %s from %s, sent to %s, and never imported or failed; it is not in the queue", day(h.Date), row.Indexer, row.Client),
 			Fix:    fmt.Sprintf("history_mark_failed %d to blocklist it and search again, or episode_search", h.Id),
 		})

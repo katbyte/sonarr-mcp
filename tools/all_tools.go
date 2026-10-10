@@ -234,7 +234,9 @@ func (r *registry) queued() *mcpregistry.Registry {
 // handler into an ordinary tool error, and sends empty collections as []
 // rather than null: an AI client reading "episodes": null cannot tell "none"
 // from "not fetched", and Go leaves un-appended slices nil. What is this
-// application's own is done around the handler here.
+// application's own is done around the handler here: the series index is
+// dropped after a write, and the text of every answer is cleaned of what
+// does not show.
 func add[In, Out any](r *registry, kind mcpregistry.Kind, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
 	mcpregistry.Add(r.queued(), kind, t, func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, Out, error) {
 		// anything that changes Sonarr may have added, edited or removed a
@@ -245,7 +247,12 @@ func add[In, Out any](r *registry, kind mcpregistry.Kind, t *mcp.Tool, h mcp.Too
 			defer r.seriesCache().invalidate()
 		}
 
-		return h(ctx, req, in)
+		// what an answer says, and what a refusal says, is mostly someone
+		// else's words: see outside.go
+		res, out, err := h(ctx, req, in)
+		cleanAnswer(&out)
+
+		return res, out, cleanFailure(err)
 	})
 }
 

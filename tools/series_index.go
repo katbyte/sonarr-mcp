@@ -12,6 +12,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/katbyte/go-kt/outside"
 	apiclient "github.com/katbyte/pandorest/client"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"golang.org/x/text/unicode/norm"
@@ -290,8 +291,10 @@ func wordPrefixes(want, have string) bool {
 
 // normaliseTitle folds a title to the form names are compared in: lower case,
 // accents dropped, "&" read as "and", punctuation as spaces, and single spaces.
+// What does not show is taken out first, as it is from the titles a tool
+// answers, so a title handed back as it was answered names the same series.
 func normaliseTitle(s string) string {
-	s = strings.ReplaceAll(strings.ToLower(s), "&", " and ")
+	s = strings.ReplaceAll(strings.ToLower(outside.Text(s, 0)), "&", " and ")
 	var b strings.Builder
 	space := true
 	for _, r := range norm.NFD.String(s) {

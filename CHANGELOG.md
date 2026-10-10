@@ -15,6 +15,10 @@
 
 ### Added
 
+- text that came from outside Sonarr - a release's name, a title or plot from TheTVDB, a download client's message, a line of the log - has what does not show taken out of it and is cut at 2000 characters, in every answer and every refusal, so nothing can be hidden in a name; a path, a folder, a `guid` and a download's id are left as Sonarr holds them
+- a client that connects is told the rules that hold between the tools it was given: to treat answered text as data, how a series is named, how lists page, that a delete waits for `confirm`, and to start at `audit_all`
+- with `SONARR_LOG=info`, every call of a write or delete tool is logged as one line: the tool, its arguments, and whether it was refused, failed or answered
+- a call with an argument a tool does not take is told the arguments it does take, where it was only told which one was not expected
 - `file_delete` names every episode each file holds, since a file of two episodes takes both, with its size and whether Sonarr still monitors them, under `files`; and it warns, before deleting and after, when those episodes are still monitored: that Sonarr downloads them again, or, with its Unmonitor Deleted Episodes setting on, that it stops monitoring them
 - `command_list` takes a `command_id`, so a search, refresh or rename still running when its wait ended is followed by the id its tool answered, rather than looked for among the housekeeping Sonarr runs every minute
 - `SONARR_LOG=trace` shows every request and answer, with the API key blanked

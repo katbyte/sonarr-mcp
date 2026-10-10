@@ -32,6 +32,24 @@ var secretHeaders = []string{"Authorization", "Proxy-Authorization", "Cookie", "
 // that a trace hides too.
 var secretEndings = []string{"password", "secret", "token", "apikey", "api_key"}
 
+// defaultSecrets is what is hidden when nothing more is named.
+var defaultSecrets = newSecrets(Options{})
+
+// RedactJSON is JSON text, whole or cut short, with the value of every string
+// field that holds a credential blanked: a field of one of the names an API
+// passes a credential under, one of also, or one whose name ends as a
+// credential's does (password, secret, token, apikey, api_key). It is the
+// rule a trace hides a body's credentials by, for whatever else writes down
+// what it was sent.
+func RedactJSON(text string, also ...string) string {
+	s := defaultSecrets
+	if len(also) > 0 {
+		s = newSecrets(Options{SecretNames: also})
+	}
+
+	return s.fields.ReplaceAllString(text, `${1}"`+redacted+`"`)
+}
+
 // lazy is text put together only when something formats it, which is how a
 // trace costs nothing while tracing is off (see Logger).
 type lazy func() string

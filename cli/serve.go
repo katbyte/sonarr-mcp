@@ -34,11 +34,18 @@ lets anyone who can reach the port use every tool, say so with --allow-no-auth
 				return err
 			}
 
+			// what a client is told when it connects: go-kt's words for every
+			// server, then this one's rules for the tools it is given
+			own, err := tools.Instructions(f.ToolOptions())
+			if err != nil {
+				return err
+			}
+
 			srv := mcp.NewServer(&mcp.Implementation{
 				Name:    "sonarr",
 				Title:   "Sonarr Library Auditor",
 				Version: version.Version,
-			}, nil)
+			}, &mcp.ServerOptions{Instructions: server.Instructions(own...)})
 
 			registered, err := tools.RegisterAll(srv, client, f.ToolOptions())
 			if err != nil {
