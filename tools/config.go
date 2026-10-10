@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
@@ -220,13 +221,54 @@ func registerConfigTools(r *registry) {
 		return nil, tagOut{ID: res.Model.Id, Label: res.Model.Label}, nil
 	})
 
-	type tagDeleteOut struct {
-		Deleted string `json:"deleted"`
+	type tagRenameIn struct {
+		Label    string `json:"label"     jsonschema:"the tag to rename, by its label"`
+		NewLabel string `json:"new_label" jsonschema:"what to call it; Sonarr stores labels in lower case"`
+	}
+	type tagRenameOut struct {
+		ID    int    `json:"id"`
+		Label string `json:"label"`
+		Was   string `json:"was"`
 	}
 	add(r, writeTool, &mcp.Tool{
+		Name:        "tag_rename",
+		Description: "Rename a tag. Everything that carries it - series, indexers, download clients, profiles - carries the new label, since they hold the tag and not its name.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in tagRenameIn) (*mcp.CallToolResult, tagRenameOut, error) {
+		label := strings.ToLower(strings.TrimSpace(in.NewLabel))
+		if label == "" {
+			return nil, tagRenameOut{}, errors.New("new_label is required")
+		}
+
+		unlock := r.locking().ByString(tagsLock)
+		defer unlock()
+
+		ids, err := r.resolveTags(ctx, []string{in.Label}, false)
+		if err != nil {
+			return nil, tagRenameOut{}, err
+		}
+		if len(ids) != 1 {
+			return nil, tagRenameOut{}, errors.New("label is required")
+		}
+		res, err := client.PutTagById(ctx, strconv.Itoa(ids[0]), sonarr.TagResource{Id: ids[0], Label: label})
+		if err != nil {
+			return nil, tagRenameOut{}, err
+		}
+
+		return nil, tagRenameOut{ID: res.Model.Id, Label: res.Model.Label, Was: strings.ToLower(strings.TrimSpace(in.Label))}, nil
+	})
+
+	type tagDeleteIn struct {
+		Label   string `json:"label"             jsonschema:"the tag to delete, by its label"`
+		Confirm bool   `json:"confirm,omitempty" jsonschema:"true to delete; without it nothing changes and the answer says what a confirmed call would delete"`
+	}
+	type tagDeleteOut struct {
+		Deleted     string `json:"deleted,omitempty"      jsonschema:"the tag deleted"`
+		WouldDelete string `json:"would_delete,omitempty" jsonschema:"without confirm: the tag a confirmed call deletes; nothing has changed"`
+	}
+	add(r, deleteTool, &mcp.Tool{
 		Name:        "tag_delete",
-		Description: "Delete a tag nothing uses - the unused tags audit_profiles finds. Sonarr refuses to delete a tag still on a series, indexer, client or profile; take it off those first.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in tagIn) (*mcp.CallToolResult, tagDeleteOut, error) {
+		Description: "Delete a tag nothing uses - the unused tags audit_profiles finds. Sonarr refuses to delete a tag still on a series, indexer, client or profile; take it off those first. Nothing changes without confirm: the answer names the tag a confirmed call would delete.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in tagDeleteIn) (*mcp.CallToolResult, tagDeleteOut, error) {
 		ids, err := r.resolveTags(ctx, []string{in.Label}, false)
 		if err != nil {
 			return nil, tagDeleteOut{}, err
@@ -234,11 +276,15 @@ func registerConfigTools(r *registry) {
 		if len(ids) != 1 {
 			return nil, tagDeleteOut{}, errors.New("label is required")
 		}
+		label := strings.ToLower(strings.TrimSpace(in.Label))
+		if !in.Confirm {
+			return nil, tagDeleteOut{WouldDelete: label}, nil
+		}
 		if _, err := client.DeleteTagById(ctx, ids[0]); err != nil {
 			return nil, tagDeleteOut{}, err
 		}
 
-		return nil, tagDeleteOut{Deleted: strings.ToLower(strings.TrimSpace(in.Label))}, nil
+		return nil, tagDeleteOut{Deleted: label}, nil
 	})
 
 	type formatRow struct {

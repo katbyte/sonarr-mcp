@@ -331,7 +331,7 @@ func registerEpisodeTools(r *registry) {
 		if err != nil {
 			return nil, searchOut{}, err
 		}
-		queued, err := r.queueFor(ctx, s.Id, ids)
+		queued, err := r.queueFor(ctx, s.Id, ids, in.Wait >= 0)
 		if err != nil {
 			return nil, searchOut{}, err
 		}
@@ -361,7 +361,7 @@ func registerEpisodeTools(r *registry) {
 		if err != nil {
 			return nil, searchOut{}, err
 		}
-		queued, err := r.queueFor(ctx, s.Id, nil)
+		queued, err := r.queueFor(ctx, s.Id, nil, in.Wait >= 0)
 		if err != nil {
 			return nil, searchOut{}, err
 		}

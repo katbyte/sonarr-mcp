@@ -102,8 +102,8 @@ func TestSurfaceSize(t *testing.T) {
 	for _, kind := range kinds(t) {
 		count[kind]++
 	}
-	if total := count["read"] + count["write"] + count["delete"]; total != 69 || count["read"] != 43 || count["write"] != 24 || count["delete"] != 2 {
-		t.Errorf("surface = %d tools: %v, want 69 with 43 read, 24 write, 2 delete", total, count)
+	if total := count["read"] + count["write"] + count["delete"]; total != 138 || count["read"] != 66 || count["write"] != 57 || count["delete"] != 15 {
+		t.Errorf("surface = %d tools: %v, want 138 with 66 read, 57 write, 15 delete", total, count)
 	}
 	for _, want := range []string{"series_list", "series_get", "calendar_list", "queue_list", "series_search"} {
 		if !slices.Contains(EssentialTools, want) {
@@ -115,15 +115,14 @@ func TestSurfaceSize(t *testing.T) {
 	}
 }
 
-// The delete tools are the ones that remove files or series; nothing else
-// is a delete tool, and each of them is.
+// The delete tools are the ones named for it, each of which removes what
+// cannot be put back: nothing else is a delete tool, and each of them is.
 func TestDeleteToolsAreMarked(t *testing.T) {
 	t.Parallel()
 
 	for name, kind := range kinds(t) {
-		isDelete := strings.HasSuffix(name, "_delete") && name != "tag_delete"
-		if isDelete != (kind == deleteTool.String()) {
-			t.Errorf("%s is a %s tool; the tools that delete series or files, and only those, are delete tools", name, kind)
+		if isDelete := strings.HasSuffix(name, "_delete"); isDelete != (kind == deleteTool.String()) {
+			t.Errorf("%s is a %s tool; the tools named _delete, and only those, are delete tools", name, kind)
 		}
 	}
 }
@@ -148,11 +147,13 @@ func TestEveryWriteToolIsHinted(t *testing.T) {
 			t.Errorf("%s has no annotations", tool.Name)
 			continue
 		}
-		// no tool here sends anything to a person or a service beyond Sonarr:
-		// a search or a grab is Sonarr asking its own indexers and download
-		// client
-		if *a.OpenWorldHint {
-			t.Errorf("%s says it reaches past Sonarr, which no tool here does", tool.Name)
+		// only a notification sends anything to a person or a service beyond
+		// Sonarr: a search or a grab is Sonarr asking its own indexers and
+		// download client
+		if *a.OpenWorldHint != strings.HasPrefix(tool.Name, "notification_") || (*a.OpenWorldHint && !toolHints[tool.Name].SendsOut) {
+			if sends := slices.Contains([]string{"notification_add", "notification_edit", "notification_test"}, tool.Name); *a.OpenWorldHint != sends {
+				t.Errorf("%s says it reaches past Sonarr: %v, want %v", tool.Name, *a.OpenWorldHint, sends)
+			}
 		}
 		switch kindOf[tool.Name] {
 		case "read":
@@ -178,11 +179,12 @@ func TestEveryWriteToolIsHinted(t *testing.T) {
 		}
 	}
 	for name := range toolHints {
-		if !seen[name] {
+		// a read tool has hints only to say it sends something out
+		if !seen[name] && name != "notification_test" {
 			t.Errorf("toolHints names %s, which is no write tool", name)
 		}
 	}
-	for _, name := range []string{"episode_search", "season_search", "series_search", "wanted_search", "release_grab", "import_apply", "task_run", "series_refresh", "series_rescan", "series_rename", "queue_remove", "rootfolder_remove", "tag_delete"} {
+	for _, name := range []string{"episode_search", "season_search", "series_search", "wanted_search", "release_grab", "import_apply", "task_run", "series_refresh", "series_rescan", "series_rename", "queue_remove", "rootfolder_remove", "backup_restore", "server_restart", "server_shutdown", "config_edit", "profile_edit", "series_bulk_edit"} {
 		if h, ok := toolHints[name]; !ok || h.Additive {
 			t.Errorf("%s can remove or overwrite what was there, and is marked additive", name)
 		}
@@ -251,7 +253,7 @@ func TestAnAllowListBesideToolsets(t *testing.T) {
 		t.Errorf("essential beside core = %v, want %v", got, want)
 	}
 	// a pattern adds every tool it names, and nothing else comes with them
-	if got, want := register(t, Options{Toolsets: []string{"core"}, Allow: []string{"tag_*"}}), with(core, "tag_create", "tag_delete", "tag_list"); !slices.Equal(got, want) {
+	if got, want := register(t, Options{Toolsets: []string{"core"}, Allow: []string{"tag_*"}}), with(core, "tag_create", "tag_list", "tag_rename"); !slices.Equal(got, want) {
 		t.Errorf("tag_* beside core = %v, want %v", got, want)
 	}
 	// a tool of another set's, by name

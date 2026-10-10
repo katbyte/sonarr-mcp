@@ -51,12 +51,7 @@ and images inside it; `series_list` rows carry what a list needs).
 
 ### What else is in the box
 
-- **69 tools, in toolsets.** List and inspect series, seasons and episodes, what airs next,
-  the queue and history, search and grab, parse a release name, import files and folders,
-  rename, rescan and refresh, edit series and files, monitoring, tags, profiles, root folders,
-  indexers and download clients (and test them), tasks, commands and logs. Each sits in a
-  toolset a session can load on its own, so a client spends under a thousand tokens of
-  context by default rather than nine thousand.
+- **138 tools, in toolsets.** List and inspect series, seasons and episodes, what airs next, the queue and history, search and grab, parse a release name, import files and folders, rename, rescan and refresh, edit one series or many, files, monitoring and tags. Set Sonarr up: its settings section by section, indexers, download clients, notifications, import lists and what they may not add, quality profiles and the sizes behind them, custom formats, delay and release profiles, path mappings and auto tags. Run it: health, tasks, commands, logs and log files, disk space, backups, updates and restarting. Each sits in a toolset a session can load on its own, so a client spends about a thousand tokens of context by default rather than twenty thousand.
 - **A Go SDK.** `sdk/sonarr` is a complete typed client for Sonarr's v3 API - all 228
   operations, generated from Sonarr's own OpenAPI document, standard library only, no
   knowledge of MCP. Useful on its own, whether or not you care about AI.
@@ -83,8 +78,8 @@ All options can be passed as command-line flags, environment variables, or via a
 | `SONARR_SERVER` (or `SONARR_URL`) | `--server`, `-s` | Sonarr's URL, with its URL base if it has one, e.g. `http://nas:8989` |
 | `SONARR_TOKEN` (or `SONARR_API_KEY`) | `--token`, `-t` | the API key, from Settings → General → Security |
 | `SONARR_READ_ONLY` | `--read-only` | register only tools that never change Sonarr's state |
-| `SONARR_ENABLE_DELETE` | `--enable-delete` | register `series_delete` (optionally with its files) and `file_delete`, which delete from disk |
-| `SONARR_TOOLSETS` | `--toolsets` | groups of tools to register, default `core`: `all`, `core`, `curation`, `library`, `admin`, or a resource family like `series` (`core` is always included) |
+| `SONARR_ENABLE_DELETE` | `--enable-delete` | register the tools that delete what cannot be put back: `series_delete` (optionally with its files) and `file_delete`, which delete from disk, and the `_delete` tool of each kind of settings record (an indexer with its credentials, a profile, a backup) |
+| `SONARR_TOOLSETS` | `--toolsets` | groups of tools to register, default `core`: `all`, `core`, `curation`, `library`, `admin`, `settings`, or a resource family like `series` (`core` is always included) |
 | `SONARR_ALLOW_TOOLS` | `--allow-tools` | register these tools by name (names, `series_*` globs, or `essential`): on its own only these, beside `--toolsets` these as well as the sets |
 | `SONARR_DENY_TOOLS` | `--deny-tools` | never register these tools, whatever asked for them (names or globs such as `*_delete`) |
 | `SONARR_LOG` | | log level (`WARN` default; `INFO` adds one line for every call of a write or delete tool, `TRACE` every request and answer) |
@@ -183,47 +178,46 @@ name.
 
 | Resource | Tools |
 |---|---|
-| server | `server_info`, `server_health`, `task_list`, `task_run`, `command_list` (what Sonarr is doing and just did), `log_list` |
-| series | `series_list` (filter by title, monitoring, status, tag, profile, or only those missing episodes), `series_get`, `series_lookup` (TheTVDB, through Sonarr), `series_add`, `series_import` (folders already on disk, added where they are), `series_edit` (monitoring, profile, type, season folders, new seasons, folder with or without moving the files, tags), `series_refresh`, `series_rescan`, `series_rename` (with `dry_run`), `series_search`, `series_delete` |
+| server | `server_info`, `server_health`, `server_disk_space`, `server_updates`, `server_restart`, `server_shutdown`, `task_list`, `task_run`, `command_list` (what Sonarr is doing and just did, or one command by its id), `command_cancel`, `log_list`, `logfile_list`, `logfile_read` (the end of a log file, or its lines with some text in them), `filesystem_list` (folders as Sonarr sees them), `backup_list`, `backup_create`, `backup_restore`, `backup_delete` |
+| series | `series_list` (filter by title, monitoring, status, tag, profile, or only those missing episodes), `series_get`, `series_lookup` (TheTVDB, through Sonarr), `series_add`, `series_import` (folders already on disk, added where they are), `series_edit` (monitoring, profile, type, season folders, new seasons, folder with or without moving the files, tags), `series_bulk_edit` (one change across many series), `series_refresh`, `series_rescan`, `series_search`, `series_rename`, `series_delete` |
 | seasons and episodes | `season_monitor`, `season_search` (season packs first), `episode_list`, `episode_monitor`, `episode_search`, `calendar_list` |
 | files | `file_list` (quality, cutoff, languages, release group, custom formats and score, and what the streams say), `file_edit` (quality, languages, release group), `file_delete`, `import_scan` (what Sonarr makes of a folder of files), `import_apply` |
 | searching | `release_search` (every release, with Sonarr's reasons for rejecting each), `release_grab` (any of them, rejected or not), `release_parse` (what Sonarr reads from a name), `wanted_search` (everything missing, or everything below cutoff) |
-| downloads | `queue_list`, `queue_grab` (send what a delay profile holds), `queue_remove` (from the client too, optionally blocklisting), `history_list`, `history_mark_failed`, `blocklist_list`, `blocklist_remove` |
-| settings | `profile_list`, `customformat_list`, `tag_list` (and what uses each tag), `tag_create`, `tag_delete`, `config_get` (naming, media management, host, UI, indexer, download client and import list options), `rootfolder_list`, `rootfolder_add`, `rootfolder_remove` |
-| providers | `indexer_list`, `indexer_test`, `downloadclient_list`, `downloadclient_test` (as Sonarr's Test button, saying what is wrong with each that fails; credentials never shown) |
+| downloads | `queue_list`, `queue_grab` (send what a delay profile holds), `queue_remove` (from the client too, optionally blocklisting), `history_list` (the library's, one series' or one episode's), `history_mark_failed`, `blocklist_list`, `blocklist_remove` |
+| settings | `config_get` and `config_edit` (naming, media management, host, UI, indexer, download client and import list options, a section at a time), `tag_list` (and what uses each tag), `tag_create`, `tag_rename`, `tag_delete`, `rootfolder_list`, `rootfolder_add`, `rootfolder_remove`, `language_list` |
+| quality | `profile_list`, `profile_create`, `profile_edit` (the qualities allowed, the cutoff, the score each custom format gets), `profile_delete`, `qualitydefinition_list`, `qualitydefinition_edit` (the sizes a release of each quality may be), `customformat_list`, `customformat_add`, `customformat_edit`, `customformat_delete` |
+| providers | `indexer_list`, `indexer_test`, `downloadclient_list`, `downloadclient_test` (as Sonarr's Test button, saying what is wrong with each that fails), and for each of indexers, download clients, notifications and import lists `_kinds` (the kinds there are and the settings each takes), `_add`, `_edit`, `_delete`; `notification_list`, `notification_test`, `importlist_list`, `importlist_test`; `exclusion_list`, `exclusion_add`, `exclusion_remove` (what import lists may not add); `metadata_list`, `metadata_edit`. Credentials are set and never shown |
+| rules | `delayprofile_*`, `releaseprofile_*`, `remotepathmapping_*`, `autotag_*` and `filter_*` (the web interface's saved filters), each with `_list`, `_add`, `_edit` and `_delete` |
 | audits | the 16 audits and `audit_all` in [the table above](#the-audits) |
 
 Every list is paged the same way: it takes `limit` (100 unless given, 1000 at most) and `offset`, and answers `total`, `offset` and, while there is another page, the `next_offset` to pass back.
 
-`series_delete` (which removes a series, and its files if asked) and `file_delete` (which deletes files from disk) are only registered when `--enable-delete` / `SONARR_ENABLE_DELETE` is set, and even then change nothing without `confirm`: called without it, each answers `would_delete`, what a confirmed call would remove. `file_delete` also names every episode each file holds and warns when Sonarr still monitors them, since it downloads those again once the files are gone, or stops monitoring them when it is set to unmonitor what is deleted. `--read-only` registers the 43 read tools and nothing else, so a write tool is absent from `tools/list` rather than refused when called.
+Every kind of record Sonarr keeps in its settings is handled the one way. A record is answered by Sonarr's own names for its properties, with its tags by label and a provider's own settings (its URL, host, category) under `settings`; `set` changes properties by those same names and `settings` a provider's own; a name the kind does not have is refused with the ones it has. A new indexer or download client is turned on, as Sonarr's own page adds one; a notification is sent for the events set and no others. Sonarr tries a provider before it saves one unless `force` is set, for one being added as well as one being changed, which Sonarr's own force does not do.
+
+The tools that delete are only registered when `--enable-delete` / `SONARR_ENABLE_DELETE` is set, and even then change nothing without `confirm`: called without it, each answers `would_delete`, what a confirmed call would remove. They are `series_delete` (which removes a series, and its files if asked), `file_delete` (which deletes files from disk) and the `_delete` tool of each kind of settings record, since an indexer deleted takes its credentials with it. `file_delete` also names every episode each file holds and warns when Sonarr still monitors them, since it downloads those again once the files are gone, or stops monitoring them when it is set to unmonitor what is deleted. Four more wait for `confirm` without deleting anything: a change to the host's settings, which can cut this server off from Sonarr; `backup_restore`; `server_restart`; and `server_shutdown`. `--read-only` registers the 66 read tools and nothing else, so a write tool is absent from `tools/list` rather than refused when called.
 
 Most of what a tool answers was written by someone else: a release's name as a public indexer gave it, a title and plot from TheTVDB, a download client's message. Every piece of text in an answer or a refusal has what does not show taken out of it (control and zero-width characters, the ones that change the direction text runs in) and is cut at 2000 characters, so nothing is hidden in a name and nothing is buried in a page of text. A path, a folder, a release's `guid` and a download's id are left as Sonarr holds them, since a later call hands them back. It is still someone else's text: a client that connects is told to treat it as data, along with the rules above for the tools it was given.
 
-With `SONARR_LOG=info`, every call of a write or delete tool is written to the log as one line: the tool, its arguments, and whether it was refused, failed or answered.
+With `SONARR_LOG=info`, every call of a write or delete tool is written to the log as one line: the tool, its arguments, and whether it was refused, failed or answered. What a record is saved with (`settings`, `set`) is written by name only, each value blanked, since some of it is a credential.
 
 ### Choosing which tools load
 
-**The default is `core`: six read-only tools, about 850 tokens.** The whole surface is around
-9,200 tokens of tool definitions before anyone asks a question, which is a poor way to spend a
-client's context by default. `--toolsets` / `SONARR_TOOLSETS` loads the groups a session
-actually needs, and `core` comes along with whatever else is asked for, because nothing else
-can find a series.
+**The default is `core`: six read-only tools, about 1,000 tokens.** The whole surface is around 21,400 tokens of tool definitions before anyone asks a question, which is a poor way to spend a client's context by default. `--toolsets` / `SONARR_TOOLSETS` loads the groups a session actually needs, and `core` comes along with whatever else is asked for, because nothing else can find a series.
 
-**Running the library day to day needs `SONARR_TOOLSETS=curation`** - every audit, and everything
-that fixes what they find. Adding shows is `library`; settings, providers, logs and the delete
-tools are `admin`. `SONARR_TOOLSETS=all` restores every tool.
+**Running the library day to day needs `SONARR_TOOLSETS=curation`** - every audit, and everything that fixes what they find. Adding shows is `library`; health, logs, backups, restarting and the tools that delete series and files are `admin`; setting Sonarr up - its settings, indexers, download clients, notifications, import lists, profiles, formats and rules - is `settings`. `SONARR_TOOLSETS=all` restores every tool.
 
 | toolset | tools | with core | ~tokens |
 |---|---|---|---|
-| `core` *(default)* | 6 | 6 | 850 |
-| `library` | 5 | 11 | 1,500 |
-| `admin` | 11 (13 with `--enable-delete`) | 17 (19) | 1,700 (1,950) |
-| `curation` | 45 | 51 | 7,700 |
-| `all` | 67 (69 with `--enable-delete`) | 67 (69) | 9,200 (9,400) |
+| `core` *(default)* | 6 | 6 | 1,000 |
+| `library` | 5 | 11 | 1,800 |
+| `admin` | 20 (23 with `--enable-delete`) | 26 (29) | 3,500 (4,050) |
+| `curation` | 45 (46) | 51 (52) | 8,900 (9,100) |
+| `settings` | 47 (58) | 53 (64) | 10,200 (11,700) |
+| `all` | 123 (138 with `--enable-delete`) | 123 (138) | 21,400 (23,600) |
 
 Tokens are what the model sees: each tool's name, description and input schema, measured over
 a real `tools/list` at four bytes a token. Every tool also carries an output schema, another
-15,500 tokens across `all`, but clients keep that to themselves to validate results rather than
+25,400 tokens across `all`, but clients keep that to themselves to validate results rather than
 sending it to the model.
 
 `--toolsets` also takes a resource family - `series`, `episode`, `season`, `file`, `queue`,
@@ -327,7 +321,7 @@ you already believed. Two suites, each in its own container:
 | | Covers | Command |
 |---|---|---|
 | `integration/` | the `sdk/sonarr` client: every one of its operations is called against the server - all but the four that restart, stop or restore Sonarr, which are named with the reason - checking that each request is one Sonarr accepts and each answer decodes with its fields populated, and a run that leaves an operation neither called nor explained fails | `make testacc-integration` |
-| `acceptance/` | the tools: name resolution, projections, every audit against a library seeded with what it exists to find, searches that grab from the fake indexer and downloads the fake SABnzbd completes, imports, renames, and journeys that chain them (an audit's finding, the fix it names, the audit again to see it gone), and the built binary itself over stdio and HTTP (flags and environment reaching the server, the bearer check, refusing to start without a key or a token) | `make testacc-acceptance` |
+| `acceptance/` | the tools: name resolution, projections, every audit against a library seeded with what it exists to find, searches that grab from the fake indexer and downloads the fake SABnzbd completes, imports, renames; every kind of settings record added, changed and deleted, with a notification that really sends to a hook the suite answers; journeys that chain them (an audit's finding, the fix it names, the audit again to see it gone; a stuck download blocklisted and replaced from a second indexer; a file below cutoff upgraded and replaced; a torrent found on a Torznab indexer, handed to a torrent blackhole and imported, with no usenet in it); and the built binary itself over stdio and HTTP (flags and environment reaching the server, the bearer check, refusing to start without a key or a token) | `make testacc-acceptance` |
 
 ```bash
 make testacc              # both suites, each in a throwaway container
@@ -352,9 +346,9 @@ seeded library never produces one of them and nothing says why. The few that a r
 cannot be made to produce (a download stuck for a day, a disk nearly full, a folder the
 scan will not account for) are listed with their reason and the unit test that covers them
 instead. Nothing in either suite talks to a real indexer or download
-client: a fake Newznab indexer and a fake SABnzbd (go-kt's `test/services`) run inside the test
+client: a fake Newznab indexer (and a Torznab one beside it) and a fake SABnzbd (go-kt's `test/services`) run inside the test
 process, serve releases for the fixture series and write a finished download's files when the
-test says so. Sonarr's own calls out to TheTVDB (through SkyHook), services.sonarr.tv, XEM and
+test says so. A library of thousands of series, which no seeded Sonarr is, is a unit test: three thousand of them paged, searched and audited against a stand-in that takes time to answer, holding the audit to reading several at once and each only once. Sonarr's own calls out to TheTVDB (through SkyHook), services.sonarr.tv, XEM and
 the artwork CDN go through a record/replay proxy (go-kt's `test/replayproxy`) - the container is
 started with `HTTPS_PROXY` pointing at it and trusts its certificate authority - so neither
 suite needs a network:

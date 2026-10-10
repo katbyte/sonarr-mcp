@@ -193,6 +193,18 @@ func registerServerTools(r *registry) {
 		if err != nil {
 			return nil, commandsOut{}, err
 		}
+		// Sonarr answers oldest first, and a busy one has run hundreds in the
+		// minutes it remembers: what is running or waiting comes first, then
+		// what finished, newest first, so the first page is the one wanted
+		slices.SortStableFunc(res.Model, func(a, b sonarr.CommandResource) int {
+			if doneA, doneB := commandDone(a.Status), commandDone(b.Status); doneA != doneB {
+				if doneB {
+					return -1
+				}
+				return 1
+			}
+			return b.Id - a.Id
+		})
 		commands, paged := pageRows(res.Model, in.pageIn)
 		out := commandsOut{pageOut: paged, Commands: make([]commandOut, 0, len(commands))}
 		for i := range commands {
@@ -262,59 +274,19 @@ func registerServerTools(r *registry) {
 		Name:        "config_get",
 		Description: "Read one section of Sonarr's settings: the episode and folder naming formats, media management (hardlinks, recycling bin, permissions, what happens to deleted files), host, UI, and the indexer, download client and import list options. Credentials are never returned.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in configIn) (*mcp.CallToolResult, configOut, error) {
-		section := strings.ToLower(strings.TrimSpace(in.Section))
-		var body any
-		var err error
-		switch section {
-		case "naming":
-			var res sonarr.GetConfigNamingOperationResponse
-			res, err = client.GetConfigNaming(ctx)
-			body = res.Model
-		case "mediamanagement", "media_management", "media management":
-			section = "mediamanagement"
-			var res sonarr.GetConfigMediaManagementOperationResponse
-			res, err = client.GetConfigMediaManagement(ctx)
-			body = res.Model
-		case "host":
-			var res sonarr.GetConfigHostOperationResponse
-			res, err = client.GetConfigHost(ctx)
-			body = res.Model
-		case "ui":
-			var res sonarr.GetConfigUiOperationResponse
-			res, err = client.GetConfigUi(ctx)
-			body = res.Model
-		case "indexer":
-			var res sonarr.GetConfigIndexerOperationResponse
-			res, err = client.GetConfigIndexer(ctx)
-			body = res.Model
-		case "downloadclient", "download_client":
-			section = "downloadclient"
-			var res sonarr.GetConfigDownloadClientOperationResponse
-			res, err = client.GetConfigDownloadClient(ctx)
-			body = res.Model
-		case "importlist", "import_list":
-			section = "importlist"
-			var res sonarr.GetConfigImportListOperationResponse
-			res, err = client.GetConfigImportList(ctx)
-			body = res.Model
-		default:
-			return nil, configOut{}, fmt.Errorf("section must be naming, mediamanagement, host, ui, indexer, downloadclient or importlist, got %q", in.Section)
-		}
+		sec, err := r.findSection(in.Section)
 		if err != nil {
 			return nil, configOut{}, err
 		}
-		settings, err := asMap(body)
+		settings, err := sec.read(ctx)
 		if err != nil {
 			return nil, configOut{}, err
-		}
-		for k := range settings {
-			if secretSetting(k) {
-				delete(settings, k)
-			}
 		}
 
-		return nil, configOut{Section: section, Settings: settings}, nil
+		return nil, configOut{Section: sec.name, Settings: withoutSecrets(settings)}, nil
 	})
+
+	registerConfigEdit(r)
 }
 
 // logLevels are Sonarr's log levels, least severe first.
@@ -334,12 +306,20 @@ func healthRank(level string) int {
 	}
 }
 
-// secretSetting reports whether a settings key holds a credential: the API
-// key, a password, a certificate's password, a proxy's.
+// secretEndings are how the name of a setting that holds a credential ends,
+// lowercased, whatever is in front: apiKey, passkey and userKey, accessToken
+// and botToken, appSecret, a tracker's cookie.
+var secretEndings = []string{"key", "token", "secret", "passphrase", "cookie"}
+
+// secretSetting reports whether a setting holds a credential, by its name:
+// a password wherever the word is in it, or a name that ends as a
+// credential's does. It goes by the name because one left off a list is a
+// credential in an answer with nothing to say so; the price is a setting
+// that is no secret and is not shown, which can still be set.
 func secretSetting(key string) bool {
 	k := strings.ToLower(key)
 
-	return k == "apikey" || strings.Contains(k, "password") || strings.HasSuffix(k, "secret")
+	return strings.Contains(k, "password") || slices.ContainsFunc(secretEndings, func(ending string) bool { return strings.HasSuffix(k, ending) })
 }
 
 // asMap renders a model as a JSON object, for a caller that wants its fields

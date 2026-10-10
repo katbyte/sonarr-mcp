@@ -162,7 +162,7 @@ func registerReleaseTools(r *registry) {
 				continue
 			}
 			out.Grabbed = projectHistory(h)
-			if out.Queued, err = r.queueFor(ctx, h.SeriesId, nil); err != nil {
+			if out.Queued, err = r.queueFor(ctx, h.SeriesId, nil, true); err != nil {
 				return nil, out, err
 			}
 			break
@@ -255,8 +255,12 @@ func registerReleaseTools(r *registry) {
 		if err != nil {
 			return nil, wantedOut{}, err
 		}
-		if err := r.refreshQueue(ctx); err != nil {
-			return nil, wantedOut{}, err
+		// a search that was only queued has grabbed nothing yet, and the
+		// check would wait its turn behind it
+		if in.Wait >= 0 {
+			if err := r.refreshQueue(ctx); err != nil {
+				return nil, wantedOut{}, err
+			}
 		}
 		queue, err := r.queueAll(ctx)
 		if err != nil {

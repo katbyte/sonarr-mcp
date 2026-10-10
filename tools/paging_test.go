@@ -148,8 +148,8 @@ func TestEveryListPagesAndEveryDeleteConfirms(t *testing.T) {
 			}
 		}
 	}
-	if lists != 16 || deletes != 2 {
-		t.Errorf("held %d lists and %d deletes to the rule, want 16 and 2", lists, deletes)
+	if lists != 30 || deletes != 15 {
+		t.Errorf("held %d lists and %d deletes to the rule, want 30 and 15", lists, deletes)
 	}
 }
 
@@ -279,7 +279,7 @@ func TestCommandListFollowsOneByID(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeServer(t)
-	f.answer(t, "GET /api/v3/command", []any{map[string]any{"id": 1, "name": "RefreshMonitoredDownloads", "status": "completed"}, map[string]any{"id": 42, "name": "SeriesSearch", "status": "started"}})
+	f.answer(t, "GET /api/v3/command", []any{map[string]any{"id": 1, "name": "RefreshMonitoredDownloads", "status": "completed"}, map[string]any{"id": 7, "name": "CheckHealth", "status": "completed"}, map[string]any{"id": 42, "name": "SeriesSearch", "status": "started"}, map[string]any{"id": 3, "name": "RssSync", "status": "queued"}})
 	f.answer(t, "GET /api/v3/command/42", map[string]any{"id": 42, "name": "SeriesSearch", "status": "started"})
 	f.answerStatus(t, "GET /api/v3/command/43", http.StatusNotFound, map[string]any{"message": "NotFound"})
 	cs := session(t, f, Options{})
@@ -291,8 +291,15 @@ func TestCommandListFollowsOneByID(t *testing.T) {
 	if msg := mustFail(t, cs, "command_list", map[string]any{"command_id": 43}); !strings.Contains(msg, "no command 43") {
 		t.Errorf("an unknown command = %q", msg)
 	}
-	if all := mustCall(t, cs, "command_list", nil); len(rowsOf(all["commands"])) != 2 {
-		t.Errorf("every command = %v", all)
+	// Sonarr answers oldest first: what is running or waiting leads, then
+	// what finished, the newest of it first
+	all := rowsOf(mustCall(t, cs, "command_list", nil)["commands"])
+	order := make([]int, 0, len(all))
+	for _, c := range all {
+		order = append(order, number(c["command_id"]))
+	}
+	if !slices.Equal(order, []int{42, 3, 7, 1}) {
+		t.Errorf("the commands in order = %v, want the running and the queued, then the finished newest first", order)
 	}
 }
 

@@ -161,7 +161,7 @@ func TestSeriesAddEditDelete(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		_, _ = invoke("series_delete", map[string]any{"series": "tvdb:" + strconv.Itoa(bob), "delete_files": true, "confirm": true})
-		_, _ = invoke("tag_delete", map[string]any{"label": "war"})
+		_, _ = invoke("tag_delete", map[string]any{"label": "war", "confirm": true})
 	})
 
 	// adding it again is refused, by id or by title
@@ -181,7 +181,7 @@ func TestSeriesAddEditDelete(t *testing.T) {
 		"series": "Band of Brothers", "monitored": false, "quality_profile": "HD-1080p", "series_type": "standard",
 		"season_folder": true, "monitor_new_items": "none", "add_tags": []any{"archive"}, "remove_tags": []any{"war"},
 	})
-	t.Cleanup(func() { _, _ = invoke("tag_delete", map[string]any{"label": "archive"}) })
+	t.Cleanup(func() { _, _ = invoke("tag_delete", map[string]any{"label": "archive", "confirm": true}) })
 	changed := acctest.Strs(t, edited["changed"], "changed")
 	for _, want := range []string{"monitored: true -> false", "quality_profile: HD-720p -> HD-1080p", "season_folder: false -> true", "monitor_new_items: all -> none", "tags: [war] -> [archive]"} {
 		if !slices.Contains(changed, want) {

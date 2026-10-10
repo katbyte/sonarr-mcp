@@ -53,10 +53,13 @@ func sdClass(res int) int {
 // auditQualityMismatch compares the quality each file is recorded as with
 // the resolution of its video.
 func (*registry) auditQualityMismatch(ctx context.Context, s *snapshot, limit int) (auditOut, error) {
+	if err := s.warm(ctx, reads{files: true, episodes: true, of: hasFiles}); err != nil {
+		return auditOut{}, err
+	}
 	out := auditOut{Scanned: len(s.series)}
 	for i := range s.series {
 		series := &s.series[i]
-		if series.Statistics == nil || series.Statistics.EpisodeFileCount == 0 {
+		if !hasFiles(series) {
 			continue
 		}
 		files, err := s.filesOf(ctx, series.Id)
@@ -104,10 +107,13 @@ func (*registry) auditRuntime(ctx context.Context, s *snapshot, limit, tolerance
 	if tolerance <= 0 {
 		tolerance = defaultRuntimeTolerance
 	}
+	if err := s.warm(ctx, reads{files: true, episodes: true, of: hasFiles}); err != nil {
+		return auditOut{}, err
+	}
 	out := auditOut{Scanned: len(s.series)}
 	for i := range s.series {
 		series := &s.series[i]
-		if series.Statistics == nil || series.Statistics.EpisodeFileCount == 0 {
+		if !hasFiles(series) {
 			continue
 		}
 		files, err := s.filesOf(ctx, series.Id)
@@ -210,10 +216,13 @@ func hasAudioIn(audio, language string) (has, tagged bool) {
 // auditLanguage checks each file is in the language the series is watched
 // in: its original language, unless another is named.
 func (*registry) auditLanguage(ctx context.Context, s *snapshot, limit int, language string) (auditOut, error) {
+	if err := s.warm(ctx, reads{files: true, episodes: true, of: hasFiles}); err != nil {
+		return auditOut{}, err
+	}
 	out := auditOut{Scanned: len(s.series)}
 	for i := range s.series {
 		series := &s.series[i]
-		if series.Statistics == nil || series.Statistics.EpisodeFileCount == 0 {
+		if !hasFiles(series) {
 			continue
 		}
 		want := language

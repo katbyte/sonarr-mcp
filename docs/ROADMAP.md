@@ -29,31 +29,32 @@ Design rules, in priority order:
 | Area | Tools | Answers |
 |---|---|---|
 | know the library | `server_info`, `series_list`, `series_get`, `episode_list`, `calendar_list`, `file_list`, `profile_list`, `customformat_list`, `tag_list`, `rootfolder_list`, `config_get` | "what do I have, and how is it set up" |
-| curation | `audit_all` + 16 audits, `release_parse`, `file_edit`, `series_edit`, `season_monitor`, `episode_monitor`, `series_rename`, `series_rescan`, `series_refresh`, `import_scan` → `import_apply`, `series_import`, `tag_create`, `tag_delete` | "what is wrong, and fix it" |
+| curation | `audit_all` + 16 audits, `release_parse`, `file_edit`, `series_edit`, `series_bulk_edit`, `season_monitor`, `episode_monitor`, `series_rename`, `series_rescan`, `series_refresh`, `import_scan` → `import_apply`, `series_import`, `tag_create`, `tag_delete` | "what is wrong, and fix it" |
 | getting episodes | `episode_search`, `season_search`, `series_search`, `wanted_search`, `release_search` → `release_grab`, `queue_list`, `queue_grab`, `queue_remove`, `history_list`, `history_mark_failed`, `blocklist_list`, `blocklist_remove` | "go and get what is missing, and see it arrive" |
 | growing the library | `series_lookup`, `series_add`, `rootfolder_add`, `rootfolder_remove` | "add this show" |
-| admin | `server_health`, `task_list`, `task_run`, `command_list`, `log_list`, `indexer_list`, `indexer_test`, `downloadclient_list`, `downloadclient_test`, `series_delete`, `file_delete` | "keep it healthy" |
+| admin | `server_health`, `server_disk_space`, `server_updates`, `server_restart`, `server_shutdown`, `task_list`, `task_run`, `command_list`, `command_cancel`, `log_list`, `logfile_list`, `logfile_read`, `filesystem_list`, `backup_list`, `backup_create`, `backup_restore`, `backup_delete`, `indexer_list`, `indexer_test`, `downloadclient_list`, `downloadclient_test`, `series_delete`, `file_delete` | "keep it healthy" |
+| settings | `config_get`, `config_edit`; add, edit and delete for indexers, download clients, notifications, import lists, delay and release profiles, remote path mappings, custom formats, auto tags and saved filters, with `_kinds` and `_test` for the providers; `exclusion_list`, `exclusion_add`, `exclusion_remove`; `metadata_list`, `metadata_edit`; `profile_create`, `profile_edit`, `profile_delete`; `qualitydefinition_list`, `qualitydefinition_edit`; `language_list`; `tag_rename` | "set it up" |
 
 ## Candidates
 
 | Tool | Endpoints | Answers |
 |---|---|---|
-| `profile_edit` | `PUT /api/v3/qualityprofile/{id}` | change a profile's cutoff, allowed qualities and format scores (the audit finds unused profiles; nothing yet edits a used one) |
-| `customformat_create` / `customformat_edit` | `/api/v3/customformat` | the formats a profile scores, e.g. preferring x265 or an anime group |
-| `series_bulk_edit` | `PUT /api/v3/series/editor` | one change across many series: a profile, a root folder, tags (today it is one `series_edit` per series) |
-| `importlist_list` | `/api/v3/importlist`, `/api/v3/importlistexclusion/paged` | what adds series on its own, and what it has been told never to add |
-| `episode_history` | `GET /api/v3/history/series` | one series' or episode's history without paging the whole library's |
-| audits that read in parallel | - | an audit reads each series' files, episodes and folder one series at a time, which is fine for a few hundred series and slow for a few thousand; `audit_all` on a big library is minutes, and naming a series is seconds |
+| a torrent client fake | - | the live suite's torrent path runs through Sonarr's torrent blackhole, which needs no client; a qBittorrent or Transmission stand-in in go-kt would exercise the queue for a torrent as SABnzbd's does for usenet |
 
-## Guarded / deliberately excluded
+## Guarded
 
-- `series_delete` (optionally with its files) and `file_delete`: only registered when
-  `--enable-delete` (`SONARR_ENABLE_DELETE`) is set, and change nothing without `confirm`.
-- Not wrapping **as tools**, ever: authentication and the API key, updates and backups
-  (restore especially), the host settings (port, SSL, URL base, proxy), notifications and
-  their plumbing, the UI settings, and the system shutdown and restart. They are one-off
-  administration better done in Sonarr's own web interface, and some would cut the
-  server's own connection.
-- Adding or editing indexers and download clients: they carry credentials, and a model has
-  no judgment to add to typing them in. Listing and testing them is wrapped, because that is
-  where a stuck library is diagnosed.
+- **Deleting is opt-in, and waits to be confirmed.** Every `_delete` tool - a series, episode files, an indexer with its credentials, a profile, a backup - is only registered when `--enable-delete` (`SONARR_ENABLE_DELETE`) is set, and changes nothing without `confirm`.
+- **Four writes wait to be confirmed too:** a change to the host's settings (the port, the address, signing in), which can cut this server off from Sonarr; `backup_restore`, which puts everything Sonarr knows back to how it was; `server_restart`; and `server_shutdown`, after which nothing here can start it again.
+- **Credentials are set and never shown.** An indexer's API key, a download client's password, a notification's token go in through `settings` and are left out of every answer: whatever Sonarr marks private, and whatever is named as a credential is (a key, a token, a secret, a cookie, a password), since Sonarr does not mark them all. An address is shown without who it signs in as or the value of any parameter, in a setting and wherever Sonarr quotes one back, which it does with an indexer's stored key on the end. The log line for the write names each setting and blanks its value. The live suite reads every answer and refusal it gets for the keys it set, and fails on one.
+- **Sonarr tries a provider before it saves one.** An indexer, client, notification or import list that fails its test is refused unless `force` is set.
+
+## Not wrapped, and why
+
+- Signing in and out of the web interface (`/login`, `/logout`): this server is given an API key, and has no session to open.
+- The calendar feed (`/feed/v3/calendar/sonarr.ics`): a link for a calendar application, which carries the API key in its address; `calendar_list` answers the same episodes.
+- The web interface's own plumbing: its translations (`/localization`), its static files and the routes dump.
+- Restoring a backup from an uploaded file: `backup_restore` restores one Sonarr already holds, and a model has no file to hand over.
+- Language profiles: Sonarr 4 keeps the endpoints for old clients and no longer uses them.
+- Sonarr's bulk forms of what a tool already does one at a time: editing or deleting several indexers, download clients or import lists in one call, and deleting several series at once. Several calls do the same, each answering for itself, and a delete of many series in one call is the one mistake that is hardest to take back.
+- What its settings pages ask a provider while a form is being filled in (the `action` endpoints: a device list, an OAuth start): they answer a form, not a caller.
+- Reordering delay profiles, and the lists of indexer flags and of the limits a quality's size may be set within.

@@ -3,6 +3,7 @@
 package acceptance
 
 import (
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -56,6 +57,16 @@ func TestIndexers(t *testing.T) {
 	single := call(t, "indexer_test", map[string]any{"name": brokenIndexerName})
 	if r := acctest.Rows(t, single["results"], "results"); r[0]["ok"] != false || len(acctest.Strs(t, r[0]["problems"], "problems")) == 0 {
 		t.Errorf("testing the broken one alone = %v", single)
+	}
+
+	// Sonarr says where it failed, the address it asked with the key it
+	// keeps for the indexer on it: the address is shown, and the key is not,
+	// in a test's problems and in a save Sonarr refuses for the same reason
+	refused := callErr(t, "indexer_edit", map[string]any{"which": brokenIndexerName, "set": map[string]any{"priority": 40}})
+	for what, said := range map[string]string{"every indexer tested": fmt.Sprint(all), "the broken one tested": fmt.Sprint(single), "the save refused": refused} {
+		if strings.Contains(said, testenv.FakeKey) || !strings.Contains(said, "apikey=REDACTED") || !strings.Contains(said, "/broken/api") {
+			t.Errorf("%s = %s, want the address Sonarr asked without the key", what, said)
+		}
 	}
 
 	// an RSS sync fails against it, Sonarr backs off it, and its health

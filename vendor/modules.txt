@@ -24,6 +24,7 @@ github.com/katbyte/go-kt/mcp/acctest
 github.com/katbyte/go-kt/mcp/registry
 github.com/katbyte/go-kt/mcp/server
 github.com/katbyte/go-kt/outside
+github.com/katbyte/go-kt/parallel
 github.com/katbyte/go-kt/test/env
 github.com/katbyte/go-kt/test/replayproxy
 github.com/katbyte/go-kt/test/services/arrserver

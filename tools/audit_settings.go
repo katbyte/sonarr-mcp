@@ -161,7 +161,7 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 		if onSeries[p.Id] == 0 {
 			out.report(limit, finding{
 				Subject: p.Name, Problem: problemProfileUnused,
-				Detail: fmt.Sprintf("no series is on the %s profile", p.Name), Fix: "leave it, or delete it in Sonarr if it will not be wanted",
+				Detail: fmt.Sprintf("no series is on the %s profile", p.Name), Fix: "leave it, or profile_delete it (in the settings toolset) if it will not be wanted",
 			})
 		}
 	}
@@ -213,7 +213,7 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 			out.report(limit, finding{
 				Subject: cf.Name, Problem: problemFormatUnscored,
 				Detail: fmt.Sprintf("no quality profile gives %q a score, so matching it changes nothing", cf.Name),
-				Fix:    "score it in a quality profile in Sonarr, or delete it",
+				Fix:    "profile_edit a quality profile with custom_format_scores to score it, or customformat_delete it (both in the settings toolset)",
 			})
 		}
 	}
@@ -226,7 +226,7 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 			}
 			out.report(limit, finding{
 				Subject: name, Problem: problemReleaseProfileOff,
-				Detail: "the release profile is switched off, so its required and ignored terms do nothing", Fix: "enable or delete it in Sonarr",
+				Detail: "the release profile is switched off, so its required and ignored terms do nothing", Fix: "releaseprofile_edit it with enabled true, or releaseprofile_delete it (both in the settings toolset)",
 			})
 		}
 	}

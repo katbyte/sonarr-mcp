@@ -5,10 +5,14 @@ package acceptance
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/katbyte/go-kt/mcp/acctest"
+	"github.com/katbyte/go-kt/test/services/newznab"
+	"github.com/katbyte/sonarr-mcp/lib/testenv"
 )
 
 // Journeys: whole sessions the way a model drives them - the overview, the
@@ -268,4 +272,286 @@ func TestJourneyFolderRenamed(t *testing.T) {
 		t.Fatal(err)
 	}
 	restored = true
+}
+
+// hasFile waits for an episode of Breaking Bad's first season to have a
+// file, having Sonarr look at its download clients as it waits.
+func hasFile(t *testing.T, episode string) {
+	t.Helper()
+
+	for range 60 {
+		out := call(t, "episode_list", map[string]any{"series": breakingBad.Title, "season": 1})
+		for _, e := range acctest.RowsOf(out["episodes"]) {
+			if acctest.Str(e["episode"]) == episode && e["has_file"] == true {
+				return
+			}
+		}
+		refreshDownloads(t)
+		time.Sleep(time.Second)
+	}
+	// what Sonarr holds of it says why it did not come in
+	queue, _ := invoke("queue_list", map[string]any{"series": breakingBad.Title})
+	log, _ := invoke("log_list", map[string]any{"level": "warn", "limit": 5})
+	t.Fatalf("%s never had a file. The queue: %v\nthe log: %v", episode, queue["downloads"], log["entries"])
+}
+
+// dropFiles deletes the files Breaking Bad has for an episode, so a journey
+// leaves the series with none, as it found it.
+func dropFiles(episode string) {
+	files, err := invoke("file_list", map[string]any{"series": breakingBad.Title, "season": 1})
+	if err != nil {
+		return
+	}
+	for _, f := range acctest.RowsOf(files["files"]) {
+		if acctest.Str(f["episodes"]) == episode {
+			_, _ = invoke("file_delete", map[string]any{"file_ids": []any{acctest.NumOr0(f["id"])}, "confirm": true})
+		}
+	}
+}
+
+// A download Sonarr cannot import, dealt with the way its finding says: it is
+// taken out of the queue and blocklisted, the episode is searched for again,
+// and a different release comes in from a second indexer the journey adds.
+func TestJourneyStuckDownloadReplaced(t *testing.T) {
+	const episode, other = "S01E04", "Alternate Indexer"
+
+	// (the other release is not called -OTHER: Sonarr takes a file ending
+	// -other, -trailer or -sample for an extra, and passes over it)
+	second, err := fakes.AddIndexer("alternate", release("Breaking.Bad.S01E04.Cancer.Man.1080p.WEB-DL.DD5.1.H.264-ALT", breakingBad.TvdbID, 1, 4, 1.5, newznab.CategoryTVHD))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for _, j := range sab.Jobs() {
+			if strings.Contains(j.Name, episode) {
+				clearDownload(t, j.ID)
+			}
+		}
+		dropFiles(episode)
+		if list, listErr := invoke("blocklist_list", nil); listErr == nil {
+			for _, b := range acctest.RowsOf(list["entries"]) {
+				if strings.Contains(acctest.Str(b["source_title"]), episode) {
+					_, _ = invoke("blocklist_remove", map[string]any{"ids": []any{acctest.NumOr0(b["id"])}})
+				}
+			}
+		}
+		_, _ = invoke("indexer_delete", map[string]any{"which": other, "confirm": true})
+	})
+	call(t, "indexer_add", map[string]any{
+		"kind": "Newznab", "name": other, "set": map[string]any{"enableRss": false, "priority": 40},
+		"settings": map[string]any{"baseUrl": second.URL(), "apiPath": "/api", "apiKey": testenv.FakeKey, "categories": []any{5030, 5040}},
+	})
+
+	// both indexers have the episode at the quality the profile wants; the
+	// first one's release is the one grabbed, and it comes down as a sample
+	found := acctest.Rows(t, call(t, "release_search", map[string]any{"series": breakingBad.Title, "episode": episode})["releases"], "releases")
+	first := found[slices.IndexFunc(found, func(r map[string]any) bool { return strings.HasSuffix(acctest.Str(r["title"]), "-FAKE") })]
+	if first["approved"] != true || len(found) != 2 {
+		t.Fatalf("the releases for %s = %v", episode, found)
+	}
+	call(t, "release_grab", map[string]any{"guid": acctest.Str(first["guid"]), "indexer_id": acctest.Num(t, first["indexer_id"], "indexer_id")})
+	job, ok := sab.FindJob("H.264-FAKE")
+	for _, j := range sab.Jobs() {
+		if strings.Contains(j.Name, episode) && strings.HasSuffix(j.Name, "-FAKE") {
+			job, ok = j, true
+		}
+	}
+	if !ok {
+		t.Fatalf("the fake client has no job for %s: %v", episode, sab.Jobs())
+	}
+	completeWith(t, job, 1)
+	row := waitQueued(t, job.ID, func(d map[string]any) bool { return acctest.Str(d["health"]) != "ok" })
+
+	// the audit finds it and names the fix, which is taken
+	stuck := only(t, call(t, "audit_stuck_downloads", nil), "subject", episode)
+	if !strings.Contains(acctest.Str(stuck["fix"]), "queue_remove") {
+		t.Fatalf("the stuck download = %v", stuck)
+	}
+	call(t, "queue_remove", map[string]any{"ids": []any{acctest.Num(t, row["id"], "id")}, "blocklist": true, "skip_redownload": true})
+	blocked := acctest.Rows(t, call(t, "blocklist_list", nil)["entries"], "entries")
+	if !slices.ContainsFunc(blocked, func(b map[string]any) bool {
+		return strings.HasSuffix(acctest.Str(b["source_title"]), "S01E04.Cancer.Man.1080p.WEB-DL.DD5.1.H.264-FAKE")
+	}) {
+		t.Fatalf("the release is not blocklisted: %v", blocked)
+	}
+
+	// searched for again, Sonarr passes over the one it was told to refuse
+	// and takes the other indexer's
+	search := call(t, "episode_search", map[string]any{"series": breakingBad.Title, "episodes": []any{episode}})
+	if q := acctest.Rows(t, search["queued"], "queued"); len(q) != 1 || !strings.HasSuffix(acctest.Str(q[0]["title"]), "-ALT") || acctest.Str(q[0]["indexer"]) != other {
+		t.Fatalf("what the second search queued = %v", search["queued"])
+	}
+	replacement, ok := sab.FindJob("H.264-ALT")
+	if !ok {
+		t.Fatalf("the fake client has no job for the other release: %v", sab.Jobs())
+	}
+	completeWith(t, replacement, 48)
+	hasFile(t, episode)
+
+	file := findRow(t, acctest.Rows(t, call(t, "file_list", map[string]any{"series": breakingBad.Title, "season": 1})["files"], "files"), "episodes", episode)
+	if acctest.Str(file["release_group"]) != "ALT" || acctest.Str(file["quality"]) != "WEBDL-1080p" {
+		t.Errorf("the file that came in = %v", file)
+	}
+	if left := findings(t, call(t, "audit_stuck_downloads", nil), "subject", episode); len(left) != 0 {
+		t.Errorf("the download is still reported stuck: %v", left)
+	}
+}
+
+// A file below its profile's cutoff, upgraded: the audit names the episode,
+// a search brings a better release in, and Sonarr replaces the file with it.
+func TestJourneyQualityUpgrade(t *testing.T) {
+	const episode = "S01E06"
+
+	// the series was added with no files, and its folder is where Sonarr put it
+	folder := strings.TrimPrefix(acctest.Str(call(t, "series_get", map[string]any{"series": breakingBad.Title})["path"]), "/tv/")
+	low := filepath.Join(tvDir(), folder, "Season 1", "Breaking Bad - S01E06 - Crazy Handful of Nothin SDTV.mkv")
+	if folder == "" {
+		t.Fatal("Breaking Bad has no folder under /tv")
+	}
+	if err := fakeVideo(low, 48, "640x360"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if job, ok := sab.FindJob("Breaking.Bad." + episode); ok {
+			clearDownload(t, job.ID)
+		}
+		dropFiles(episode)
+		_ = os.Remove(low)
+		_, _ = invoke("series_rescan", map[string]any{"series": breakingBad.Title})
+	})
+	call(t, "series_rescan", map[string]any{"series": breakingBad.Title})
+	had := findRow(t, acctest.Rows(t, call(t, "file_list", map[string]any{"series": breakingBad.Title, "season": 1})["files"], "files"), "episodes", episode)
+	if acctest.Str(had["quality"]) != "SDTV" || had["below_cutoff"] != true {
+		t.Fatalf("the file to upgrade = %v", had)
+	}
+
+	// the audit names the file, and what stands in the way of replacing it:
+	// the profile does not upgrade, so a search brings nothing in
+	below := only(t, call(t, "audit_cutoff_unmet", map[string]any{"series": breakingBad.Title}), "series", breakingBad.Title)
+	if !strings.Contains(acctest.Str(below["detail"]), episode+" SDTV") || !strings.Contains(acctest.Str(below["detail"]), "Upgrades Allowed off") || !strings.Contains(acctest.Str(below["fix"]), "profile_edit") || !strings.Contains(acctest.Str(below["fix"]), "episode_search") {
+		t.Fatalf("the file below cutoff = %v", below)
+	}
+	if early := call(t, "episode_search", map[string]any{"series": breakingBad.Title, "episodes": []any{episode}}); len(acctest.RowsOf(early["queued"])) != 0 {
+		t.Fatalf("a search queued %v though the profile does not upgrade", early["queued"])
+	}
+	// the fix it names is taken, and put back when the journey is over
+	t.Cleanup(func() { _, _ = invoke("profile_edit", map[string]any{"profile": profile, "upgrade_allowed": false}) })
+	if allowed := call(t, "profile_edit", map[string]any{"profile": profile, "upgrade_allowed": true}); !slices.Contains(acctest.Strs(t, allowed["changed"], "changed"), "upgrade_allowed: false -> true") {
+		t.Fatalf("profile_edit = %v", allowed)
+	}
+
+	search := call(t, "episode_search", map[string]any{"series": breakingBad.Title, "episodes": []any{episode}})
+	if q := acctest.Rows(t, search["queued"], "queued"); len(q) != 1 || acctest.Str(q[0]["quality"]) != "WEBDL-1080p" {
+		t.Fatalf("what the search queued = %v", search["queued"])
+	}
+	job, ok := sab.FindJob("Breaking.Bad." + episode)
+	if !ok {
+		t.Fatalf("the fake client has no job for %s: %v", episode, sab.Jobs())
+	}
+	completeWith(t, job, 48)
+
+	// the better file takes the place of the one that was there
+	eventually(t, "file_list", map[string]any{"series": breakingBad.Title, "season": 1}, "the upgrade imported", func(out map[string]any) bool {
+		for _, f := range acctest.RowsOf(out["files"]) {
+			if acctest.Str(f["episodes"]) == episode && acctest.Str(f["quality"]) == "WEBDL-1080p" {
+				return true
+			}
+		}
+		refreshDownloads(t)
+		return false
+	})
+	files := acctest.Rows(t, call(t, "file_list", map[string]any{"series": breakingBad.Title, "season": 1})["files"], "files")
+	if n := len(findAll(files, "episodes", episode)); n != 1 {
+		t.Errorf("%s has %d files after the upgrade, want the one that replaced the other", episode, n)
+	}
+	if now := findRow(t, files, "episodes", episode); now["below_cutoff"] != false {
+		t.Errorf("the file after the upgrade = %v", now)
+	}
+	if _, err := os.Stat(low); !os.IsNotExist(err) {
+		t.Errorf("the file that was upgraded is still on disk: %v", err)
+	}
+	if left := findings(t, call(t, "audit_cutoff_unmet", map[string]any{"series": breakingBad.Title}), "series", breakingBad.Title); len(left) != 0 {
+		t.Errorf("the series is still below cutoff: %v", left)
+	}
+}
+
+// findAll are the rows with a field of a value.
+func findAll(rows []map[string]any, field, value string) []map[string]any {
+	var out []map[string]any
+	for _, row := range rows {
+		if acctest.Str(row[field]) == value {
+			out = append(out, row)
+		}
+	}
+
+	return out
+}
+
+// The torrent path, end to end, with no usenet in it: a Torznab indexer and a
+// torrent blackhole added with the tools, a release found on the one and
+// grabbed, its .torrent handed to the other, and what that "downloads"
+// imported.
+func TestJourneyTorrentDownload(t *testing.T) {
+	const episode, tracker, client = "S01E07", "Torrent Indexer", "Torrent Blackhole"
+	const title = "Breaking.Bad.S01E07.A.No.Rough.Stuff.Type.Deal.1080p.WEB-DL.DD5.1.H.264-TORRENT"
+
+	rel := release(title, breakingBad.TvdbID, 1, 7, 1.4, newznab.CategoryTVHD)
+	rel.Seeders, rel.Peers = 25, 30
+	torrents, err := fakes.AddTorrentIndexer("torrents", rel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inbox, watch := testenv.DataDir("downloads", "torrents"), testenv.DataDir("downloads", "watch")
+	for _, dir := range []string{inbox, watch} {
+		if err := os.MkdirAll(dir, 0o777); err != nil { //nolint:gosec // the container writes to it as another user
+			t.Fatal(err)
+		}
+		if err := os.Chmod(dir, 0o777); err != nil { //nolint:gosec // the same
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() {
+		dropFiles(episode)
+		_, _ = invoke("downloadclient_delete", map[string]any{"which": client, "confirm": true})
+		_, _ = invoke("indexer_delete", map[string]any{"which": tracker, "confirm": true})
+		_ = os.RemoveAll(inbox)
+		_ = os.RemoveAll(watch)
+	})
+
+	call(t, "indexer_add", map[string]any{
+		"kind": "Torznab", "name": tracker, "set": map[string]any{"enableRss": false},
+		"settings": map[string]any{"baseUrl": torrents.URL(), "apiPath": "/api", "apiKey": testenv.FakeKey, "categories": []any{5030, 5040}},
+	})
+	added := call(t, "downloadclient_add", map[string]any{"kind": "TorrentBlackhole", "name": client, "settings": map[string]any{"torrentFolder": "/downloads/torrents", "watchFolder": "/downloads/watch"}})
+	if rec := record(t, added); acctest.Str(rec["protocol"]) != "torrent" {
+		t.Fatalf("the blackhole added = %v", rec)
+	}
+
+	found := acctest.Rows(t, call(t, "release_search", map[string]any{"series": breakingBad.Title, "episode": episode})["releases"], "releases")
+	torrent := found[slices.IndexFunc(found, func(r map[string]any) bool { return acctest.Str(r["protocol"]) == "torrent" })]
+	if acctest.Str(torrent["title"]) != title || acctest.Str(torrent["indexer"]) != tracker || acctest.NumOr0(torrent["seeders"]) != 25 || torrent["approved"] != true {
+		t.Fatalf("the torrent release = %v", torrent)
+	}
+	grab := call(t, "release_grab", map[string]any{"guid": acctest.Str(torrent["guid"]), "indexer_id": acctest.Num(t, torrent["indexer_id"], "indexer_id")})
+	if g := acctest.Object(t, grab["grabbed"], "grabbed"); acctest.Str(g["download_client"]) != client || acctest.Str(g["episode"]) != episode {
+		t.Fatalf("release_grab of the torrent = %v", grab)
+	}
+	// the .torrent the indexer handed over is in the folder the client reads
+	if dropped, _ := filepath.Glob(filepath.Join(inbox, "*.torrent")); len(dropped) != 1 {
+		t.Fatalf("%d .torrent files were handed to the blackhole, want one", len(dropped))
+	}
+
+	// what a torrent client would leave where Sonarr watches for it
+	if err := fakeVideo(filepath.Join(watch, title, title+".mkv"), 48, "1920x1080"); err != nil {
+		t.Fatal(err)
+	}
+	hasFile(t, episode)
+	file := findRow(t, acctest.Rows(t, call(t, "file_list", map[string]any{"series": breakingBad.Title, "season": 1})["files"], "files"), "episodes", episode)
+	if acctest.Str(file["release_group"]) != "TORRENT" || acctest.Str(file["quality"]) != "WEBDL-1080p" {
+		t.Errorf("the file that came in = %v", file)
+	}
+	hist := acctest.Rows(t, call(t, "history_list", map[string]any{"series": breakingBad.Title, "episode": episode, "events": []any{"imported"}})["entries"], "entries")
+	if len(hist) == 0 || !strings.Contains(acctest.Str(hist[0]["detail"]), "/downloads/watch/") {
+		t.Errorf("the import in history = %v", hist)
+	}
 }

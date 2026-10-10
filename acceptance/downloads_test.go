@@ -360,7 +360,7 @@ func TestQueueGrabDelayed(t *testing.T) {
 	call(t, "series_edit", map[string]any{"series": breakingBad.Title, "add_tags": []any{"delayed"}})
 	t.Cleanup(func() {
 		call(t, "series_edit", map[string]any{"series": breakingBad.Title, "remove_tags": []any{"delayed"}})
-		_, _ = invoke("tag_delete", map[string]any{"label": "delayed"})
+		_, _ = invoke("tag_delete", map[string]any{"label": "delayed", "confirm": true})
 	})
 	tags := acctest.Rows(t, call(t, "tag_list", nil)["tags"], "tags")
 	tag := acctest.Num(t, findRow(t, tags, "label", "delayed")["id"], "id")

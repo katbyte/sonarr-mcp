@@ -97,12 +97,17 @@ func (r *registry) refreshQueue(ctx context.Context) error {
 }
 
 // queueFor is what the queue holds for a series, or for some of its
-// episodes, once Sonarr has checked the download clients for what was just
-// grabbed.
-func (r *registry) queueFor(ctx context.Context, seriesID int, episodeIDs []int) ([]queueRow, error) {
-	if err := r.refreshQueue(ctx); err != nil {
-		return nil, err
+// episodes. fresh has Sonarr check the download clients first, for what was
+// just grabbed. A search that was only queued has grabbed nothing yet, and
+// the check is a command of its own that would wait its turn behind it, so
+// such a search reads the queue as it stands.
+func (r *registry) queueFor(ctx context.Context, seriesID int, episodeIDs []int, fresh bool) ([]queueRow, error) {
+	if fresh {
+		if err := r.refreshQueue(ctx); err != nil {
+			return nil, err
+		}
 	}
+
 	res, err := r.client.GetQueueDetails(ctx, sonarr.GetQueueDetailsOperationOptions{
 		SeriesId: new(seriesID), IncludeSeries: new(true), IncludeEpisode: new(true),
 	})

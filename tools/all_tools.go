@@ -5,16 +5,20 @@
 //
 // Every tool is registered through add with a kind: read tools never change
 // Sonarr's state, write tools do (and are dropped under --read-only), and
-// delete tools remove series or episode files (and are only registered with
-// --enable-delete). --toolsets picks the groups a session needs,
+// delete tools remove what cannot be put back - a series, episode files, an
+// indexer with its credentials, a profile, a backup - and are only
+// registered with --enable-delete. --toolsets picks the groups a session needs,
 // --allow-tools adds tools to them by name, and --deny-tools takes tools out
 // of whatever is left.
 package tools
 
 import (
 	"context"
+	"encoding/json"
+	"slices"
 	"sync"
 
+	"github.com/katbyte/go-kt/clog"
 	"github.com/katbyte/go-kt/lock"
 	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
@@ -25,8 +29,9 @@ import (
 type Options struct {
 	// ReadOnly registers only tools that never change Sonarr's state.
 	ReadOnly bool
-	// EnableDelete registers the tools that delete series and episode
-	// files. Off unless the operator opts in.
+	// EnableDelete registers the tools that delete: series and episode
+	// files, and the records Sonarr keeps in its settings. Off unless the
+	// operator opts in.
 	EnableDelete bool
 	// Toolsets, when set, restricts registration to the named groups (see
 	// Toolsets). "core" is always included, so a set can be asked for on its
@@ -67,7 +72,9 @@ var Toolsets = map[string][]string{
 	// find what is wrong with a library and fix it: every audit, and every
 	// tool an audit's worklist is fixed with - searching and grabbing,
 	// clearing the queue and the blocklist, importing what Sonarr lost track
-	// of, renaming, re-monitoring, and the profile and tag edits
+	// of, renaming, re-monitoring, and the tag edits. A finding whose fix
+	// is a change to Sonarr's settings names the tool and says it is the
+	// settings set's
 	"curation": {
 		"audit_all", "audit_missing_episodes", "audit_cutoff_unmet", "audit_stuck_downloads", "audit_failed_downloads",
 		"audit_unmapped_folders", "audit_missing_folders", "audit_untracked_files", "audit_naming", "audit_missing_files", "audit_quality_mismatch",
@@ -76,7 +83,7 @@ var Toolsets = map[string][]string{
 		"release_search", "release_grab", "release_parse",
 		"queue_remove", "queue_grab", "history_list", "history_mark_failed", "blocklist_list", "blocklist_remove",
 		"import_scan", "import_apply", "series_import", "series_rename",
-		"file_list", "file_edit", "series_edit", "season_monitor", "episode_monitor", "series_refresh", "series_rescan",
+		"file_list", "file_edit", "series_edit", "series_bulk_edit", "season_monitor", "episode_monitor", "series_refresh", "series_rescan",
 		"profile_list", "tag_list", "tag_create", "tag_delete",
 	},
 	// grow the library: find a show and add it, and the root folders it goes in
@@ -84,12 +91,37 @@ var Toolsets = map[string][]string{
 		"series_lookup", "series_add", "rootfolder_list", "rootfolder_add", "rootfolder_remove",
 	},
 	// running Sonarr rather than using it: health, scheduled tasks and
-	// commands, logs, settings, the indexers and download clients, and the
-	// tools that remove series and files
+	// commands, logs and log files, disk space, backups, updates, restarting
+	// it, what its settings say, the indexers and download clients as they
+	// stand, and the tools that remove series and files
 	"admin": {
-		"server_health", "task_list", "task_run", "command_list", "log_list", "config_get",
-		"indexer_list", "indexer_test", "downloadclient_list", "downloadclient_test", "customformat_list",
+		"server_health", "task_list", "task_run", "command_list", "command_cancel", "log_list", "logfile_list", "logfile_read",
+		"indexer_list", "indexer_test", "downloadclient_list", "downloadclient_test",
+		"server_disk_space", "server_updates", "server_restart", "server_shutdown", "filesystem_list",
+		"backup_list", "backup_create", "backup_delete", "backup_restore",
 		"series_delete", "file_delete",
+	},
+	// setting Sonarr up: its settings, section by section, and every list it
+	// keeps in them - indexers, download clients, notifications, import lists
+	// and what they may not add, metadata, quality profiles and the sizes
+	// behind them, custom formats, delay and release profiles, path
+	// mappings, auto tags and saved filters
+	"settings": {
+		"config_get", "config_edit",
+		"indexer_kinds", "indexer_add", "indexer_edit", "indexer_delete",
+		"downloadclient_kinds", "downloadclient_add", "downloadclient_edit", "downloadclient_delete",
+		"notification_list", "notification_kinds", "notification_add", "notification_edit", "notification_delete", "notification_test",
+		"importlist_list", "importlist_kinds", "importlist_add", "importlist_edit", "importlist_delete", "importlist_test",
+		"exclusion_list", "exclusion_add", "exclusion_remove",
+		"metadata_list", "metadata_edit",
+		"profile_create", "profile_edit", "profile_delete", "qualitydefinition_list", "qualitydefinition_edit", "language_list",
+		"customformat_list", "customformat_add", "customformat_edit", "customformat_delete",
+		"delayprofile_list", "delayprofile_add", "delayprofile_edit", "delayprofile_delete",
+		"releaseprofile_list", "releaseprofile_add", "releaseprofile_edit", "releaseprofile_delete",
+		"remotepathmapping_list", "remotepathmapping_add", "remotepathmapping_edit", "remotepathmapping_delete",
+		"autotag_list", "autotag_add", "autotag_edit", "autotag_delete",
+		"filter_list", "filter_add", "filter_edit", "filter_delete",
+		"tag_rename",
 	},
 }
 
@@ -136,6 +168,9 @@ type registry struct {
 	// errorLog is where a handler's panic is logged; nil is the process's
 	// log
 	errorLog func(format string, args ...any)
+	// writeLog is where the line for every write is logged; nil is the
+	// process's log
+	writeLog func(format string, args ...any)
 }
 
 // toolHints are what a tool tells a client about itself beyond its kind, in
@@ -158,8 +193,6 @@ var toolHints = map[string]mcpregistry.Hints{
 	// a tag that was not there; a label there already is refused before
 	// anything is sent
 	"tag_create": {Additive: true, Idempotent: true},
-	// a tag taken away; asked again, there is no tag of that label to take
-	"tag_delete": {Idempotent: true},
 	// a root folder that was not there; nothing on disk is touched
 	"rootfolder_add": {Additive: true},
 	// a root folder taken out of Sonarr; asked again, there is none at that
@@ -211,6 +244,58 @@ var toolHints = map[string]mcpregistry.Hints{
 	// series that were not there, each with a folder already on disk as its
 	// path; a folder imported is in the library and is passed over
 	"series_import": {Additive: true, Idempotent: true},
+	// the same values written over on every series named, the same again
+	// the second time; a new root folder with move_files moves the files
+	"series_bulk_edit": {Idempotent: true},
+	// a label written over, the same again the second time
+	"tag_rename": {Idempotent: true},
+	// settings written over, the same again the second time
+	"config_edit": {Idempotent: true},
+	// a record that was not there: added again it is a second one
+	"indexer_add":           {Additive: true},
+	"downloadclient_add":    {Additive: true},
+	"importlist_add":        {Additive: true},
+	"delayprofile_add":      {Additive: true},
+	"releaseprofile_add":    {Additive: true},
+	"remotepathmapping_add": {Additive: true},
+	"customformat_add":      {Additive: true},
+	"autotag_add":           {Additive: true},
+	"filter_add":            {Additive: true},
+	"profile_create":        {Additive: true},
+	// a record's values written over, the same again the second time
+	"indexer_edit":           {Idempotent: true},
+	"downloadclient_edit":    {Idempotent: true},
+	"importlist_edit":        {Idempotent: true},
+	"metadata_edit":          {Idempotent: true},
+	"delayprofile_edit":      {Idempotent: true},
+	"releaseprofile_edit":    {Idempotent: true},
+	"remotepathmapping_edit": {Idempotent: true},
+	"customformat_edit":      {Idempotent: true},
+	"autotag_edit":           {Idempotent: true},
+	"filter_edit":            {Idempotent: true},
+	"profile_edit":           {Idempotent: true},
+	"qualitydefinition_edit": {Idempotent: true},
+	// Sonarr sends a test through a notification before it saves one, and
+	// the test tool sends one on purpose: a message leaves for wherever the
+	// notification points, to a person as often as not
+	"notification_add":  {Additive: true, SendsOut: true},
+	"notification_edit": {Idempotent: true, SendsOut: true},
+	"notification_test": {SendsOut: true},
+	// a show the lists may not add; one excluded already is refused by
+	// Sonarr before anything changes
+	"exclusion_add": {Additive: true, Idempotent: true},
+	// an exclusion lifted; asked again, there is none for that show
+	"exclusion_remove": {Idempotent: true},
+	// a backup that was not there: made again it is a second one
+	"backup_create": {Additive: true},
+	// everything Sonarr knows written over with what it knew then
+	"backup_restore": {},
+	// whatever Sonarr was doing is cut short
+	"server_restart":  {},
+	"server_shutdown": {},
+	// a command taken out of the queue before it ran; asked again, it is
+	// not there to take
+	"command_cancel": {Idempotent: true},
 }
 
 // queued is every tool queued so far, in go-kt's registry, which is made
@@ -222,10 +307,56 @@ func (r *registry) queued() *mcpregistry.Registry {
 			Essential: EssentialTools,
 			Hints:     toolHints,
 			LogError:  r.errorLog,
+			LogWrite:  r.logWrite,
 		})
 	}
 
 	return r.tools
+}
+
+// logWrite is where go-kt's registry writes its line for every call of a
+// write or delete tool. The registry blanks an argument named as a
+// credential is (apiKey, password); what an indexer, a download client or a
+// notification is saved with sits under names of Sonarr's own choosing - a
+// webhook's address, a passkey, a cookie - inside settings and set, so every
+// value in those is blanked here and its name kept.
+func (r *registry) logWrite(format string, args ...any) {
+	const sent = 3 // kind, tool, outcome, then what the call sent
+	if len(args) > sent {
+		if arguments, ok := args[sent].(string); ok {
+			args = slices.Clone(args)
+			args[sent] = blankFreeForm(arguments)
+		}
+	}
+	if r.writeLog != nil {
+		r.writeLog(format, args...)
+
+		return
+	}
+	clog.Log.Infof(format, args...)
+}
+
+// blankFreeForm is a call's arguments, as the write line carries them, with
+// every value under settings and set blanked.
+func blankFreeForm(arguments string) string {
+	var sent map[string]any
+	if err := json.Unmarshal([]byte(arguments), &sent); err != nil {
+		// cut short for the line, and so not to be read: nothing of it is
+		// written rather than something unblanked
+		return "(arguments too long to show)"
+	}
+	for _, key := range []string{"settings", "set"} {
+		values := asObject(sent[key])
+		for name := range values {
+			values[name] = "***"
+		}
+	}
+	raw, err := json.Marshal(sent)
+	if err != nil {
+		return "(arguments not shown)"
+	}
+
+	return string(raw)
 }
 
 // add queues a typed tool for registration. go-kt's registry sets the MCP
@@ -291,6 +422,11 @@ func queueTools(r *registry) {
 	registerImportTools(r)
 	registerConfigTools(r)
 	registerProviderTools(r)
+	registerSettingsTools(r)
+	registerProfileTools(r)
+	registerExclusionTools(r)
+	registerBulkTools(r)
+	registerSystemTools(r)
 	registerAuditTools(r)
 }
 

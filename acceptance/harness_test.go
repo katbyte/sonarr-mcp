@@ -13,8 +13,10 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -75,6 +77,17 @@ func testMain(m *testing.M) {
 		if code == 0 {
 			code = 1
 		}
+	}
+
+	// no answer and no refusal may hand a caller a credential, whichever
+	// test asked for it
+	if len(keysShown) > 0 {
+		fmt.Fprintf(os.Stderr, "\n%d tool(s) answered or refused with a credential in what they said:\n", len(keysShown))
+		for _, name := range slices.Sorted(maps.Keys(keysShown)) {
+			fmt.Fprintln(os.Stderr, "  "+name)
+		}
+		fmt.Fprintln(os.Stderr, "Sonarr's API key, or the key it keeps for the fake indexer and download client, reached a caller")
+		code = 1
 	}
 
 	// every registered tool must have been seen to answer by something above.
@@ -190,12 +203,37 @@ func waitForSonarr() error {
 // an audit's answer is read for the kinds of finding it reported.
 func invoke(name string, args map[string]any) (map[string]any, error) {
 	out, err := suite.Invoke(name, args)
+	noteKeys(name, out, err)
 	if err != nil {
 		return nil, err
 	}
 	recordFindings(name, out)
 
 	return out, nil
+}
+
+// keysShown are the tools that answered, or refused, with a credential in
+// what they said: the key the fakes demand, which Sonarr keeps for its
+// indexers and its download client, or Sonarr's own. No test has to look for
+// one: every call the suite makes is read for them, and one shown fails the
+// run.
+var (
+	keysMu    sync.Mutex
+	keysShown = map[string]bool{}
+)
+
+func noteKeys(name string, out map[string]any, err error) {
+	said := fmt.Sprint(out)
+	if err != nil {
+		said += err.Error()
+	}
+	for _, key := range []string{testenv.FakeKey, testenv.Token()} {
+		if key != "" && strings.Contains(said, key) {
+			keysMu.Lock()
+			keysShown[name] = true
+			keysMu.Unlock()
+		}
+	}
 }
 
 // skipUnlessReady skips a test when there is no container to run against.

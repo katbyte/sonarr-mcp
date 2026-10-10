@@ -202,6 +202,16 @@ func (f *Fakes) AddIndexer(name string, releases ...newznab.Release) (*newznab.I
 	return f.indexers.Add(newznab.Site{Name: name, APIKey: FakeKey, Releases: releases})
 }
 
+// AddTorrentIndexer serves another indexer beside the first, a torrent one:
+// its feed is Torznab's, and what it hands a grab is a .torrent.
+func (f *Fakes) AddTorrentIndexer(name string, releases ...newznab.Release) (*newznab.Indexer, error) {
+	if ix := f.indexers.Indexer(name); ix != nil {
+		return ix, nil
+	}
+
+	return f.indexers.Add(newznab.Site{Name: name, Protocol: newznab.Torrent, APIKey: FakeKey, Releases: releases})
+}
+
 // Stop closes both fakes. Stopping what never started is harmless.
 func (f *Fakes) Stop() {
 	if f == nil {

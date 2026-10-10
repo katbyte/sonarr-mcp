@@ -245,6 +245,12 @@ func (r *registry) auditMissingFolders(ctx context.Context, s *snapshot, limit i
 // auditUntrackedFiles compares each series' folder with the files Sonarr
 // records, and asks Sonarr about any video file it is not tracking.
 func (r *registry) auditUntrackedFiles(ctx context.Context, s *snapshot, limit int) (auditOut, error) {
+	if err := s.warm(ctx, reads{disk: true}); err != nil {
+		return auditOut{}, err
+	}
+	if err := s.warm(ctx, reads{files: true, of: hasFiles}); err != nil {
+		return auditOut{}, err
+	}
 	out := auditOut{Scanned: len(s.series)}
 	for i := range s.series {
 		series := &s.series[i]
@@ -321,10 +327,13 @@ func (r *registry) auditMissingFiles(ctx context.Context, s *snapshot, limit int
 	if err != nil {
 		return auditOut{}, err
 	}
+	if err := s.warm(ctx, reads{files: true, disk: true, of: hasFiles}); err != nil {
+		return auditOut{}, err
+	}
 	out := auditOut{Scanned: len(s.series)}
 	for i := range s.series {
 		series := &s.series[i]
-		if series.Statistics == nil || series.Statistics.EpisodeFileCount == 0 {
+		if !hasFiles(series) {
 			continue
 		}
 		files, err := s.filesOf(ctx, series.Id)
@@ -389,7 +398,7 @@ func (r *registry) auditNaming(ctx context.Context, s *snapshot, limit int) (aud
 		out.report(limit, finding{
 			Subject: "Rename Episodes", Problem: problemRenamingOff,
 			Detail: "Sonarr keeps the names files arrive with, so it cannot say which differ from the naming format",
-			Fix:    "turn on Rename Episodes in Sonarr's media management settings; this audit then lists the files to rename",
+			Fix:    "config_edit (in the settings toolset) section naming with renameEpisodes true; this audit then lists the files to rename",
 		})
 		return out, nil
 	}

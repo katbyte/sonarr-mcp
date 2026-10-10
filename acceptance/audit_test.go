@@ -164,7 +164,7 @@ func TestAuditNaming(t *testing.T) {
 		}
 	})
 	off := audit(t, "audit_naming", nil)
-	if f := only(t, off, "problem", "renaming is off"); !strings.Contains(acctest.Str(f["fix"]), "Rename Episodes") {
+	if f := only(t, off, "problem", "renaming is off"); !strings.Contains(acctest.Str(f["fix"]), "config_edit") || !strings.Contains(acctest.Str(f["fix"]), "renameEpisodes true") {
 		t.Errorf("renaming off = %v", f)
 	}
 	if n := acctest.Num(t, off["total_findings"], "total_findings"); n != 1 {
@@ -259,7 +259,7 @@ func TestAuditProfiles(t *testing.T) {
 	// and a tag that scopes a setting but no series scopes nothing
 	call(t, "tag_create", map[string]any{"label": scopingTag})
 	// the test deletes it as the fix; the cleanup is for a run that stops first
-	t.Cleanup(func() { _, _ = invoke("tag_delete", map[string]any{"label": scopingTag}) })
+	t.Cleanup(func() { _, _ = invoke("tag_delete", map[string]any{"label": scopingTag, "confirm": true}) })
 	tagID := acctest.Num(t, findRow(t, acctest.Rows(t, call(t, "tag_list", nil)["tags"], "tags"), "label", scopingTag)["id"], "id")
 	indexers, err := api.GetIndexer(ctx)
 	if err != nil || len(indexers.Model) == 0 {
@@ -290,7 +290,7 @@ func TestAuditProfiles(t *testing.T) {
 	if _, err := api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOperationOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	call(t, "tag_delete", map[string]any{"label": scopingTag})
+	call(t, "tag_delete", map[string]any{"label": scopingTag, "confirm": true})
 	if left := findings(t, audit(t, "audit_profiles", nil), "subject", scopingTag); len(left) != 0 {
 		t.Errorf("after deleting the tag = %v", left)
 	}

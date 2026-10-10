@@ -222,6 +222,13 @@ func (r *registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int)
 	// format scores, so a file good enough on quality and short of the score
 	// the profile upgrades until is in no list Sonarr shows. Those are found
 	// here, series by series.
+	scored := func(series *sonarr.SeriesResource) bool {
+		p := byID[series.QualityProfileId]
+		return p != nil && p.CutoffFormatScore > 0
+	}
+	if err := s.warm(ctx, reads{files: true, episodes: true, of: scored}); err != nil {
+		return auditOut{}, err
+	}
 	for i := range s.series {
 		series := &s.series[i]
 		p := byID[series.QualityProfileId]
@@ -277,9 +284,11 @@ func (r *registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int)
 			problem = problemBelowFormatCutoff
 		}
 		fix := "series_search, or episode_search for the ones that matter"
+		// with upgrades off Sonarr rejects every release for an episode that
+		// has a file, searched for by hand or not
 		if g.noUpgrades {
-			detail += "; the profile has Upgrades Allowed off, so Sonarr will not replace them on its own"
-			fix = "turn Upgrades Allowed on in the profile if they should be replaced by themselves, or " + fix
+			detail += "; the profile has Upgrades Allowed off, so Sonarr will not replace them, on its own or when searched for"
+			fix = "profile_edit (in the settings toolset) the profile with upgrade_allowed true, then " + fix
 		}
 		out.report(limit, finding{
 			Series: g.title, SeriesID: id, Subject: fmt.Sprintf("%d files", len(g.labels)), Problem: problem, Detail: detail,

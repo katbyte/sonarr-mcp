@@ -3,12 +3,15 @@ package tools
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/katbyte/go-kt/outside"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -51,7 +54,7 @@ func TestCleanAnswer(t *testing.T) {
 		Total: 1, Series: hidden, Folder: hidden, Score: 1.5,
 		Rows: []row{{
 			Title: hidden, Path: "/tv/" + hidden, GUID: hidden, Messages: []string{hidden, "plain"},
-			Settings: map[string]any{"baseUrl": hidden, "path": hidden, "tags": []any{hidden, 7}, "nested": map[string]any{"name": hidden}},
+			Settings: map[string]any{"baseUrl": hidden, "path": hidden, "rootFolderPath": hidden, "tags": []any{hidden, 7}, "nested": map[string]any{"name": hidden}},
 			Any:      hidden,
 		}},
 		One: &row{Title: strings.Repeat("a", answerLength+50)},
@@ -68,8 +71,8 @@ func TestCleanAnswer(t *testing.T) {
 	if got.Settings["baseUrl"] != clean || !isList || !isMap || len(tags) != 2 || tags[0] != clean || tags[1] != 7 || nested["name"] != clean {
 		t.Errorf("the text in a map = %v", got.Settings)
 	}
-	if out.Folder != hidden || got.Path != "/tv/"+hidden || got.GUID != hidden || got.Settings["path"] != hidden {
-		t.Errorf("a value handed back was changed: folder %q, path %q, guid %q, a map's path %q", out.Folder, got.Path, got.GUID, got.Settings["path"])
+	if out.Folder != hidden || got.Path != "/tv/"+hidden || got.GUID != hidden || got.Settings["path"] != hidden || got.Settings["rootFolderPath"] != hidden {
+		t.Errorf("a value handed back was changed: folder %q, path %q, guid %q, a map's path %q and root folder %q", out.Folder, got.Path, got.GUID, got.Settings["path"], got.Settings["rootFolderPath"])
 	}
 	if n := len([]rune(out.One.Title)); n != answerLength || !strings.HasSuffix(out.One.Title, "…") {
 		t.Errorf("a long text is %d characters ending %q, want %d ending in an ellipsis", n, out.One.Title[len(out.One.Title)-6:], answerLength)
@@ -185,7 +188,24 @@ func TestEveryHandleIsAnAnswersField(t *testing.T) {
 		}
 		schemas.Write(raw)
 	}
+	// three are never a tool's field: a settings record is answered as a map
+	// by Sonarr's own names, so each is held to being a name Sonarr has
+	underKeys := map[string][]string{
+		"rootFolderPath": propertyNames(reflect.TypeFor[sonarr.ImportListResource]()),
+		"remotePath":     propertyNames(reflect.TypeFor[sonarr.RemotePathMappingResource]()),
+		"localPath":      propertyNames(reflect.TypeFor[sonarr.RemotePathMappingResource]()),
+	}
 	for name := range handles {
+		if names, underKey := underKeys[name]; underKey {
+			if !slices.Contains(names, name) {
+				t.Errorf("handles has %q, which is no property of the record it is kept for", name)
+			}
+			if strings.Contains(schemas.String(), `"`+name+`":{`) {
+				t.Errorf("handles has %q as a name only a record's map has, and a tool now answers it as a field", name)
+			}
+
+			continue
+		}
 		if !strings.Contains(schemas.String(), `"`+name+`":{`) {
 			t.Errorf("handles has %q, which no tool answers", name)
 		}
@@ -223,5 +243,66 @@ func TestInstructionsFollowTheToolsRegistered(t *testing.T) {
 	}
 	if strings.Contains(strings.Join(withoutDelete, "\n"), "confirm") {
 		t.Error("deleting is spoken of with no delete tool registered")
+	}
+}
+
+// An address in an answer's text is shown without who it signs in as and
+// without the value of any parameter; what is around it, and a place on a
+// page, is as it was.
+func TestAddressesCarryNoCredential(t *testing.T) {
+	t.Parallel()
+
+	for text, want := range map[string]string{ //nolint:gosec // made-up credentials, here to be taken out
+		"Unable to connect to indexer. HTTP request failed: [500:InternalServerError] [GET] at [http://indexer.example:8080/api?t=tvsearch&cat=5030,5040&apikey=s3cret-key&limit=100].": "Unable to connect to indexer. HTTP request failed: [500:InternalServerError] [GET] at [http://indexer.example:8080/api?t=REDACTED&cat=REDACTED&apikey=REDACTED&limit=REDACTED].",
+		"https://admin:hunter2@indexer.example/api":                                                       "https://REDACTED@indexer.example/api",
+		"signed in at https://sonarr.example/callback#access_token=s3cret-key":                            "signed in at https://sonarr.example/callback#REDACTED",
+		"see https://wiki.servarr.com/sonarr/system#indexers-are-unavailable-due-to-failures, then retry": "see https://wiki.servarr.com/sonarr/system#indexers-are-unavailable-due-to-failures, then retry",
+		"https://hooks.example/in?s3cret-key":                                                             "https://hooks.example/in?REDACTED",
+		"https://indexer.example/api?apikey=&t=caps":                                                      "https://indexer.example/api?apikey=&t=REDACTED",
+		"/tv/Firefly/Season 01/Firefly - S01E01.mkv":                                                      "/tv/Firefly/Season 01/Firefly - S01E01.mkv",
+		"no address here: 12:30":                                                                          "no address here: 12:30",
+	} {
+		if got := hideAddresses(text); got != want {
+			t.Errorf("hideAddresses(%q)\n got %q\nwant %q", text, got, want)
+		}
+	}
+}
+
+// Sonarr says an indexer failed at the address it asked, with the API key it
+// keeps for that indexer on the end of it: in the problems of a test, which
+// are an answer, and in a save it refused. Neither hands a caller the key,
+// nor does a setting that is an address with a token on it.
+func TestAStoredKeyIsNotQuotedBack(t *testing.T) {
+	t.Parallel()
+
+	const key = "s3cret-key"
+	failed := []any{map[string]any{"propertyName": "", "errorMessage": "Unable to connect to indexer, indexer's server is unavailable. Try again later. HTTP request failed: [500:InternalServerError] [GET] at [http://indexer.example/api?t=tvsearch&apikey=" + key + "&limit=100]."}}
+
+	f := newFakeServer(t)
+	f.answer(t, "GET /api/v3/indexer", []any{map[string]any{"id": 1, "name": "Broken Indexer", "implementation": "Newznab", "priority": 25, "fields": []any{}}})
+	f.answer(t, "GET /api/v3/tag", []any{})
+	f.answerStatus(t, "POST /api/v3/indexer/test", http.StatusBadRequest, failed)
+	f.answerStatus(t, "POST /api/v3/indexer/testall", http.StatusBadRequest, []any{map[string]any{"id": 1, "isValid": false, "validationFailures": failed}})
+	f.answerStatus(t, "PUT /api/v3/indexer/1", http.StatusBadRequest, failed)
+	f.answer(t, "GET /api/v3/notification", []any{map[string]any{"id": 2, "name": "Hook", "implementation": "Webhook", "onGrab": true, "fields": []any{map[string]any{"name": "url", "value": "https://hooks.example/in?token=" + key}}}})
+	// Sonarr does not mark this one private, and it is a key all the same
+	f.answer(t, "GET /api/v3/importlist", []any{map[string]any{"id": 3, "name": "Other Sonarr", "implementation": "SonarrImport", "fields": []any{map[string]any{"name": "baseUrl", "value": "http://other.example:8989"}, map[string]any{"name": "apiKey", "value": key, "privacy": "normal"}}}})
+	cs := session(t, f, Options{})
+
+	if listed := mustCall(t, cs, "importlist_list", nil); strings.Contains(fmt.Sprint(listed), key) || !strings.Contains(fmt.Sprint(listed), "http://other.example:8989") {
+		t.Errorf("importlist_list = %v, want the other Sonarr's address and not its key", listed)
+	}
+
+	for what, args := range map[string]map[string]any{"one": {"name": "Broken Indexer"}, "every one": nil} {
+		out := mustCall(t, cs, "indexer_test", args)
+		if said := fmt.Sprint(out); strings.Contains(said, key) || !strings.Contains(said, "apikey=REDACTED") || !strings.Contains(said, "http://indexer.example/api") {
+			t.Errorf("testing %s = %v, want the address without the key", what, out)
+		}
+	}
+	if msg := mustFail(t, cs, "indexer_edit", map[string]any{"which": "Broken Indexer", "set": map[string]any{"priority": 40}}); strings.Contains(msg, key) || !strings.Contains(msg, "apikey=REDACTED") {
+		t.Errorf("the save Sonarr refused = %q, want the address without the key", msg)
+	}
+	if listed := mustCall(t, cs, "notification_list", nil); strings.Contains(fmt.Sprint(listed), key) || !strings.Contains(fmt.Sprint(listed), "https://hooks.example/in?token=REDACTED") {
+		t.Errorf("notification_list = %v, want the hook's address without its token", listed)
 	}
 }

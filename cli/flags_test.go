@@ -93,7 +93,7 @@ func TestAnAllowListChoosesFromEveryTool(t *testing.T) {
 	if got := names(FlagData{AllowTools: essential}); !slices.Equal(got, want) {
 		t.Errorf("--allow-tools essential = %v, want %v", got, want)
 	}
-	if got := names(FlagData{AllowTools: []string{"tag_*"}}); !slices.Equal(got, []string{"tag_create", "tag_delete", "tag_list"}) {
+	if got := names(FlagData{AllowTools: []string{"tag_*"}}); !slices.Equal(got, []string{"tag_create", "tag_list", "tag_rename"}) {
 		t.Errorf("--allow-tools tag_* = %v", got)
 	}
 
@@ -110,5 +110,17 @@ func TestAnAllowListChoosesFromEveryTool(t *testing.T) {
 	// with neither, the default is still core
 	if opts := (&FlagData{}).ToolOptions(); !slices.Equal(opts.Toolsets, DefaultToolsets) {
 		t.Errorf("no flags = %v, want the default %v", opts.Toolsets, DefaultToolsets)
+	}
+}
+
+// The tools command lists the sets in an order of its own, and a set left out
+// of that order is a set whose tools it does not list.
+func TestToolsListsEveryToolset(t *testing.T) {
+	t.Parallel()
+
+	for _, set := range tools.ToolsetNames() {
+		if !slices.Contains(toolsetOrder, set) {
+			t.Errorf("the tools command does not list the %s toolset", set)
+		}
 	}
 }

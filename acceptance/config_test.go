@@ -154,14 +154,14 @@ func TestTags(t *testing.T) {
 	}
 
 	// Sonarr will not delete a tag something carries
-	if msg := callErr(t, "tag_delete", map[string]any{"label": "kids shows"}); !strings.Contains(strings.ToLower(msg), "in use") {
+	if msg := callErr(t, "tag_delete", map[string]any{"label": "kids shows", "confirm": true}); !strings.Contains(strings.ToLower(msg), "in use") {
 		t.Errorf("deleting a tag in use = %s", msg)
 	}
 	call(t, "series_edit", map[string]any{"series": firefly.Title, "remove_tags": []any{"kids shows"}})
-	if out := call(t, "tag_delete", map[string]any{"label": "Kids Shows"}); acctest.Str(out["deleted"]) != "kids shows" {
+	if out := call(t, "tag_delete", map[string]any{"label": "Kids Shows", "confirm": true}); acctest.Str(out["deleted"]) != "kids shows" {
 		t.Errorf("tag_delete = %v", out)
 	}
-	if msg := callErr(t, "tag_delete", map[string]any{"label": "kids shows"}); !strings.Contains(msg, "no tag") {
+	if msg := callErr(t, "tag_delete", map[string]any{"label": "kids shows", "confirm": true}); !strings.Contains(msg, "no tag") {
 		t.Errorf("deleting it again = %s", msg)
 	}
 }

@@ -539,7 +539,7 @@ func registerSeriesWriteTools(r *registry) {
 		if err != nil {
 			return nil, searchOut{}, err
 		}
-		queued, err := r.queueFor(ctx, res.Series.ID, nil)
+		queued, err := r.queueFor(ctx, res.Series.ID, nil, in.Wait >= 0)
 		if err != nil {
 			return nil, searchOut{}, err
 		}

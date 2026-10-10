@@ -58,7 +58,7 @@ var connectionParams = []string{"server", "token"}
 
 // toolsetOrder is how `sonarr-mcp tools` lists the sets: the base first,
 // then the job most sessions are for.
-var toolsetOrder = []string{"core", "curation", "library", "admin"}
+var toolsetOrder = []string{"core", "curation", "library", "admin", "settings"}
 
 func Make() (*cobra.Command, error) {
 	root := &cobra.Command{

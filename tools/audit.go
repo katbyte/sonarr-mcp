@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/katbyte/go-kt/parallel"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -109,34 +110,90 @@ func (s *snapshot) covers(seriesID int) bool {
 	return slices.ContainsFunc(s.series, func(x sonarr.SeriesResource) bool { return x.Id == seriesID })
 }
 
+// auditWorkers is how many series an audit reads at once. One at a time, a
+// library of a few thousand series is a few thousand round trips in a row,
+// which is minutes; Sonarr answers a handful side by side without strain.
+const auditWorkers = 8
+
+// reads says what an audit is about to read of each series it covers.
+type reads struct {
+	files, episodes, disk bool
+	// of is the series the audit will look at; nil is every one
+	of func(series *sonarr.SeriesResource) bool
+}
+
+// hasFiles reports whether Sonarr records any file for a series: the audits
+// of files pass over the ones with none.
+func hasFiles(series *sonarr.SeriesResource) bool {
+	return series.Statistics != nil && series.Statistics.EpisodeFileCount > 0
+}
+
+// warm reads what an audit is about to ask for, a few series at a time, so
+// that its own pass over them, one after another, finds each already read.
+// What it reads is what the audit would have, no more: the audit's findings
+// and their order are the same.
+func (s *snapshot) warm(ctx context.Context, what reads) error {
+	return parallel.Each(ctx, len(s.series), auditWorkers, func(ctx context.Context, i int) error {
+		series := &s.series[i]
+		if what.of != nil && !what.of(series) {
+			return nil
+		}
+		if what.files {
+			if _, err := s.filesOf(ctx, series.Id); err != nil {
+				return err
+			}
+		}
+		if what.episodes {
+			if _, err := s.episodesOf(ctx, series.Id); err != nil {
+				return err
+			}
+		}
+		if what.disk {
+			if _, err := s.diskOf(ctx, series); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// filesOf are the files Sonarr records for a series, read once. The lock is
+// not held while Sonarr is asked, so several series are read side by side.
 func (s *snapshot) filesOf(ctx context.Context, seriesID int) ([]sonarr.EpisodeFileResource, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if f, ok := s.files[seriesID]; ok {
+	f, ok := s.files[seriesID]
+	s.mu.Unlock()
+	if ok {
 		return f, nil
 	}
+
 	res, err := s.r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: new(seriesID)})
 	if err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
 	s.files[seriesID] = res.Model
+	s.mu.Unlock()
 
 	return res.Model, nil
 }
 
 func (s *snapshot) episodesOf(ctx context.Context, seriesID int) ([]sonarr.EpisodeResource, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if e, ok := s.episodes[seriesID]; ok {
+	e, ok := s.episodes[seriesID]
+	s.mu.Unlock()
+	if ok {
 		return e, nil
 	}
+
 	eps, err := s.r.episodesOf(ctx, seriesID, nil, false)
 	if err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
 	s.episodes[seriesID] = eps
+	s.mu.Unlock()
 
 	return eps, nil
 }
