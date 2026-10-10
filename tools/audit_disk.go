@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 // renaming reports whether Sonarr's Rename Episodes setting is on.
@@ -398,7 +398,7 @@ func (r *registry) auditNaming(ctx context.Context, s *snapshot, limit int) (aud
 		if series.Statistics == nil || series.Statistics.EpisodeFileCount == 0 {
 			continue
 		}
-		plan, err := r.client.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: series.Id})
+		plan, err := r.client.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: new(series.Id)})
 		if err != nil {
 			return auditOut{}, err
 		}

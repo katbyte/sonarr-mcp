@@ -12,13 +12,14 @@ package integration
 import (
 	"encoding/json"
 	"net/http"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"sync"
 
-	"github.com/katbyte/sonarr-mcp/internal/pandorest/definitions"
+	"github.com/katbyte/pandorest/config"
+	"github.com/katbyte/pandorest/definitions"
+	"github.com/katbyte/sonarr-mcp/sdk/pandorest/workarounds"
 )
 
 // notCalled are the operations the suite leaves alone, and why. A name here
@@ -60,8 +61,20 @@ type template struct {
 
 var placeholder = regexp.MustCompile(`\{[^}]+\}`)
 
+// loadDefinitions reads the definitions the SDK was generated from: the ones
+// beside the highest-versioned document under api-defs.
+func loadDefinitions() (*definitions.Service, error) {
+	svc, _ := config.Find(workarounds.Services, workarounds.Service)
+	svc, err := svc.In("..").Resolve()
+	if err != nil {
+		return nil, err
+	}
+
+	return definitions.Load(svc.Path(svc.Definitions))
+}
+
 func templates() ([]template, error) {
-	svc, err := definitions.Load(filepath.Join("..", "api-definitions", "sonarr"))
+	svc, err := loadDefinitions()
 	if err != nil {
 		return nil, err
 	}

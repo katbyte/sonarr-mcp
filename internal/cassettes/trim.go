@@ -1,5 +1,5 @@
 // Package cassettes cuts the lists of every show a provider knows down to the
-// shows a test suite uses, as the provider proxy records them.
+// shows a test suite uses, as the replay proxy records them.
 //
 // Sonarr fetches two such lists as it starts: the scene names from
 // services.sonarr.tv (1.6 MB, every alias of every series) and XEM's names
@@ -16,7 +16,7 @@ import (
 	"strings"
 )
 
-// ForSeries returns the proxy's Trim option (providerproxy.Options.Trim) for
+// ForSeries returns the proxy's Trim option (replayproxy.Options.Trim) for
 // a suite whose series have these TheTVDB ids.
 func ForSeries(tvdbIDs ...int) map[string]func([]byte) ([]byte, error) {
 	keep := func(id string) bool {

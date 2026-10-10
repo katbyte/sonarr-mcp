@@ -8,9 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/katbyte/sonarr-mcp/internal/fakes/newznab"
-	"github.com/katbyte/sonarr-mcp/internal/fakes/sabnzbd"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/go-kt/mcp/acctest"
+	"github.com/katbyte/go-kt/test/services/newznab"
+	"github.com/katbyte/go-kt/test/services/sabnzbd"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 // The downloads, end to end: release_search against the fake indexer,
@@ -25,13 +26,13 @@ func grabEpisode(t *testing.T, series, episode string) sabnzbd.Job {
 	t.Helper()
 
 	found := call(t, "release_search", map[string]any{"series": series, "episode": episode})
-	releases := rows(t, found["releases"], "releases")
+	releases := acctest.Rows(t, found["releases"], "releases")
 	if len(releases) == 0 || releases[0]["approved"] != true {
 		t.Fatalf("no approved release for %s %s: %v", series, episode, found)
 	}
-	grab := call(t, "release_grab", map[string]any{"guid": str(releases[0]["guid"]), "indexer_id": num(t, releases[0]["indexer_id"], "indexer_id")})
-	grabbed := object(t, grab["grabbed"], "grabbed")
-	if str(grabbed["episode"]) != episode || str(grabbed["series"]) != series || str(grabbed["download_client"]) != fakeClientName {
+	grab := call(t, "release_grab", map[string]any{"guid": acctest.Str(releases[0]["guid"]), "indexer_id": acctest.Num(t, releases[0]["indexer_id"], "indexer_id")})
+	grabbed := acctest.Object(t, grab["grabbed"], "grabbed")
+	if acctest.Str(grabbed["episode"]) != episode || acctest.Str(grabbed["series"]) != series || acctest.Str(grabbed["download_client"]) != fakeClientName {
 		t.Fatalf("release_grab = %v", grab)
 	}
 	// the job is named for the release: Breaking.Bad.S01E01.Pilot...
@@ -56,8 +57,8 @@ func refreshDownloads(t *testing.T) {
 func queued(t *testing.T, downloadID string) map[string]any {
 	t.Helper()
 
-	for _, d := range rows(t, call(t, "queue_list", nil)["downloads"], "downloads") {
-		if strings.EqualFold(str(d["download_id"]), downloadID) {
+	for _, d := range acctest.Rows(t, call(t, "queue_list", nil)["downloads"], "downloads") {
+		if strings.EqualFold(acctest.Str(d["download_id"]), downloadID) {
 			return d
 		}
 	}
@@ -72,8 +73,8 @@ func waitQueued(t *testing.T, downloadID string, check func(map[string]any) bool
 	var row map[string]any
 	eventually(t, "queue_list", nil, "download "+downloadID, func(out map[string]any) bool {
 		row = nil
-		for _, d := range rowsOf(out["downloads"]) {
-			if strings.EqualFold(str(d["download_id"]), downloadID) {
+		for _, d := range acctest.RowsOf(out["downloads"]) {
+			if strings.EqualFold(acctest.Str(d["download_id"]), downloadID) {
 				row = d
 			}
 		}
@@ -93,7 +94,7 @@ func clearDownload(t *testing.T, id string) {
 	t.Helper()
 
 	if d := queued(t, id); d != nil {
-		_, _ = invoke("queue_remove", map[string]any{"ids": []any{num(t, d["id"], "id")}})
+		_, _ = invoke("queue_remove", map[string]any{"ids": []any{acctest.Num(t, d["id"], "id")}})
 	}
 	_ = sab.Remove(id)
 }
@@ -112,26 +113,26 @@ func completeWith(t *testing.T, job sabnzbd.Job, minutes int) {
 func TestReleaseSearch(t *testing.T) {
 	out := call(t, "release_search", map[string]any{"series": breakingBad.Title, "episode": "S01E01"})
 
-	releases := rows(t, out["releases"], "releases")
-	if num(t, out["total"], "total") != 3 || num(t, out["approved"], "approved") != 1 {
+	releases := acctest.Rows(t, out["releases"], "releases")
+	if acctest.Num(t, out["total"], "total") != 3 || acctest.Num(t, out["approved"], "approved") != 1 {
 		t.Fatalf("Breaking Bad S01E01 = %v", out)
 	}
 	best := releases[0]
-	if !strings.Contains(str(best["title"]), "1080p.WEB-DL") || best["approved"] != true || str(best["quality"]) != "WEBDL-1080p" ||
-		str(best["episodes"]) != "S01E01" || str(best["indexer"]) != fakeIndexerName || str(best["protocol"]) != "usenet" {
+	if !strings.Contains(acctest.Str(best["title"]), "1080p.WEB-DL") || best["approved"] != true || acctest.Str(best["quality"]) != "WEBDL-1080p" ||
+		acctest.Str(best["episodes"]) != "S01E01" || acctest.Str(best["indexer"]) != fakeIndexerName || acctest.Str(best["protocol"]) != "usenet" {
 		t.Errorf("the approved release = %v", best)
 	}
 	// the profile wants 1080p, so the 720p and 2160p releases are rejected,
 	// with Sonarr's reasons
 	for _, r := range releases[1:] {
-		if r["approved"] != false || len(strs(t, r["rejections"], "rejections")) == 0 {
+		if r["approved"] != false || len(acctest.Strs(t, r["rejections"], "rejections")) == 0 {
 			t.Errorf("a release the profile does not want = %v", r)
 		}
 	}
 
 	// a season: the episodes in it, from the catalogue
 	season := call(t, "release_search", map[string]any{"series": breakingBad.Title, "season": 1, "limit": 2})
-	if len(rows(t, season["releases"], "releases")) != 2 || num(t, season["total"], "total") < 7 {
+	if len(acctest.Rows(t, season["releases"], "releases")) != 2 || acctest.Num(t, season["total"], "total") < 7 {
 		t.Errorf("season 1 = %v", season)
 	}
 	for _, bad := range []map[string]any{
@@ -150,29 +151,29 @@ func TestReleaseSearch(t *testing.T) {
 // the quality, the group - and what it cannot.
 func TestReleaseParse(t *testing.T) {
 	out := call(t, "release_parse", map[string]any{"title": "Firefly.S01E07.Safe.720p.HDTV.x264-FAKE"})
-	if out["understood"] != true || str(out["series"]) != firefly.Title || numOr0(out["series_id"]) == 0 ||
-		str(out["episodes"]) != "S01E07" || str(out["quality"]) != "HDTV-720p" || str(out["release_group"]) != "FAKE" ||
-		!slices.Contains(strs(t, out["languages"], "languages"), "English") {
+	if out["understood"] != true || acctest.Str(out["series"]) != firefly.Title || acctest.NumOr0(out["series_id"]) == 0 ||
+		acctest.Str(out["episodes"]) != "S01E07" || acctest.Str(out["quality"]) != "HDTV-720p" || acctest.Str(out["release_group"]) != "FAKE" ||
+		!slices.Contains(acctest.Strs(t, out["languages"], "languages"), "English") {
 		t.Errorf("a release name = %v", out)
 	}
 
 	// a season pack, a German release, and a multi-episode file
 	pack := call(t, "release_parse", map[string]any{"title": "Breaking.Bad.S02.1080p.BluRay.x264-FAKE"})
-	if pack["full_season"] != true || str(pack["episodes"]) != "season 2" || str(pack["quality"]) != "Bluray-1080p" {
+	if pack["full_season"] != true || acctest.Str(pack["episodes"]) != "season 2" || acctest.Str(pack["quality"]) != "Bluray-1080p" {
 		t.Errorf("a season pack = %v", pack)
 	}
 	german := call(t, "release_parse", map[string]any{"title": "Chernobyl.S01E05.GERMAN.1080p.WEB-DL.x264-FAKE"})
-	if !slices.Contains(strs(t, german["languages"], "languages"), "German") {
+	if !slices.Contains(acctest.Strs(t, german["languages"], "languages"), "German") {
 		t.Errorf("a German release = %v", german)
 	}
 	multi := call(t, "release_parse", map[string]any{"title": "Severance.S01E03E04.1080p.WEB-DL.x264-FAKE"})
-	if str(multi["episodes"]) != "S01E03-E04" {
+	if acctest.Str(multi["episodes"]) != "S01E03-E04" {
 		t.Errorf("a two-episode release = %v", multi)
 	}
 
 	// a show not in the library is read, but matches no series
 	stranger := call(t, "release_parse", map[string]any{"title": "The.Wire.S01E01.720p.HDTV.x264-FAKE"})
-	if stranger["understood"] != true || str(stranger["series"]) != "" || str(stranger["parsed_series_title"]) != "The Wire" {
+	if stranger["understood"] != true || acctest.Str(stranger["series"]) != "" || acctest.Str(stranger["parsed_series_title"]) != "The Wire" {
 		t.Errorf("a show Sonarr does not have = %v", stranger)
 	}
 	if junk := call(t, "release_parse", map[string]any{"title": "holiday photos"}); junk["understood"] != false {
@@ -189,9 +190,9 @@ func TestDownloadImports(t *testing.T) {
 	if err := sab.SetProgress(job.ID, 0.4); err != nil {
 		t.Fatal(err)
 	}
-	row := waitQueued(t, job.ID, func(d map[string]any) bool { return numOr0(d["progress_percent"]) == 40 })
-	if str(row["episode"]) != "S01E01" || str(row["series"]) != breakingBad.Title || str(row["state"]) != "downloading" ||
-		str(row["health"]) != "ok" || str(row["quality"]) != "WEBDL-1080p" || str(row["indexer"]) != fakeIndexerName || str(row["time_left"]) == "" {
+	row := waitQueued(t, job.ID, func(d map[string]any) bool { return acctest.NumOr0(d["progress_percent"]) == 40 })
+	if acctest.Str(row["episode"]) != "S01E01" || acctest.Str(row["series"]) != breakingBad.Title || acctest.Str(row["state"]) != "downloading" ||
+		acctest.Str(row["health"]) != "ok" || acctest.Str(row["quality"]) != "WEBDL-1080p" || acctest.Str(row["indexer"]) != fakeIndexerName || acctest.Str(row["time_left"]) == "" {
 		t.Errorf("downloading = %v", row)
 	}
 	// a download going well is nothing the stuck audit wants
@@ -199,14 +200,14 @@ func TestDownloadImports(t *testing.T) {
 		t.Errorf("a healthy download is reported stuck: %v", f)
 	}
 	// and it is what series_search reports queued for the series
-	if q := call(t, "queue_list", map[string]any{"series": breakingBad.Title}); num(t, q["total"], "total") < 1 {
+	if q := call(t, "queue_list", map[string]any{"series": breakingBad.Title}); acctest.Num(t, q["total"], "total") < 1 {
 		t.Errorf("queue_list for the series = %v", q)
 	}
 
 	completeWith(t, job, 58)
 	eventually(t, "episode_list", map[string]any{"series": breakingBad.Title, "season": 1}, "S01E01 imported", func(out map[string]any) bool {
-		for _, e := range rowsOf(out["episodes"]) {
-			if str(e["episode"]) == "S01E01" && e["has_file"] == true {
+		for _, e := range acctest.RowsOf(out["episodes"]) {
+			if acctest.Str(e["episode"]) == "S01E01" && e["has_file"] == true {
 				return true
 			}
 		}
@@ -214,8 +215,8 @@ func TestDownloadImports(t *testing.T) {
 		return false
 	})
 	hist := call(t, "history_list", map[string]any{"series": breakingBad.Title, "episode": "S01E01", "events": []any{"imported"}})
-	imp := rows(t, hist["entries"], "entries")
-	if len(imp) == 0 || str(imp[0]["event"]) != "downloadFolderImported" || !strings.Contains(str(imp[0]["detail"]), "/downloads/complete/") {
+	imp := acctest.Rows(t, hist["entries"], "entries")
+	if len(imp) == 0 || acctest.Str(imp[0]["event"]) != "downloadFolderImported" || !strings.Contains(acctest.Str(imp[0]["detail"]), "/downloads/complete/") {
 		t.Errorf("the import in history = %v", hist)
 	}
 	if queued(t, job.ID) != nil {
@@ -231,7 +232,7 @@ func TestDownloadFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	eventually(t, "history_list", map[string]any{"series": breakingBad.Title, "events": []any{"failed"}}, "the failure", func(out map[string]any) bool {
-		if len(rowsOf(out["entries"])) > 0 {
+		if len(acctest.RowsOf(out["entries"])) > 0 {
 			return true
 		}
 		refreshDownloads(t)
@@ -240,26 +241,26 @@ func TestDownloadFails(t *testing.T) {
 
 	failed := call(t, "audit_failed_downloads", map[string]any{"series": breakingBad.Title})
 	f := only(t, failed, "subject", "S01E02")
-	if str(f["problem"]) != "download failed" || !strings.Contains(str(f["detail"]), "CRC error") || !strings.Contains(str(f["detail"]), "Breaking.Bad.S01E02") {
+	if acctest.Str(f["problem"]) != "download failed" || !strings.Contains(acctest.Str(f["detail"]), "CRC error") || !strings.Contains(acctest.Str(f["detail"]), "Breaking.Bad.S01E02") {
 		t.Errorf("the failure = %v", f)
 	}
 
 	block := call(t, "blocklist_list", map[string]any{"series": breakingBad.Title})
-	entry := findRow(t, rows(t, block["entries"], "entries"), "source_title", job.Name)
-	if str(entry["series"]) != breakingBad.Title || str(entry["protocol"]) != "usenet" || !strings.Contains(str(entry["message"]), "CRC") {
+	entry := findRow(t, acctest.Rows(t, block["entries"], "entries"), "source_title", job.Name)
+	if acctest.Str(entry["series"]) != breakingBad.Title || acctest.Str(entry["protocol"]) != "usenet" || !strings.Contains(acctest.Str(entry["message"]), "CRC") {
 		t.Errorf("the blocklist entry = %v", entry)
 	}
 	// blocklisted, the release is rejected by a search
 	again := call(t, "release_search", map[string]any{"series": breakingBad.Title, "episode": "S01E02"})
-	if rel := rows(t, again["releases"], "releases"); len(rel) == 0 || rel[0]["approved"] != false || !strings.Contains(strings.Join(strs(t, rel[0]["rejections"], "r"), " "), "locklist") {
+	if rel := acctest.Rows(t, again["releases"], "releases"); len(rel) == 0 || rel[0]["approved"] != false || !strings.Contains(strings.Join(acctest.Strs(t, rel[0]["rejections"], "r"), " "), "locklist") {
 		t.Errorf("a blocklisted release = %v", again)
 	}
 
-	removed := call(t, "blocklist_remove", map[string]any{"ids": []any{num(t, entry["id"], "id")}})
-	if num(t, removed["removed"], "removed") != 1 {
+	removed := call(t, "blocklist_remove", map[string]any{"ids": []any{acctest.Num(t, entry["id"], "id")}})
+	if acctest.Num(t, removed["removed"], "removed") != 1 {
 		t.Errorf("blocklist_remove = %v", removed)
 	}
-	if left := call(t, "blocklist_list", map[string]any{"series": breakingBad.Title}); num(t, left["total"], "total") != 0 {
+	if left := call(t, "blocklist_list", map[string]any{"series": breakingBad.Title}); acctest.Num(t, left["total"], "total") != 0 {
 		t.Errorf("the blocklist after removing = %v", left)
 	}
 	callErr(t, "blocklist_remove", map[string]any{"ids": []any{}})
@@ -281,11 +282,11 @@ func TestDownloadFails(t *testing.T) {
 		return false
 	})
 	twice := only(t, call(t, "audit_failed_downloads", map[string]any{"series": breakingBad.Title}), "subject", "S01E02")
-	if !strings.Contains(str(twice["detail"]), "2 failed in 30 days") || !strings.Contains(str(twice["fix"]), "release_search") {
+	if !strings.Contains(acctest.Str(twice["detail"]), "2 failed in 30 days") || !strings.Contains(acctest.Str(twice["fix"]), "release_search") {
 		t.Errorf("two failures = %v", twice)
 	}
-	for _, e := range rows(t, call(t, "blocklist_list", map[string]any{"series": breakingBad.Title})["entries"], "entries") {
-		call(t, "blocklist_remove", map[string]any{"ids": []any{num(t, e["id"], "id")}})
+	for _, e := range acctest.Rows(t, call(t, "blocklist_list", map[string]any{"series": breakingBad.Title})["entries"], "entries") {
+		call(t, "blocklist_remove", map[string]any{"ids": []any{acctest.Num(t, e["id"], "id")}})
 	}
 }
 
@@ -296,24 +297,24 @@ func TestDownloadImportBlocked(t *testing.T) {
 	job := grabEpisode(t, breakingBad.Title, "S01E03")
 	completeWith(t, job, 1) // a minute of an hour-long episode is a sample to Sonarr
 
-	row := waitQueued(t, job.ID, func(d map[string]any) bool { return str(d["health"]) != "ok" })
-	if str(row["state"]) != "importBlocked" && str(row["state"]) != "importPending" || len(strs(t, row["messages"], "messages")) == 0 {
+	row := waitQueued(t, job.ID, func(d map[string]any) bool { return acctest.Str(d["health"]) != "ok" })
+	if acctest.Str(row["state"]) != "importBlocked" && acctest.Str(row["state"]) != "importPending" || len(acctest.Strs(t, row["messages"], "messages")) == 0 {
 		t.Fatalf("a download of a sample = %v", row)
 	}
 	stuck := call(t, "audit_stuck_downloads", nil)
 	f := only(t, stuck, "subject", "S01E03")
-	if str(f["problem"]) != "cannot import" || !strings.Contains(str(f["detail"]), "Sample") || !strings.Contains(str(f["fix"]), "import_scan") {
+	if acctest.Str(f["problem"]) != "cannot import" || !strings.Contains(acctest.Str(f["detail"]), "Sample") || !strings.Contains(acctest.Str(f["fix"]), "import_scan") {
 		t.Errorf("the stuck download = %v", f)
 	}
 
-	scan := call(t, "import_scan", map[string]any{"folder": str(row["output_path"])})
-	file := rows(t, scan["files"], "files")
-	if len(file) != 1 || file[0]["importable"] != false || !slices.ContainsFunc(strs(t, file[0]["rejections"], "r"), func(r string) bool { return strings.Contains(r, "ample") }) {
+	scan := call(t, "import_scan", map[string]any{"folder": acctest.Str(row["output_path"])})
+	file := acctest.Rows(t, scan["files"], "files")
+	if len(file) != 1 || file[0]["importable"] != false || !slices.ContainsFunc(acctest.Strs(t, file[0]["rejections"], "r"), func(r string) bool { return strings.Contains(r, "ample") }) {
 		t.Errorf("import_scan of the sample = %v", scan)
 	}
 
-	removed := call(t, "queue_remove", map[string]any{"ids": []any{num(t, row["id"], "id")}, "blocklist": true, "skip_redownload": true})
-	if got := strs(t, removed["removed"], "removed"); len(got) != 1 || got[0] != str(row["title"]) {
+	removed := call(t, "queue_remove", map[string]any{"ids": []any{acctest.Num(t, row["id"], "id")}, "blocklist": true, "skip_redownload": true})
+	if got := acctest.Strs(t, removed["removed"], "removed"); len(got) != 1 || got[0] != acctest.Str(row["title"]) {
 		t.Errorf("queue_remove = %v", removed)
 	}
 	if queued(t, job.ID) != nil {
@@ -335,19 +336,19 @@ func TestDownloadPaused(t *testing.T) {
 	if err := sab.Pause(job.ID); err != nil {
 		t.Fatal(err)
 	}
-	row := waitQueued(t, job.ID, func(d map[string]any) bool { return str(d["status"]) == "paused" })
+	row := waitQueued(t, job.ID, func(d map[string]any) bool { return acctest.Str(d["status"]) == "paused" })
 
 	stuck := call(t, "audit_stuck_downloads", map[string]any{"series": breakingBad.Title})
-	if f := only(t, stuck, "subject", "S01E04"); str(f["problem"]) != "paused in the download client" {
+	if f := only(t, stuck, "subject", "S01E04"); acctest.Str(f["problem"]) != "paused in the download client" {
 		t.Errorf("the paused download = %v", f)
 	}
 	// issues_only lists it, and a download going well would not be
 	issues := call(t, "queue_list", map[string]any{"issues_only": true})
-	if findRow(t, rows(t, issues["downloads"], "downloads"), "download_id", str(row["download_id"])) == nil {
+	if findRow(t, acctest.Rows(t, issues["downloads"], "downloads"), "download_id", acctest.Str(row["download_id"])) == nil {
 		t.Error("issues_only lacks the paused download")
 	}
 	// queue_grab is for delayed downloads, not paused ones
-	if msg := callErr(t, "queue_grab", map[string]any{"ids": []any{num(t, row["id"], "id")}}); !strings.Contains(msg, "not held by a delay profile") {
+	if msg := callErr(t, "queue_grab", map[string]any{"ids": []any{acctest.Num(t, row["id"], "id")}}); !strings.Contains(msg, "not held by a delay profile") {
 		t.Errorf("queue_grab on a paused download = %s", msg)
 	}
 }
@@ -361,8 +362,8 @@ func TestQueueGrabDelayed(t *testing.T) {
 		call(t, "series_edit", map[string]any{"series": breakingBad.Title, "remove_tags": []any{"delayed"}})
 		_, _ = invoke("tag_delete", map[string]any{"label": "delayed"})
 	})
-	tags := rows(t, call(t, "tag_list", nil)["tags"], "tags")
-	tag := num(t, findRow(t, tags, "label", "delayed")["id"], "id")
+	tags := acctest.Rows(t, call(t, "tag_list", nil)["tags"], "tags")
+	tag := acctest.Num(t, findRow(t, tags, "label", "delayed")["id"], "id")
 	// a delay counts from when a release was published, and the catalogue's
 	// were published two days ago, so the delay has to be longer than that
 	delay, err := api.PostDelayProfile(ctx, sonarr.DelayProfileResource{
@@ -378,29 +379,33 @@ func TestQueueGrabDelayed(t *testing.T) {
 	// has to arrive the automatic way: an RSS sync, with the feed holding
 	// only the one release and RSS switched on for the run
 	all := indexer.Releases()
-	indexer.SetReleases(slices.DeleteFunc(slices.Clone(all), func(r newznab.Release) bool {
-		return !strings.HasPrefix(r.Title, "Breaking.Bad.S01E07.")
-	}))
-	t.Cleanup(func() { indexer.SetReleases(all) })
+	if err := indexer.SetReleases(slices.DeleteFunc(slices.Clone(all), func(r newznab.Release) bool { return !strings.HasPrefix(r.Title, "Breaking.Bad.S01E07.") })...); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := indexer.SetReleases(all...); err != nil {
+			t.Error(err)
+		}
+	})
 	setIndexerRSS(t, true)
 	t.Cleanup(func() { setIndexerRSS(t, false) })
 	call(t, "task_run", map[string]any{"task": "RssSync"})
 
 	var held map[string]any
-	for _, d := range rows(t, call(t, "queue_list", map[string]any{"series": breakingBad.Title})["downloads"], "downloads") {
-		if str(d["episode"]) == "S01E07" {
+	for _, d := range acctest.Rows(t, call(t, "queue_list", map[string]any{"series": breakingBad.Title})["downloads"], "downloads") {
+		if acctest.Str(d["episode"]) == "S01E07" {
 			held = d
 		}
 	}
-	if held == nil || str(held["status"]) != "delay" {
+	if held == nil || acctest.Str(held["status"]) != "delay" {
 		t.Fatalf("the delayed release = %v", held)
 	}
 	if f := findings(t, call(t, "audit_stuck_downloads", nil), "subject", "S01E07"); len(f) != 0 {
 		t.Errorf("a download held by a delay profile is not stuck: %v", f)
 	}
 
-	out := call(t, "queue_grab", map[string]any{"ids": []any{num(t, held["id"], "id")}})
-	if got := strs(t, out["grabbed"], "grabbed"); len(got) != 1 || !strings.Contains(got[0], "S01E07") {
+	out := call(t, "queue_grab", map[string]any{"ids": []any{acctest.Num(t, held["id"], "id")}})
+	if got := acctest.Strs(t, out["grabbed"], "grabbed"); len(got) != 1 || !strings.Contains(got[0], "S01E07") {
 		t.Errorf("queue_grab = %v", out)
 	}
 	job, ok := sab.FindJob("Breaking.Bad.S01E07")
@@ -443,33 +448,33 @@ func TestSearchCommands(t *testing.T) {
 	})
 
 	ep := call(t, "episode_search", map[string]any{"series": firefly.Title, "episodes": []any{"S01E07"}})
-	if str(object(t, ep["command"], "command")["status"]) != "completed" {
+	if acctest.Str(acctest.Object(t, ep["command"], "command")["status"]) != "completed" {
 		t.Fatalf("episode_search = %v", ep)
 	}
-	if q := rows(t, ep["queued"], "queued"); len(q) != 1 || str(q[0]["episode"]) != "S01E07" {
+	if q := acctest.Rows(t, ep["queued"], "queued"); len(q) != 1 || acctest.Str(q[0]["episode"]) != "S01E07" {
 		t.Errorf("episode_search queued = %v", ep["queued"])
 	}
 
 	season := call(t, "season_search", map[string]any{"series": firefly.Title, "season": 1})
-	for _, q := range rows(t, season["queued"], "queued") {
-		if num(t, q["season"], "season") != 1 {
+	for _, q := range acctest.Rows(t, season["queued"], "queued") {
+		if acctest.Num(t, q["season"], "season") != 1 {
 			t.Errorf("season_search queued another season: %v", q)
 		}
 	}
 	// E08 has a release in the catalogue, and E07 is already downloading
-	if len(rowsOf(season["queued"])) < 2 {
+	if len(acctest.RowsOf(season["queued"])) < 2 {
 		t.Errorf("season_search queued = %v", season["queued"])
 	}
 	callErr(t, "season_search", map[string]any{"series": firefly.Title, "season": 7})
 
 	series := call(t, "series_search", map[string]any{"series": severance.Title})
-	res := object(t, series["result"], "result")
-	if str(object(t, res["command"], "command")["status"]) != "completed" || str(object(t, res["series"], "series")["title"]) != severance.Title {
+	res := acctest.Object(t, series["result"], "result")
+	if acctest.Str(acctest.Object(t, res["command"], "command")["status"]) != "completed" || acctest.Str(acctest.Object(t, res["series"], "series")["title"]) != severance.Title {
 		t.Errorf("series_search = %v", series)
 	}
 
 	wanted := call(t, "wanted_search", map[string]any{"kind": "cutoff"})
-	if str(object(t, wanted["command"], "command")["status"]) != "completed" {
+	if acctest.Str(acctest.Object(t, wanted["command"], "command")["status"]) != "completed" {
 		t.Errorf("wanted_search = %v", wanted)
 	}
 	if msg := callErr(t, "wanted_search", map[string]any{"kind": "everything"}); !strings.Contains(msg, "missing or cutoff") {

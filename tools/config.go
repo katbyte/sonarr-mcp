@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -113,12 +113,13 @@ func registerConfigTools(r *registry) {
 	client := r.client
 
 	type profilesOut struct {
+		pageOut
 		Profiles []profileRow `json:"profiles"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "profile_list",
 		Description: "The quality profiles: the qualities each allows, best first, the cutoff it upgrades to, whether it upgrades at all, the custom formats it scores and the scores it needs, and how many series are on it.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, profilesOut, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in pageIn) (*mcp.CallToolResult, profilesOut, error) {
 		res, err := client.GetQualityProfile(ctx)
 		if err != nil {
 			return nil, profilesOut{}, err
@@ -131,21 +132,23 @@ func registerConfigTools(r *registry) {
 		for i := range series {
 			counts[series[i].QualityProfileId]++
 		}
-		out := profilesOut{}
-		for i := range res.Model {
-			out.Profiles = append(out.Profiles, projectProfile(&res.Model[i], counts[res.Model[i].Id]))
+		profiles, paged := pageRows(res.Model, in)
+		out := profilesOut{pageOut: paged, Profiles: make([]profileRow, 0, len(profiles))}
+		for i := range profiles {
+			out.Profiles = append(out.Profiles, projectProfile(&profiles[i], counts[profiles[i].Id]))
 		}
 
 		return nil, out, nil
 	})
 
 	type tagsOut struct {
+		pageOut
 		Tags []tagRow `json:"tags"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "tag_list",
 		Description: "Every tag and what uses it: which series carry it, and how many indexers, download clients, delay and release profiles, import lists, notifications and auto-tags are scoped by it.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, tagsOut, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in pageIn) (*mcp.CallToolResult, tagsOut, error) {
 		details, err := client.GetTagDetail(ctx)
 		if err != nil {
 			return nil, tagsOut{}, err
@@ -158,7 +161,7 @@ func registerConfigTools(r *registry) {
 		for i := range series {
 			titles[series[i].Id] = series[i].Title
 		}
-		out := tagsOut{}
+		rows := make([]tagRow, 0, len(details.Model))
 		for _, d := range details.Model {
 			row := tagRow{
 				ID: d.Id, Label: d.Label, Indexers: len(d.IndexerIds), DownloadClients: len(d.DownloadClientIds),
@@ -170,9 +173,11 @@ func registerConfigTools(r *registry) {
 			}
 			slices.Sort(row.Series)
 			row.InUse = len(d.SeriesIds)+row.Indexers+row.DownloadClients+row.DelayProfiles+row.ReleaseProfiles+row.ImportLists+row.Notifications+row.AutoTags > 0
-			out.Tags = append(out.Tags, row)
+			rows = append(rows, row)
 		}
-		slices.SortFunc(out.Tags, func(a, b tagRow) int { return strings.Compare(a.Label, b.Label) })
+		slices.SortFunc(rows, func(a, b tagRow) int { return strings.Compare(a.Label, b.Label) })
+		out := tagsOut{}
+		out.Tags, out.pageOut = pageRows(rows, in)
 
 		return nil, out, nil
 	})
@@ -192,6 +197,12 @@ func registerConfigTools(r *registry) {
 		if label == "" {
 			return nil, tagOut{}, errors.New("label is required")
 		}
+
+		// the list is read to see the label is not there, then added to: two
+		// calls making one tag take turns, and the second is told it exists
+		unlock := r.locking().ByString(tagsLock)
+		defer unlock()
+
 		existing, err := client.GetTag(ctx)
 		if err != nil {
 			return nil, tagOut{}, err
@@ -237,12 +248,13 @@ func registerConfigTools(r *registry) {
 		Scores         map[string]int `json:"scores"         jsonschema:"the quality profiles that score it, with the score"`
 	}
 	type formatsOut struct {
+		pageOut
 		Formats []formatRow `json:"custom_formats"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "customformat_list",
 		Description: "The custom formats: what each matches in a release or file, and which quality profiles score it and how.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, formatsOut, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in pageIn) (*mcp.CallToolResult, formatsOut, error) {
 		formats, err := client.GetCustomFormat(ctx)
 		if err != nil {
 			return nil, formatsOut{}, err
@@ -251,8 +263,9 @@ func registerConfigTools(r *registry) {
 		if err != nil {
 			return nil, formatsOut{}, err
 		}
-		out := formatsOut{}
-		for _, f := range formats.Model {
+		listed, paged := pageRows(formats.Model, in)
+		out := formatsOut{pageOut: paged, Formats: make([]formatRow, 0, len(listed))}
+		for _, f := range listed {
 			row := formatRow{ID: f.Id, Name: f.Name, Scores: map[string]int{}}
 			for _, spec := range f.Specifications {
 				desc := spec.Implementation + ": " + spec.Name
@@ -278,12 +291,13 @@ func registerConfigTools(r *registry) {
 	})
 
 	type foldersOut struct {
+		pageOut
 		RootFolders []rootFolderRow `json:"root_folders"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "rootfolder_list",
 		Description: "The root folders series live in: whether Sonarr can reach each, its free space, how many series are in it, and the folders in it Sonarr does not know as a series.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, foldersOut, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in pageIn) (*mcp.CallToolResult, foldersOut, error) {
 		res, err := client.GetRootFolder(ctx)
 		if err != nil {
 			return nil, foldersOut{}, err
@@ -292,8 +306,9 @@ func registerConfigTools(r *registry) {
 		if err != nil {
 			return nil, foldersOut{}, err
 		}
-		out := foldersOut{}
-		for _, f := range res.Model {
+		folders, paged := pageRows(res.Model, in)
+		out := foldersOut{pageOut: paged, RootFolders: make([]rootFolderRow, 0, len(folders))}
+		for _, f := range folders {
 			out.RootFolders = append(out.RootFolders, projectRootFolder(&f, series))
 		}
 

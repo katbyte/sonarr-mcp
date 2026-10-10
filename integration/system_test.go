@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 //nolint:paralleltest // the tests share one Sonarr
@@ -86,7 +86,7 @@ func TestBackups(t *testing.T) {
 func TestLogs(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	page := must(sc.GetLog(ctx, sonarr.GetLogOperationOptions{PageSize: 5, SortKey: "time", SortDirection: sonarr.SortDirectionDescending})).Model
+	page := must(sc.GetLog(ctx, sonarr.GetLogOperationOptions{PageSize: new(5), SortKey: "time", SortDirection: sonarr.SortDirectionDescending})).Model
 	if len(page.Records) != 5 || page.TotalRecords < 5 || page.Records[0].Message == "" || page.Records[0].Level == "" {
 		t.Errorf("GetLog, five newest = %+v", page)
 	}

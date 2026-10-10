@@ -17,8 +17,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/katbyte/sonarr-mcp/lib/client"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/lib/testenv"
+
+	"github.com/katbyte/pandorest/client"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 // gone checks a read of something deleted answers 404.
@@ -107,7 +109,7 @@ func TestRootFolders(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	// a root folder has to exist, and be writable, in the container
-	mkdirAll(t, dataDir(), "downloads", "sdk-root")
+	mkdirAll(t, testenv.DataDir(), "downloads", "sdk-root")
 	res := must(sc.PostRootFolder(ctx, sonarr.RootFolderResource{Path: "/downloads/sdk-root"}))
 	status(t, res.HttpResponse, http.StatusCreated)
 	id := res.Model.Id
@@ -350,7 +352,7 @@ func TestDelayProfiles(t *testing.T) {
 	}
 
 	// moving a after b answers the whole ordered list, a now below b
-	order := must(sc.PutDelayProfileReorderById(ctx, a.Id, sonarr.PutDelayProfileReorderByIdOperationOptions{After: b.Id}))
+	order := must(sc.PutDelayProfileReorderById(ctx, a.Id, sonarr.PutDelayProfileReorderByIdOperationOptions{After: new(b.Id)}))
 	status(t, order.HttpResponse, http.StatusOK)
 	ia := slices.IndexFunc(order.Model, func(p sonarr.DelayProfileResource) bool { return p.Id == a.Id })
 	ib := slices.IndexFunc(order.Model, func(p sonarr.DelayProfileResource) bool { return p.Id == b.Id })
@@ -451,7 +453,7 @@ func TestImportListExclusions(t *testing.T) {
 		t.Error("GetImportListExclusion does not list the new exclusion")
 	}
 	other := create(78107, "The Office")
-	paged := must(sc.GetImportListExclusionPagedComplete(ctx, sonarr.GetImportListExclusionPagedOperationOptions{PageSize: 1}))
+	paged := must(sc.GetImportListExclusionPagedComplete(ctx, sonarr.GetImportListExclusionPagedOperationOptions{PageSize: new(1)}))
 	if len(paged.Items) < 2 || !slices.ContainsFunc(paged.Items, func(x sonarr.ImportListExclusionResource) bool { return x.Id == other.Id }) {
 		t.Errorf("GetImportListExclusionPagedComplete over pages of one = %+v", paged.Items)
 	}

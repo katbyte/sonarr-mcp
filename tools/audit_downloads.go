@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 const (

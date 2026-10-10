@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"path"
@@ -9,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -115,7 +116,7 @@ func (s *snapshot) filesOf(ctx context.Context, seriesID int) ([]sonarr.EpisodeF
 	if f, ok := s.files[seriesID]; ok {
 		return f, nil
 	}
-	res, err := s.r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: seriesID})
+	res, err := s.r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: new(seriesID)})
 	if err != nil {
 		return nil, err
 	}
@@ -464,14 +465,16 @@ func registerAuditTools(r *registry) {
 
 type auditAllRow struct {
 	Audit    string `json:"audit"`
-	Findings int    `json:"findings"`
+	Findings *int   `json:"findings,omitempty" jsonschema:"absent when the audit could not run: unknown, not none"`
 	Scanned  int    `json:"scanned"`
 	Note     string `json:"note,omitempty"`
+	Error    string `json:"error,omitempty"    jsonschema:"why this audit could not run"`
 }
 
 type auditAllOut struct {
-	Series int           `json:"series"         jsonschema:"series audited"`
-	Total  int           `json:"total_findings"`
+	Series int           `json:"series"           jsonschema:"series audited"`
+	Total  int           `json:"total_findings"   jsonschema:"across the audits that ran"`
+	Failed []string      `json:"failed,omitempty" jsonschema:"the audits that could not run: total_findings is without them, and their own row says why"`
 	Audits []auditAllRow `json:"audits"`
 }
 
@@ -482,7 +485,7 @@ func registerAuditAll(r *registry) {
 	add(r, readTool, &mcp.Tool{
 		Name: "audit_all",
 		Description: "Run every audit and report only the counts, so one call says where the library needs work: missing episodes, files below cutoff, stuck and failing downloads, folders and files Sonarr has lost track of or thinks it has, naming, quality labels, runtimes, languages, monitoring gaps, dead settings, and Sonarr's health. " +
-			"Start here, then call the audit whose count is not zero for its worklist.",
+			"Start here, then call the audit whose count is not zero for its worklist. An audit that could not run is listed under failed with its error and has no count: that is unknown, not none.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in allIn) (*mcp.CallToolResult, auditAllOut, error) {
 		s, err := r.snap(ctx, in.Series)
 		if err != nil {
@@ -490,13 +493,24 @@ func registerAuditAll(r *registry) {
 		}
 		out := auditAllOut{Series: len(s.series)}
 		specs := append(r.auditSpecs(), r.mediaAuditSpecs()...)
+		var first error
 		for _, spec := range specs {
 			res, err := spec.run(ctx, s, 1)
 			if err != nil {
-				return nil, auditAllOut{}, fmt.Errorf("%s: %w", spec.name, err)
+				// one audit's read failing is that audit's to report: the
+				// others' counts stand, and its own is left out rather than
+				// read as none
+				first = cmp.Or(first, fmt.Errorf("%s: %w", spec.name, err))
+				out.Failed = append(out.Failed, spec.name)
+				out.Audits = append(out.Audits, auditAllRow{Audit: spec.name, Note: spec.note, Error: err.Error()})
+				continue
 			}
-			out.Audits = append(out.Audits, auditAllRow{Audit: spec.name, Findings: res.Found, Scanned: res.Scanned, Note: spec.note})
+			out.Audits = append(out.Audits, auditAllRow{Audit: spec.name, Findings: new(res.Found), Scanned: res.Scanned, Note: spec.note})
 			out.Total += res.Found
+		}
+		// nothing ran, or the call was given up on: there is no answer to keep
+		if len(out.Failed) == len(specs) || ctx.Err() != nil {
+			return nil, auditAllOut{}, first
 		}
 
 		return nil, out, nil

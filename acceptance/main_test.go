@@ -8,9 +8,10 @@
 // The library is built through the tools themselves (rootfolder_add,
 // series_import, series_add, series_edit), so the setup is part of the
 // coverage. Sonarr's calls out to SkyHook and services.sonarr.tv go through a
-// record/replay proxy (lib/providerproxy), and the indexer and download client
-// it searches and downloads with are fakes this suite runs (internal/fakes),
-// so a run needs no network and every download is one the suite chose.
+// record/replay proxy (go-kt's test/replayproxy), and the indexer and download
+// client it searches and downloads with are fakes this suite runs (go-kt's
+// test/services), so a run needs no network and every download is one the
+// suite chose.
 //
 //	make testacc-acceptance                             # container started and torn down
 //

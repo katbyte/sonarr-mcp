@@ -16,9 +16,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/internal/fakes/newznab"
-	"github.com/katbyte/sonarr-mcp/internal/fakes/sabnzbd"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/lib/testenv"
+
+	"github.com/katbyte/go-kt/mcp/acctest"
+	"github.com/katbyte/go-kt/test/services/newznab"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 // seriesFixture is a series in the library and what Sonarr should hold for
@@ -71,16 +73,6 @@ const unusedTag = "4k"
 // scopingTag is the tag TestAuditProfiles puts on an indexer and no series.
 const scopingTag = "test-scope"
 
-// The fakes the container searches and downloads with.
-var (
-	indexer *newznab.Server
-	sab     *sabnzbd.Server
-)
-
-// fakeKey is the API key both fakes demand, so a Sonarr that sent none
-// would be caught.
-const fakeKey = "sonarr-mcp-fake"
-
 // release builds a catalogue entry for one episode (episode 0 for a season
 // pack).
 func release(title string, tvdb, season, episode int, sizeGB float64, category int) newznab.Release {
@@ -96,59 +88,21 @@ func release(title string, tvdb, season, episode int, sizeGB float64, category i
 func catalogue() []newznab.Release {
 	bb := breakingBad.TvdbID
 	out := []newznab.Release{
-		release("Breaking.Bad.S01E01.Pilot.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 1, 1.6, newznab.CategoryHD),
-		release("Breaking.Bad.S01E01.Pilot.720p.HDTV.x264-FAKE", bb, 1, 1, 0.9, newznab.CategoryHD),
-		release("Breaking.Bad.S01E01.Pilot.2160p.WEB-DL.DDP5.1.HDR.HEVC-FAKE", bb, 1, 1, 7.5, newznab.CategoryUHD),
-		release("Breaking.Bad.S01E02.Cats.in.the.Bag.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 2, 1.4, newznab.CategoryHD),
-		release("Breaking.Bad.S01E03.And.the.Bags.in.the.River.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 3, 1.4, newznab.CategoryHD),
-		release("Breaking.Bad.S01E04.Cancer.Man.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 4, 1.4, newznab.CategoryHD),
-		release("Breaking.Bad.S01E05.Gray.Matter.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 5, 1.4, newznab.CategoryHD),
-		release("Breaking.Bad.S01E06.Crazy.Handful.of.Nothin.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 6, 1.4, newznab.CategoryHD),
-		release("Breaking.Bad.S01E07.A.No.Rough.Stuff.Type.Deal.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 7, 1.4, newznab.CategoryHD),
-		release("Firefly.S01E07.Safe.1080p.WEB-DL.DD5.1.H.264-FAKE", firefly.TvdbID, 1, 7, 1.3, newznab.CategoryHD),
-		release("Firefly.S01E08.Ariel.1080p.WEB-DL.DD5.1.H.264-FAKE", firefly.TvdbID, 1, 8, 1.3, newznab.CategoryHD),
-		release("Chernobyl.S01E05.Vichnaya.Pamyat.1080p.WEB-DL.DD5.1.H.264-FAKE", chernobyl.TvdbID, 1, 5, 2.1, newznab.CategoryHD),
+		release("Breaking.Bad.S01E01.Pilot.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 1, 1.6, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E01.Pilot.720p.HDTV.x264-FAKE", bb, 1, 1, 0.9, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E01.Pilot.2160p.WEB-DL.DDP5.1.HDR.HEVC-FAKE", bb, 1, 1, 7.5, newznab.CategoryTVUHD),
+		release("Breaking.Bad.S01E02.Cats.in.the.Bag.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 2, 1.4, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E03.And.the.Bags.in.the.River.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 3, 1.4, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E04.Cancer.Man.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 4, 1.4, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E05.Gray.Matter.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 5, 1.4, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E06.Crazy.Handful.of.Nothin.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 6, 1.4, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E07.A.No.Rough.Stuff.Type.Deal.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 7, 1.4, newznab.CategoryTVHD),
+		release("Firefly.S01E07.Safe.1080p.WEB-DL.DD5.1.H.264-FAKE", firefly.TvdbID, 1, 7, 1.3, newznab.CategoryTVHD),
+		release("Firefly.S01E08.Ariel.1080p.WEB-DL.DD5.1.H.264-FAKE", firefly.TvdbID, 1, 8, 1.3, newznab.CategoryTVHD),
+		release("Chernobyl.S01E05.Vichnaya.Pamyat.1080p.WEB-DL.DD5.1.H.264-FAKE", chernobyl.TvdbID, 1, 5, 2.1, newznab.CategoryTVHD),
 	}
 
 	return out
-}
-
-// startFakes starts the indexer and the download client the container is
-// configured with, on the ports testenv.sh told it about.
-func startFakes() error {
-	iport, err := envPort("SONARR_TEST_INDEXER_PORT", 18081)
-	if err != nil {
-		return err
-	}
-	sport, err := envPort("SONARR_TEST_SAB_PORT", 18082)
-	if err != nil {
-		return err
-	}
-	if indexer, err = newznab.New(newznab.Options{
-		Addr: ":" + strconv.Itoa(iport), APIKey: fakeKey, PublicHost: containerHost(), Releases: catalogue(),
-	}); err != nil {
-		return err
-	}
-	complete := filepath.Join(dataDir(), "downloads", "complete")
-	if sab, err = sabnzbd.New(sabnzbd.Options{
-		Addr: ":" + strconv.Itoa(sport), APIKey: fakeKey, PublicHost: containerHost(),
-		CompleteDir: "/downloads/complete", HostCompleteDir: complete,
-	}); err != nil {
-		return err
-	}
-	if err := waitHTTP(indexer.LocalURL() + "/api?t=caps"); err != nil {
-		return fmt.Errorf("the fake indexer never answered: %w", err)
-	}
-
-	return waitHTTP(sab.LocalURL() + "/api?mode=version")
-}
-
-func stopFakes() {
-	for _, c := range []interface{ Close() error }{indexer, sab} {
-		if c != nil {
-			_ = c.Close()
-		}
-	}
 }
 
 // fakeVideo writes a video of black frames and a silent audio track (Sonarr
@@ -197,7 +151,7 @@ func seed() error {
 	if err != nil {
 		return err
 	}
-	if numOr0(existing["total"]) > 0 {
+	if acctest.NumOr0(existing["total"]) > 0 {
 		return nil
 	}
 
@@ -213,9 +167,9 @@ func seed() error {
 	if err != nil {
 		return err
 	}
-	for _, row := range rowsOf(imported["folders"]) {
-		if str(row["status"]) != "imported" {
-			return fmt.Errorf("series_import did not import %s: %v", str(row["folder"]), row)
+	for _, row := range acctest.RowsOf(imported["folders"]) {
+		if acctest.Str(row["status"]) != "imported" {
+			return fmt.Errorf("series_import did not import %s: %v", acctest.Str(row["folder"]), row)
 		}
 	}
 	if _, err := invoke("series_add", map[string]any{"series": "tvdb:" + strconv.Itoa(breakingBad.TvdbID), "quality_profile": profile}); err != nil {
@@ -293,7 +247,7 @@ func seedDownloads() error {
 	// run, and the queue would never hold only what a test put there
 	idx.Name, idx.EnableRss, idx.EnableAutomaticSearch, idx.EnableInteractiveSearch = fakeIndexerName, new(false), new(true), new(true)
 	idx.Fields = providerFields(idx.Fields, map[string]any{
-		"baseUrl": indexer.URL(), "apiPath": "/api", "apiKey": fakeKey, "categories": []int{5030, 5040, 5045},
+		"baseUrl": indexer.URL(), "apiPath": "/api", "apiKey": testenv.FakeKey, "categories": []int{5030, 5040, 5045},
 	})
 	if _, err := api.PostIndexer(ctx, idx, sonarr.PostIndexerOperationOptions{}); err != nil {
 		return fmt.Errorf("adding the fake indexer: %w", err)
@@ -310,7 +264,7 @@ func seedDownloads() error {
 	dc := clients.Model[j]
 	dc.Name, dc.Enable = fakeClientName, new(true)
 	dc.Fields = providerFields(dc.Fields, map[string]any{
-		"host": sab.Host(), "port": sab.Port(), "apiKey": fakeKey, "tvCategory": sab.Category(), "useSsl": false, "urlBase": "",
+		"host": sab.Host(), "port": sab.Port(), "apiKey": testenv.FakeKey, "tvCategory": sab.Category(), "useSsl": false, "urlBase": "",
 	})
 	if _, err := api.PostDownloadClient(ctx, dc, sonarr.PostDownloadClientOperationOptions{}); err != nil {
 		return fmt.Errorf("adding the fake download client: %w", err)
@@ -366,10 +320,10 @@ func waitForFiles(title string, want int) error {
 		switch {
 		case err != nil:
 			last = err.Error()
-		case numOr0(out["episodes_have"]) == want && numOr0(out["episodes_total"]) > 0:
+		case acctest.NumOr0(out["episodes_have"]) == want && acctest.NumOr0(out["episodes_total"]) > 0:
 			return nil
 		default:
-			last = fmt.Sprintf("%d of %d files", numOr0(out["episodes_have"]), want)
+			last = fmt.Sprintf("%d of %d files", acctest.NumOr0(out["episodes_have"]), want)
 		}
 		time.Sleep(time.Second)
 	}

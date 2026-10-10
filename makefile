@@ -97,19 +97,19 @@ docker: ## Build the sonarr-mcp container image with version info from git
 
 tools: $(ACTIONLINT) $(GOFUMPT) $(GOLANGCI_LINT) $(GOLANGCI_LINT_MODULES) $(SHELLCHECK) $(YAMLLINT) $(ZIZMOR) ## Install all pinned dev tools into .tools/bin
 
-##@ SDK generation (internal/pandorest)
-generate: pandorest-import pandorest-generate ## Import the spec into api-definitions/, then generate lib/sonarr from it
+##@ SDK generation (sdk/pandorest)
+generate: pandorest-import pandorest-generate ## Import the highest-versioned spec into api-defs/sonarr-<version>/, then generate sdk/sonarr
 
-pandorest-import: ## Import docs/sonarr-openapi.json into api-definitions/, applying the workarounds
-	@echo "==> importing the OpenAPI spec into api-definitions/..."
-	go run ./internal/pandorest import
+pandorest-import: ## Import api-defs/sonarr-openapi-<version>.json (the highest version) into api-defs/sonarr-<version>/, applying the workarounds
+	@echo "==> importing the OpenAPI spec into api-defs/sonarr-<version>/..."
+	go run ./sdk/pandorest import
 
-pandorest-generate: ## Generate lib/sonarr from api-definitions/
-	@echo "==> generating lib/sonarr from api-definitions/..."
-	go run ./internal/pandorest generate
+pandorest-generate: ## Generate sdk/sonarr from api-defs/sonarr-<version>/
+	@echo "==> generating sdk/sonarr from api-defs/sonarr-<version>/..."
+	go run ./sdk/pandorest generate
 
-pandorest-diff: ## Report what the spec in docs/ changes against the checked-in api-definitions/
-	@go run ./internal/pandorest diff -quiet
+pandorest-diff: ## Report what the vendored spec changes against its checked-in definitions
+	@go run ./sdk/pandorest diff -quiet
 
 ##@ Formatting
 fmt: $(GOFUMPT) $(GOLANGCI_LINT) ## Fix Go formatting (gofmt, gofumpt, goimports)
@@ -150,13 +150,13 @@ zizmor: $(ZIZMOR) ## Audit GitHub workflows for security issues with zizmor
 	@$(ZIZMOR) .
 
 gencheck: generate ## Check that the definitions and generated SDK match the spec (regenerate, then diff)
-	@test -z "$$(git status --porcelain -- api-definitions lib/sonarr)" || \
-		(git status --short -- api-definitions lib/sonarr; echo; \
-		echo "api-definitions/ or lib/sonarr is stale. Run 'make generate' and commit."; exit 1)
+	@test -z "$$(git status --porcelain -- api-defs sdk/sonarr)" || \
+		(git status --short -- api-defs sdk/sonarr; echo; \
+		echo "api-defs/ or sdk/sonarr is stale. Run 'make generate' and commit."; exit 1)
 
-apicheck: ## Check that the definitions match the spec and every operation has a method in lib/sonarr
-	@echo "==> Checking API coverage of lib/sonarr..."
-	@go run ./internal/pandorest check -quiet
+apicheck: ## Check that the definitions match the spec and every operation has a method in sdk/sonarr
+	@echo "==> Checking API coverage of sdk/sonarr..."
+	@go run ./sdk/pandorest check -quiet
 
 depscheck: ## Check that go.mod/go.sum and vendor/ are in sync
 	@echo "==> Checking source code with go mod tidy..."
@@ -185,7 +185,7 @@ depscheck: ## Check that go.mod/go.sum and vendor/ are in sync
 test: build ## Run the unit tests
 	go test ./... -timeout ${TEST_TIMEOUT}
 
-test-integration: ## Run the SDK tests (lib/sonarr) against an already-running Sonarr
+test-integration: ## Run the SDK tests (sdk/sonarr) against an already-running Sonarr
 	@[ -n "${SONARR_SERVER}" ] && [ -n "${SONARR_TOKEN}" ] && [ -n "${SONARR_TEST_CONTAINER}" ] || \
 		(echo 'SONARR_SERVER, SONARR_TOKEN and SONARR_TEST_CONTAINER must be set: eval "$$(scripts/testenv.sh up)"; or use "make testacc"'; exit 1)
 	go test -tags integration -count=1 ./integration/... -timeout ${TEST_TIMEOUT} -v
@@ -227,20 +227,20 @@ testacc: testacc-integration testacc-acceptance ## Run both live suites, each in
 # directory and covdata merges them, which is stdlib tooling rather than a
 # third-party merger.
 COVERDIR?=.coverage
-COVERPKG=./tools/...,./lib/...,./cli/...,./internal/...
-SDK=/lib/sonarr/
+COVERPKG=./tools/...,./sdk/...,./lib/...,./cli/...,./internal/...
+SDK=/sdk/sonarr/
 COVERDIRS=$(COVERDIR)/unit,$(COVERDIR)/integration,$(COVERDIR)/acceptance
 
 cover: ## Run every suite with coverage and report the total
 	@rm -rf $(COVERDIR)
 	@mkdir -p $(COVERDIR)/unit $(COVERDIR)/integration $(COVERDIR)/acceptance
 	@echo "==> unit..."
-	@go test -count=1 -coverpkg=$(COVERPKG) ./tools/ ./cli/ ./lib/... ./internal/... \
+	@go test -count=1 -coverpkg=$(COVERPKG) ./tools/ ./cli/ ./sdk/... ./lib/... ./internal/... \
 		-args -test.gocoverdir=$(CURDIR)/$(COVERDIR)/unit >/dev/null
 	@$(MAKE) --no-print-directory cover-integration
 	@$(MAKE) --no-print-directory cover-acceptance
 	@go tool covdata textfmt -i=$(COVERDIRS) -o=$(COVERDIR)/coverage.all
-	@# lib/sonarr is generated, one mechanical method per operation (228 of them);
+	@# sdk/sonarr is generated, one mechanical method per operation (228 of them);
 	@# the suites exercise the ones the tools rely on, so the total is for the
 	@# hand-written code and the SDK gets a line of its own (the per-package
 	@# figures below include it)

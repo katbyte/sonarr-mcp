@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -104,7 +104,7 @@ func (r *registry) queueFor(ctx context.Context, seriesID int, episodeIDs []int)
 		return nil, err
 	}
 	res, err := r.client.GetQueueDetails(ctx, sonarr.GetQueueDetailsOperationOptions{
-		SeriesId: seriesID, IncludeSeries: new(true), IncludeEpisode: new(true),
+		SeriesId: new(seriesID), IncludeSeries: new(true), IncludeEpisode: new(true),
 	})
 	if err != nil {
 		return nil, err
@@ -212,10 +212,10 @@ func registerQueueTools(r *registry) {
 	type listIn struct {
 		Series string `json:"series,omitempty"      jsonschema:"only this series: title, Sonarr id or tvdb:<id>"`
 		Issues bool   `json:"issues_only,omitempty" jsonschema:"only the downloads that need a person: failed, paused, unable to import, warned about, or waiting too long"`
-		Limit  int    `json:"limit,omitempty"       jsonschema:"downloads to return, default 100"`
+		pageIn
 	}
 	type listOut struct {
-		Total     int        `json:"total"`
+		pageOut
 		Downloads []queueRow `json:"downloads"`
 	}
 	add(r, readTool, &mcp.Tool{
@@ -234,7 +234,7 @@ func registerQueueTools(r *registry) {
 		if err != nil {
 			return nil, listOut{}, err
 		}
-		out := listOut{}
+		rows := make([]queueRow, 0, len(all))
 		now := time.Now()
 		for i := range all {
 			q := &all[i]
@@ -246,11 +246,10 @@ func registerQueueTools(r *registry) {
 			if problem, _ := stuckProblem(q, now.Sub(parseTime(q.Added))); in.Issues && problem == "" {
 				continue
 			}
-			out.Total++
-			if len(out.Downloads) < limitOr(in.Limit, 100) {
-				out.Downloads = append(out.Downloads, projectQueue(q))
-			}
+			rows = append(rows, projectQueue(q))
 		}
+		out := listOut{}
+		out.Downloads, out.pageOut = pageRows(rows, in.pageIn)
 
 		return nil, out, nil
 	})
@@ -341,11 +340,11 @@ func registerHistoryTools(r *registry) {
 		Episode string   `json:"episode,omitempty" jsonschema:"with series: only this episode, S01E02"`
 		Events  []string `json:"events,omitempty"  jsonschema:"only these events: grabbed, imported, failed, deleted, renamed, ignored"`
 		Days    int      `json:"days,omitempty"    jsonschema:"only the last this many days"`
-		Limit   int      `json:"limit,omitempty"   jsonschema:"entries to return, newest first, default 50"`
+		pageIn
 	}
 	type listOut struct {
-		Total   int          `json:"total"   jsonschema:"entries matching, of which the newest are returned"`
-		Entries []historyRow `json:"entries"`
+		pageOut
+		Entries []historyRow `json:"entries" jsonschema:"newest first"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "history_list",
@@ -374,43 +373,59 @@ func registerHistoryTools(r *registry) {
 				if err != nil {
 					return nil, listOut{}, err
 				}
-				opts.EpisodeId = picked[0].Id
+				opts.EpisodeId = new(picked[0].Id)
 			}
 		} else if in.Episode != "" {
 			return nil, listOut{}, errors.New("an episode needs its series")
 		}
-		limit := limitOr(in.Limit, 50)
-		var cutoff time.Time
-		if in.Days > 0 {
-			cutoff = time.Now().AddDate(0, 0, -in.Days)
-		}
-		out := listOut{}
-		// newest first, so paging stops at the first entry older than the cutoff
-		for page := 1; ; page++ {
-			opts.Page, opts.PageSize = page, max(limit, 100)
+		fetch := func(page, size int) ([]sonarr.HistoryResource, int, error) {
+			opts.Page, opts.PageSize = new(page), new(size)
 			res, err := client.GetHistory(ctx, opts)
+			if err != nil {
+				return nil, 0, err
+			}
+
+			return res.Model.Records, res.Model.TotalRecords, nil
+		}
+
+		// with no age asked for, Sonarr does the paging and says how many
+		// there are in all
+		if in.Days <= 0 {
+			records, paged, err := window(in.pageIn, fetch)
 			if err != nil {
 				return nil, listOut{}, err
 			}
-			done := len(res.Model.Records) < opts.PageSize
-			for i := range res.Model.Records {
-				h := &res.Model.Records[i]
-				if !cutoff.IsZero() && parseTime(h.Date).Before(cutoff) {
-					done = true
-					break
-				}
-				out.Total++
-				if len(out.Entries) < limit {
-					out.Entries = append(out.Entries, projectHistory(h))
-				}
+			out := listOut{pageOut: paged, Entries: make([]historyRow, 0, len(records))}
+			for i := range records {
+				out.Entries = append(out.Entries, projectHistory(&records[i]))
 			}
-			if done || cutoff.IsZero() {
-				if cutoff.IsZero() {
-					out.Total = res.Model.TotalRecords
-				}
+
+			return nil, out, nil
+		}
+
+		// Sonarr cannot filter by age, so the entries are read newest first
+		// until the first one older than the cutoff, and paged from those
+		cutoff := time.Now().AddDate(0, 0, -in.Days)
+		var rows []historyRow
+		for page := 1; ; page++ {
+			records, _, err := fetch(page, historyPage)
+			if err != nil {
+				return nil, listOut{}, err
+			}
+			older := slices.IndexFunc(records, func(h sonarr.HistoryResource) bool { return parseTime(h.Date).Before(cutoff) })
+			keep := len(records)
+			if older >= 0 {
+				keep = older
+			}
+			for i := range records[:keep] {
+				rows = append(rows, projectHistory(&records[i]))
+			}
+			if older >= 0 || len(records) < historyPage {
 				break
 			}
 		}
+		out := listOut{}
+		out.Entries, out.pageOut = pageRows(rows, in.pageIn)
 
 		return nil, out, nil
 	})
@@ -441,11 +456,11 @@ func registerHistoryTools(r *registry) {
 
 	type blockIn struct {
 		Series string `json:"series,omitempty" jsonschema:"only this series: title, Sonarr id or tvdb:<id>"`
-		Limit  int    `json:"limit,omitempty"  jsonschema:"entries to return, newest first, default 100"`
+		pageIn
 	}
 	type blockOut struct {
-		Total   int            `json:"total"`
-		Entries []blocklistRow `json:"entries"`
+		pageOut
+		Entries []blocklistRow `json:"entries" jsonschema:"newest first"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "blocklist_list",
@@ -471,11 +486,9 @@ func registerHistoryTools(r *registry) {
 		for i := range series {
 			titles[series[i].Id] = series[i].Title
 		}
-		out := blockOut{Total: len(res.Items)}
-		for _, b := range res.Items {
-			if len(out.Entries) >= limitOr(in.Limit, 100) {
-				break
-			}
+		items, paged := pageRows(res.Items, in.pageIn)
+		out := blockOut{pageOut: paged, Entries: make([]blocklistRow, 0, len(items))}
+		for _, b := range items {
 			out.Entries = append(out.Entries, blocklistRow{
 				ID: b.Id, Date: b.Date, Series: titles[b.SeriesId], SourceTitle: b.SourceTitle, Quality: qualityName(b.Quality),
 				Indexer: b.Indexer, Protocol: string(b.Protocol), Message: b.Message,
@@ -510,6 +523,10 @@ func registerHistoryTools(r *registry) {
 	})
 }
 
+// historyPage is how many history entries are read at a time when Sonarr is
+// read through rather than asked for one page.
+const historyPage = 250
+
 // historyScan is how many recent history entries historyEntry looks through:
 // Sonarr has no read of one entry by id, and the entries a caller has just
 // been shown are the recent ones.
@@ -517,10 +534,10 @@ const historyScan = 2000
 
 // historyEntry finds a history entry by id among the recent ones.
 func (r *registry) historyEntry(ctx context.Context, id int) (*sonarr.HistoryResource, error) {
-	const size = 250
+	const size = historyPage
 	for page := 1; page*size <= historyScan; page++ {
 		res, err := r.client.GetHistory(ctx, sonarr.GetHistoryOperationOptions{
-			Page: page, PageSize: size, SortKey: "date", SortDirection: sonarr.SortDirectionDescending,
+			Page: new(page), PageSize: new(size), SortKey: "date", SortDirection: sonarr.SortDirectionDescending,
 			IncludeSeries: new(true), IncludeEpisode: new(true),
 		})
 		if err != nil {

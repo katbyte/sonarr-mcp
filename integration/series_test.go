@@ -19,7 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/lib/testenv"
+
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 // waitForFiles polls a series until Sonarr has imported want files from its
@@ -61,13 +63,13 @@ func TestSeriesLifecycle(t *testing.T) {
 	t.Cleanup(func() {
 		_, _ = sc.DeleteSeriesById(context.WithoutCancel(ctx), id, sonarr.DeleteSeriesByIdOperationOptions{})
 		// the folder back where the fixtures put it, for the next run
-		tv := filepath.Join(dataDir(), "tv")
+		tv := testenv.DataDir("tv")
 		if _, err := os.Stat(filepath.Join(tv, theExpanse.Folder)); os.IsNotExist(err) {
 			_ = os.Rename(filepath.Join(tv, "The Expanse (2015)"), filepath.Join(tv, theExpanse.Folder))
 		}
 	})
 	s := waitForFiles(ctx, t, id, theExpanse.Files)
-	if byTvdb := must(sc.GetSeries(ctx, sonarr.GetSeriesOperationOptions{TvdbId: theExpanse.TvdbID})).Model; len(byTvdb) != 1 || byTvdb[0].Id != id {
+	if byTvdb := must(sc.GetSeries(ctx, sonarr.GetSeriesOperationOptions{TvdbId: new(theExpanse.TvdbID)})).Model; len(byTvdb) != 1 || byTvdb[0].Id != id {
 		t.Errorf("GetSeries by tvdb id = %+v", byTvdb)
 	}
 	if s.Title != theExpanse.Title || s.Network == "" || len(s.Genres) == 0 || s.Runtime == 0 || s.Statistics.SizeOnDisk == 0 {
@@ -93,7 +95,7 @@ func TestSeriesLifecycle(t *testing.T) {
 	moved.Path = "/tv/The Expanse (2015)"
 	status(t, must(sc.PutSeriesById(ctx, strconv.Itoa(id), moved, sonarr.PutSeriesByIdOperationOptions{MoveFiles: new(true)})).HttpResponse, http.StatusAccepted)
 	if !poll(time.Minute, func() bool {
-		entries, err := os.ReadDir(filepath.Join(dataDir(), "tv", "The Expanse (2015)", "Season 1"))
+		entries, err := os.ReadDir(testenv.DataDir("tv", "The Expanse (2015)", "Season 1"))
 		return err == nil && len(entries) == theExpanse.Files
 	}) {
 		t.Error("moving the series never moved its files")
@@ -123,7 +125,7 @@ func TestSeriesLifecycle(t *testing.T) {
 	status(t, must(sc.DeleteSeriesEditor(ctx, sonarr.SeriesEditorResource{SeriesIds: []int{id}, DeleteFiles: new(false)})).HttpResponse, http.StatusOK)
 	_, err := sc.GetSeriesById(ctx, id, sonarr.GetSeriesByIdOperationOptions{})
 	gone(t, "GetSeriesById after the editor's delete", err)
-	if _, err := os.Stat(filepath.Join(dataDir(), "tv", "The Expanse (2015)", "Season 1")); err != nil {
+	if _, err := os.Stat(testenv.DataDir("tv", "The Expanse (2015)", "Season 1")); err != nil {
 		t.Errorf("the editor's delete without deleteFiles took the files: %v", err)
 	}
 }
@@ -202,7 +204,7 @@ func TestEpisodes(t *testing.T) {
 	if len(byIDs) != 2 {
 		t.Errorf("GetEpisode by ids = %d episodes, want 2", len(byIDs))
 	}
-	byFile := must(sc.GetEpisode(ctx, sonarr.GetEpisodeOperationOptions{EpisodeFileId: e.EpisodeFileId})).Model
+	byFile := must(sc.GetEpisode(ctx, sonarr.GetEpisodeOperationOptions{EpisodeFileId: new(e.EpisodeFileId)})).Model
 	if len(byFile) != 1 || byFile[0].Id != e.Id {
 		t.Errorf("GetEpisode by file = %+v", byFile)
 	}
@@ -233,7 +235,7 @@ func TestEpisodeFiles(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	id := seriesIDs[chernobyl.Title]
-	files := must(sc.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: id})).Model
+	files := must(sc.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: new(id)})).Model
 	if len(files) != chernobyl.Files {
 		t.Fatalf("GetEpisodeFile = %d files, want %d", len(files), chernobyl.Files)
 	}
@@ -277,22 +279,27 @@ func TestEpisodeFiles(t *testing.T) {
 	status(t, must(sc.DeleteEpisodeFileById(ctx, files[3].Id)).HttpResponse, http.StatusOK)
 	_, err := sc.GetEpisodeFileById(ctx, files[3].Id)
 	gone(t, "GetEpisodeFileById", err)
-	if _, err := os.Stat(filepath.Join(dataDir(), "tv", strings.TrimPrefix(files[3].Path, "/tv/"))); !os.IsNotExist(err) {
+	if _, err := os.Stat(testenv.DataDir("tv", strings.TrimPrefix(files[3].Path, "/tv/"))); !os.IsNotExist(err) {
 		t.Errorf("the deleted file is still on disk: %v", err)
 	}
 	status(t, must(sc.DeleteEpisodeFileBulk(ctx, sonarr.EpisodeFileListResource{EpisodeFileIds: []int{files[4].Id}})).HttpResponse, http.StatusOK)
-	if left := must(sc.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: id})).Model; len(left) != chernobyl.Files-2 {
+	if left := must(sc.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: new(id)})).Model; len(left) != chernobyl.Files-2 {
 		t.Errorf("after two deletes, %d files, want %d", len(left), chernobyl.Files-2)
 	}
 
 	// put back on disk, a rescan finds them again
 	for _, f := range files[3:] {
-		if err := fakeVideo(ctx, filepath.Join(dataDir(), "tv", strings.TrimPrefix(f.Path, "/tv/")), 60, "1920x1080"); err != nil {
+		if err := fakeVideo(ctx, testenv.DataDir("tv", strings.TrimPrefix(f.Path, "/tv/")), 60, "1920x1080"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	runCommand(ctx, t, "RescanSeries", map[string]any{"seriesId": id})
-	if back := must(sc.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: id})).Model; len(back) != chernobyl.Files {
+	// a command read back carries its own fields, which the document's
+	// Command schema has no place for: here the series it was for
+	rescan := runCommand(ctx, t, "RescanSeries", map[string]any{"seriesId": id})
+	if got, ok := rescan.Body["seriesId"].(float64); !ok || int(got) != id {
+		t.Errorf("RescanSeries read back for series %v, want %d: %v", rescan.Body["seriesId"], id, rescan.Body)
+	}
+	if back := must(sc.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: new(id)})).Model; len(back) != chernobyl.Files {
 		t.Errorf("after the rescan, %d files, want %d", len(back), chernobyl.Files)
 	}
 }
@@ -305,7 +312,7 @@ func TestManualImport(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	id := seriesIDs[severance.Title]
-	dir := mkdirAll(t, dataDir(), "downloads", "manual")
+	dir := mkdirAll(t, testenv.DataDir(), "downloads", "manual")
 	name := "Severance.S01E03.In.Perpetuity.720p.HDTV.x264-SDK.mkv"
 	// eleven minutes: Sonarr takes anything shorter from a download folder
 	// for a sample
@@ -324,7 +331,7 @@ func TestManualImport(t *testing.T) {
 		t.Errorf("GetManualImport read the file as %+v", item)
 	}
 	// the series form lists what the series' folder holds, already imported
-	existing := must(sc.GetManualImport(ctx, sonarr.GetManualImportOperationOptions{SeriesId: id})).Model
+	existing := must(sc.GetManualImport(ctx, sonarr.GetManualImportOperationOptions{SeriesId: new(id)})).Model
 	if len(existing) < severance.Files || !slices.ContainsFunc(existing, func(m sonarr.ManualImportResource) bool { return m.EpisodeFileId != 0 }) {
 		t.Errorf("GetManualImport(series) = %+v", existing)
 	}
@@ -384,7 +391,7 @@ func TestCalendarAndWanted(t *testing.T) {
 		t.Errorf("GetCalendarById = %+v", got)
 	}
 
-	missing := must(sc.GetWantedMissingComplete(ctx, sonarr.GetWantedMissingOperationOptions{Monitored: new(true), IncludeSeries: new(true), PageSize: 10})).Items
+	missing := must(sc.GetWantedMissingComplete(ctx, sonarr.GetWantedMissingOperationOptions{Monitored: new(true), IncludeSeries: new(true), PageSize: new(10)})).Items
 	j := slices.IndexFunc(missing, func(e sonarr.EpisodeResource) bool {
 		return e.SeriesId == seriesIDs[firefly.Title] && e.SeasonNumber == 1 && e.EpisodeNumber == 7
 	})
@@ -408,7 +415,7 @@ func TestCalendarAndWanted(t *testing.T) {
 	}
 
 	// the iCal feed of the same, a file
-	feed := must(sc.GetFeedV3CalendarSonarrIcs(ctx, sonarr.GetFeedV3CalendarSonarrIcsOperationOptions{PastDays: 9000, FutureDays: 30, Unmonitored: new(true)}))
+	feed := must(sc.GetFeedV3CalendarSonarrIcs(ctx, sonarr.GetFeedV3CalendarSonarrIcsOperationOptions{PastDays: new(9000), FutureDays: new(30), Unmonitored: new(true)}))
 	defer func() { _ = feed.HttpResponse.Body.Close() }()
 	body, err := io.ReadAll(feed.HttpResponse.Body)
 	if err != nil || !strings.HasPrefix(string(body), "BEGIN:VCALENDAR") || !strings.Contains(string(body), "Firefly") {

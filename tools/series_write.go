@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/go-kt/lock"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -275,7 +276,7 @@ func registerSeriesWriteTools(r *registry) {
 		if newItems == "" {
 			newItems = sonarr.NewItemMonitorTypesAll
 		}
-		tags, err := r.resolveTags(ctx, in.Tags, true)
+		tags, err := r.makeTags(ctx, in.Tags)
 		if err != nil {
 			return nil, addOut{}, err
 		}
@@ -326,8 +327,19 @@ func registerSeriesWriteTools(r *registry) {
 		if err != nil {
 			return nil, editOut{}, err
 		}
-		// the index holds a series without its statistics' latest word, so
-		// the record to write back is read fresh
+
+		// another edit of this series in the same turn waits its turn, and a
+		// tag made on the way is made once
+		things := []lock.Thing{seriesLock(s.Id)}
+		if len(in.AddTags) > 0 {
+			things = append(things, lock.String(tagsLock))
+		}
+		unlock := r.locking().By(things...)
+		defer unlock()
+
+		// the index holds a series without its statistics' latest word, and
+		// another edit may have just changed it, so the record to write back
+		// is read fresh, once the series is this call's alone
 		cur, err := client.GetSeriesById(ctx, s.Id, sonarr.GetSeriesByIdOperationOptions{})
 		if err != nil {
 			return nil, editOut{}, err
@@ -425,27 +437,49 @@ func registerSeriesWriteTools(r *registry) {
 		Series             string `json:"series"                         jsonschema:"the series: title, Sonarr id or tvdb:<id>"`
 		DeleteFiles        bool   `json:"delete_files,omitempty"         jsonschema:"also delete the series folder and every file in it; without this the files stay on disk"`
 		AddImportExclusion bool   `json:"add_import_exclusion,omitempty" jsonschema:"stop import lists adding the show back"`
+		Confirm            bool   `json:"confirm,omitempty"              jsonschema:"true to delete; without it nothing changes and the answer says what a confirmed call would remove"`
 	}
 	type deleteOut struct {
-		Deleted      string `json:"deleted"`
-		Path         string `json:"path"`
-		FilesDeleted bool   `json:"files_deleted"`
+		Deleted      string `json:"deleted,omitempty"      jsonschema:"the series removed from Sonarr"`
+		WouldDelete  string `json:"would_delete,omitempty" jsonschema:"without confirm: the series a confirmed call removes; nothing has changed"`
+		Path         string `json:"path"                   jsonschema:"the series folder"`
+		Files        string `json:"files,omitempty"        jsonschema:"with delete_files: what is erased from disk, the series folder and everything in it"`
+		FilesDeleted bool   `json:"files_deleted"          jsonschema:"the folder and its files went with the series"`
 	}
 	add(r, deleteTool, &mcp.Tool{
 		Name:        "series_delete",
-		Description: "Remove a series from Sonarr. Its files stay on disk unless delete_files is set, which deletes the series folder and everything in it.",
+		Description: "Remove a series from Sonarr. Its files stay on disk unless delete_files is set, which deletes the series folder and everything in it. Nothing changes without confirm: the answer says what a confirmed call would remove.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in deleteIn) (*mcp.CallToolResult, deleteOut, error) {
 		s, err := r.resolveSeries(ctx, in.Series)
 		if err != nil {
 			return nil, deleteOut{}, err
 		}
-		if _, err := client.DeleteSeriesById(ctx, s.Id, sonarr.DeleteSeriesByIdOperationOptions{
-			DeleteFiles: new(in.DeleteFiles), AddImportListExclusion: new(in.AddImportExclusion),
-		}); err != nil {
-			return nil, deleteOut{}, err
+
+		// an edit of this series in the same turn finishes first, rather than
+		// writing back a series that has just gone
+		unlock := r.locking().By(seriesLock(s.Id))
+		defer unlock()
+
+		label := fmt.Sprintf("%s (%d)", s.Title, s.Year)
+		out := deleteOut{Path: s.Path}
+		if in.DeleteFiles {
+			out.Files = "the folder " + s.Path + " and everything in it"
+			if st := s.Statistics; st != nil {
+				out.Files += fmt.Sprintf(": %s, %s", countOf(st.EpisodeFileCount, "episode file"), humanSize(st.SizeOnDisk))
+			}
+		}
+		if !in.Confirm {
+			out.WouldDelete = label
+
+			return nil, out, nil
 		}
 
-		return nil, deleteOut{Deleted: fmt.Sprintf("%s (%d)", s.Title, s.Year), Path: s.Path, FilesDeleted: in.DeleteFiles}, nil
+		if _, err := client.DeleteSeriesById(ctx, s.Id, sonarr.DeleteSeriesByIdOperationOptions{DeleteFiles: new(in.DeleteFiles), AddImportListExclusion: new(in.AddImportExclusion)}); err != nil {
+			return nil, deleteOut{}, err
+		}
+		out.Deleted, out.FilesDeleted = label, in.DeleteFiles
+
+		return nil, out, nil
 	})
 
 	type commandIn struct {
@@ -544,7 +578,7 @@ func registerSeriesWriteTools(r *registry) {
 		} else if !on {
 			return nil, renameOut{}, errors.New("sonarr's Rename Episodes setting is off, so it renames nothing; turn it on in its media management settings first")
 		}
-		plan, err := client.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: s.Id})
+		plan, err := client.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: new(s.Id)})
 		if err != nil {
 			return nil, renameOut{}, err
 		}

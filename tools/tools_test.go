@@ -1,14 +1,17 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
-	"reflect"
+	"errors"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -34,13 +37,18 @@ func register(t *testing.T, opts Options) []string {
 	return names
 }
 
-// kinds maps every tool to its kind, as registration queued it.
-func kinds() map[string]toolKind {
-	r := &registry{}
-	queueTools(r)
-	out := map[string]toolKind{}
-	for _, p := range r.pending {
-		out[p.name] = p.kind
+// kinds maps every tool to its kind - read, write or delete - as Describe
+// reports it.
+func kinds(t *testing.T) map[string]string {
+	t.Helper()
+
+	list, err := Describe(Options{Toolsets: []string{"all"}, EnableDelete: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]string{}
+	for _, ti := range list {
+		out[ti.Name] = ti.Kind
 	}
 
 	return out
@@ -83,15 +91,105 @@ func TestRegisterAllKinds(t *testing.T) {
 	}
 }
 
+// The surface is 69 tools, 43 of them reads and 2 deletes, and the essential
+// preset is enough to see what is in the library and what is coming, and to
+// go and get what is missing. A tool added, merged, removed or moved between
+// kinds changes these on purpose, and this is where that is said.
+func TestSurfaceSize(t *testing.T) {
+	t.Parallel()
+
+	count := map[string]int{}
+	for _, kind := range kinds(t) {
+		count[kind]++
+	}
+	if total := count["read"] + count["write"] + count["delete"]; total != 69 || count["read"] != 43 || count["write"] != 24 || count["delete"] != 2 {
+		t.Errorf("surface = %d tools: %v, want 69 with 43 read, 24 write, 2 delete", total, count)
+	}
+	for _, want := range []string{"series_list", "series_get", "calendar_list", "queue_list", "series_search"} {
+		if !slices.Contains(EssentialTools, want) {
+			t.Errorf("essential lacks %s: %v", want, EssentialTools)
+		}
+	}
+	if len(EssentialTools) != 5 {
+		t.Errorf("essential = %v, want five tools", EssentialTools)
+	}
+}
+
 // The delete tools are the ones that remove files or series; nothing else
-// is marked destructive, and each of them is.
+// is a delete tool, and each of them is.
 func TestDeleteToolsAreMarked(t *testing.T) {
 	t.Parallel()
 
-	for name, kind := range kinds() {
+	for name, kind := range kinds(t) {
 		isDelete := strings.HasSuffix(name, "_delete") && name != "tag_delete"
-		if isDelete != (kind == deleteTool) {
-			t.Errorf("%s is kind %d; the tools that delete series or files, and only those, are delete tools", name, kind)
+		if isDelete != (kind == deleteTool.String()) {
+			t.Errorf("%s is a %s tool; the tools that delete series or files, and only those, are delete tools", name, kind)
+		}
+	}
+}
+
+// Every tool tells a client what it changes, without the client reading the
+// text: a read tool says it changes nothing, every write tool says whether it
+// can take away what was there and whether a repeat changes more, from its
+// own entry rather than its kind, and every delete is destructive. The ones
+// that would read as additive if all writes were marked alike are named.
+func TestEveryWriteToolIsHinted(t *testing.T) {
+	t.Parallel()
+
+	listed, err := session(t, newFakeServer(t), Options{EnableDelete: true}).ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kindOf := kinds(t)
+	seen := map[string]bool{}
+	for _, tool := range listed.Tools {
+		a := tool.Annotations
+		if a == nil || a.DestructiveHint == nil || a.OpenWorldHint == nil {
+			t.Errorf("%s has no annotations", tool.Name)
+			continue
+		}
+		// no tool here sends anything to a person or a service beyond Sonarr:
+		// a search or a grab is Sonarr asking its own indexers and download
+		// client
+		if *a.OpenWorldHint {
+			t.Errorf("%s says it reaches past Sonarr, which no tool here does", tool.Name)
+		}
+		switch kindOf[tool.Name] {
+		case "read":
+			if !a.ReadOnlyHint || *a.DestructiveHint {
+				t.Errorf("%s: read-only %v, destructive %v", tool.Name, a.ReadOnlyHint, *a.DestructiveHint)
+			}
+		case "write":
+			seen[tool.Name] = true
+			h, ok := toolHints[tool.Name]
+			if !ok {
+				t.Errorf("%s is a write tool with no hints of its own", tool.Name)
+				continue
+			}
+			if a.ReadOnlyHint || *a.DestructiveHint == h.Additive || a.IdempotentHint != h.Idempotent || h.WritesHere {
+				t.Errorf("%s: read-only %v, destructive %v, idempotent %v; want %+v", tool.Name, a.ReadOnlyHint, *a.DestructiveHint, a.IdempotentHint, h)
+			}
+		case "delete":
+			if a.ReadOnlyHint || !*a.DestructiveHint {
+				t.Errorf("%s deletes: read-only %v, destructive %v", tool.Name, a.ReadOnlyHint, *a.DestructiveHint)
+			}
+		default:
+			t.Errorf("%s has no kind", tool.Name)
+		}
+	}
+	for name := range toolHints {
+		if !seen[name] {
+			t.Errorf("toolHints names %s, which is no write tool", name)
+		}
+	}
+	for _, name := range []string{"episode_search", "season_search", "series_search", "wanted_search", "release_grab", "import_apply", "task_run", "series_refresh", "series_rescan", "series_rename", "queue_remove", "rootfolder_remove", "tag_delete"} {
+		if h, ok := toolHints[name]; !ok || h.Additive {
+			t.Errorf("%s can remove or overwrite what was there, and is marked additive", name)
+		}
+	}
+	for _, name := range []string{"tag_create", "rootfolder_add", "series_add", "series_import"} {
+		if !toolHints[name].Additive {
+			t.Errorf("%s only ever adds, and no longer says so", name)
 		}
 	}
 }
@@ -124,6 +222,62 @@ func TestRegisterAllFilters(t *testing.T) {
 	}
 	if _, err := RegisterAll(mcp.NewServer(&mcp.Implementation{Name: "t", Version: "0"}, nil), newTestClient(t), Options{Deny: []string{"nope"}}); err == nil {
 		t.Error("unknown deny pattern accepted")
+	}
+}
+
+// Beside toolsets an allow list adds the tools it names to them, these sets
+// and these tools as well, whatever set holds them; on its own it is only
+// the tools it names, with no core put beside it. It gets nothing past the
+// read-only switch or the delete gate, and a set is narrowed with a deny
+// list.
+func TestAnAllowListBesideToolsets(t *testing.T) {
+	t.Parallel()
+
+	with := func(base []string, more ...string) []string {
+		out := slices.Clone(base)
+		for _, name := range more {
+			if !slices.Contains(out, name) {
+				out = append(out, name)
+			}
+		}
+		slices.Sort(out)
+
+		return out
+	}
+	core := register(t, Options{Toolsets: []string{"core"}})
+
+	// core and the essential five, one of which no part of core is
+	if got, want := register(t, Options{Toolsets: []string{"core"}, Allow: []string{"essential"}}), with(core, EssentialTools...); !slices.Equal(got, want) || !slices.Contains(got, "series_search") {
+		t.Errorf("essential beside core = %v, want %v", got, want)
+	}
+	// a pattern adds every tool it names, and nothing else comes with them
+	if got, want := register(t, Options{Toolsets: []string{"core"}, Allow: []string{"tag_*"}}), with(core, "tag_create", "tag_delete", "tag_list"); !slices.Equal(got, want) {
+		t.Errorf("tag_* beside core = %v, want %v", got, want)
+	}
+	// a tool of another set's, by name
+	if got, want := register(t, Options{Toolsets: []string{"library"}, Allow: []string{"task_list"}}), with(register(t, Options{Toolsets: []string{"library"}}), "task_list"); !slices.Equal(got, want) {
+		t.Errorf("task_list beside library = %v, want %v", got, want)
+	}
+
+	// naming a tool does not get it past the delete gate or the read-only switch
+	if got := register(t, Options{Toolsets: []string{"core"}, Allow: []string{"series_delete"}}); !slices.Equal(got, core) {
+		t.Errorf("series_delete beside core, deletes not enabled = %v, want core alone", got)
+	}
+	if got := register(t, Options{Toolsets: []string{"core"}, Allow: []string{"series_delete"}, EnableDelete: true}); !slices.Equal(got, with(core, "series_delete")) {
+		t.Errorf("series_delete beside core, deletes enabled = %v", got)
+	}
+	if got := register(t, Options{Toolsets: []string{"core"}, Allow: []string{"series_rescan"}, ReadOnly: true}); !slices.Equal(got, core) {
+		t.Errorf("series_rescan beside core, read only = %v, want core alone", got)
+	}
+
+	// on its own an allow list is the whole of what loads
+	if got := register(t, Options{Allow: []string{"task_list"}}); !slices.Equal(got, []string{"task_list"}) {
+		t.Errorf("task_list alone = %v", got)
+	}
+	// and a set is narrowed by denying, which takes from whatever asked
+	narrowed := register(t, Options{Toolsets: []string{"library"}, Allow: []string{"task_list"}, Deny: []string{"rootfolder_*", "task_*"}})
+	if slices.ContainsFunc(narrowed, func(n string) bool { return strings.HasPrefix(n, "rootfolder_") || strings.HasPrefix(n, "task_") }) || !slices.Contains(narrowed, "series_add") {
+		t.Errorf("library and task_list, rootfolder_* and task_* denied = %v", narrowed)
 	}
 }
 
@@ -299,46 +453,50 @@ func TestToolsDescribeThemselves(t *testing.T) {
 // selfEvident are input names that say all there is to say.
 var selfEvident = []string{"monitored", "label", "path", "season_folder", "release_group", "quality_profile", "series_type"}
 
-func TestMatchPattern(t *testing.T) {
+// A handler that panics answers its call with an error naming the tool and
+// logs the stack, rather than ending the session: the next call is served.
+// A write tool that panicked still drops the series index, since it may have
+// changed Sonarr before it failed.
+func TestAPanicInAToolIsAnErrorNotACrash(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
-		pattern, name string
-		want          bool
-	}{
-		{"series_get", "series_get", true},
-		{"series_get", "series_gets", false},
-		{"series_*", "series_get", true},
-		{"series_*", "audit_series_settings", false},
-		{"*_delete", "file_delete", true},
-		{"*", "anything", true},
-	} {
-		if got := matchPattern(tc.pattern, tc.name); got != tc.want {
-			t.Errorf("matchPattern(%q, %q) = %v", tc.pattern, tc.name, got)
-		}
-	}
-}
+	var (
+		mu     sync.Mutex
+		logged strings.Builder
+	)
+	r := &registry{client: newTestClient(t), errorLog: func(format string, args ...any) {
+		mu.Lock()
+		defer mu.Unlock()
+		_, _ = fmt.Fprintf(&logged, format, args...)
+	}}
+	type none struct{}
+	add(r, writeTool, &mcp.Tool{Name: "zzyzx_panic"}, func(context.Context, *mcp.CallToolRequest, none) (*mcp.CallToolResult, none, error) {
+		var found map[string]*sonarr.SeriesResource
 
-// A nil slice in a result must serialise as [], so a client can tell "none"
-// from "not fetched".
-func TestEmptyNilSlices(t *testing.T) {
-	t.Parallel()
+		return nil, none{}, errors.New(found["9"].Title) // a nil dereference
+	})
+	add(r, readTool, &mcp.Tool{Name: "zzyzx_fine"}, func(context.Context, *mcp.CallToolRequest, none) (*mcp.CallToolResult, none, error) {
+		return nil, none{}, nil
+	})
+	cs := hostRegistry(t, r)
+	cache := r.seriesCache()
+	cache.idx = &seriesIndex{}
 
-	type inner struct{ Tags []string }
-	type out struct {
-		Items  []inner
-		Ptr    *inner
-		Names  []string
-		Nested [][]string
-		Keep   []string
+	msg := mustFail(t, cs, "zzyzx_panic", map[string]any{})
+	if !strings.Contains(msg, "internal error in zzyzx_panic") || !strings.Contains(msg, "nil pointer") {
+		t.Errorf("the refusal = %q, want the tool and the panic named", msg)
 	}
-	v := out{Items: []inner{{}}, Ptr: &inner{}, Keep: []string{"x"}}
-	emptyNilSlices(reflect.ValueOf(&v).Elem())
-
-	if v.Names == nil || v.Nested == nil || v.Items[0].Tags == nil || v.Ptr.Tags == nil {
-		t.Errorf("nil slices survived: %+v", v)
+	mu.Lock()
+	log := logged.String()
+	mu.Unlock()
+	if !strings.Contains(log, "internal error in zzyzx_panic") || !strings.Contains(log, "goroutine") {
+		t.Errorf("the log = %q, want the panic and its stack", log)
 	}
-	if len(v.Keep) != 1 {
-		t.Error("a populated slice was touched")
+	cache.mu.Lock()
+	left := cache.idx
+	cache.mu.Unlock()
+	if left != nil {
+		t.Error("a write tool that panicked left the series index standing")
 	}
+	mustCall(t, cs, "zzyzx_fine", map[string]any{})
 }

@@ -25,6 +25,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/katbyte/sonarr-mcp/lib/testenv"
+
+	"github.com/katbyte/go-kt/mcp/acctest"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -138,10 +141,10 @@ func TestBinaryStdio(t *testing.T) {
 		t.Errorf("the default tools = %v, want core %v", names, want)
 	}
 	info := callSession(t, cs, "server_info", nil)
-	if !strings.HasPrefix(str(info["sonarr_version"]), "4.") || numOr0(info["series"]) < len(importedSeed) {
+	if !strings.HasPrefix(acctest.Str(info["sonarr_version"]), "4.") || acctest.NumOr0(info["series"]) < len(importedSeed) {
 		t.Errorf("server_info over stdio = %v", info)
 	}
-	if got := callSession(t, cs, "series_get", map[string]any{"series": "tvdb:78874"}); str(got["title"]) != firefly.Title {
+	if got := callSession(t, cs, "series_get", map[string]any{"series": "tvdb:78874"}); acctest.Str(got["title"]) != firefly.Title {
 		t.Errorf("series_get over stdio = %v", got["title"])
 	}
 }
@@ -165,7 +168,7 @@ func TestBinaryFlagsAndAliases(t *testing.T) {
 		}
 	}
 	all := callSession(t, cs, "audit_all", map[string]any{"series": chernobyl.Title})
-	if numOr0(all["series"]) != 1 {
+	if acctest.NumOr0(all["series"]) != 1 {
 		t.Errorf("audit_all over stdio = %v", all)
 	}
 }
@@ -187,7 +190,7 @@ func TestBinaryHTTP(t *testing.T) {
 		_ = cmd.Process.Signal(os.Interrupt)
 		_ = cmd.Wait()
 	})
-	if err := waitHTTP("http://" + addr + "/healthz"); err != nil {
+	if err := testenv.WaitHTTP("http://" + addr + "/healthz"); err != nil {
 		t.Fatalf("the HTTP server never answered: %v\n%s", err, stderr.String())
 	}
 
@@ -216,7 +219,7 @@ func TestBinaryHTTP(t *testing.T) {
 	if names := listNames(t, cs); !slices.Contains(names, "series_edit") || slices.Contains(names, "series_delete") {
 		t.Errorf("--toolsets all without --enable-delete = %d tools: %v", len(names), names)
 	}
-	if got := callSession(t, cs, "series_list", map[string]any{"query": "chernobyl"}); numOr0(got["total"]) != 1 {
+	if got := callSession(t, cs, "series_list", map[string]any{"query": "chernobyl"}); acctest.NumOr0(got["total"]) != 1 {
 		t.Errorf("series_list over HTTP = %v", got)
 	}
 }

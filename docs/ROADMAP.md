@@ -20,6 +20,8 @@ Design rules, in priority order:
    tool fixes it; the live suite has to report every kind of finding an audit can make, or
    name the reason it cannot (`acceptance/coverage_test.go`), and where the fix is a tool it
    runs the fix and the audit again.
+8. **One way to page.** Every list takes `limit` and `offset` and answers `total`, `offset` and `next_offset`, whatever it lists and whether Sonarr pages it or the tool does. A test holds every `_list` tool to it.
+9. **`confirm` before what cannot be put back.** A tool that deletes a series or files changes nothing without `confirm`, and says what it would do: `would_delete`. The same test holds every delete tool to it.
 
 ## Done
 
@@ -45,7 +47,7 @@ Design rules, in priority order:
 ## Guarded / deliberately excluded
 
 - `series_delete` (optionally with its files) and `file_delete`: only registered when
-  `--enable-delete` (`SONARR_ENABLE_DELETE`) is set.
+  `--enable-delete` (`SONARR_ENABLE_DELETE`) is set, and change nothing without `confirm`.
 - Not wrapping **as tools**, ever: authentication and the API key, updates and backups
   (restore especially), the host settings (port, SSL, URL base, proxy), notifications and
   their plumbing, the UI settings, and the system shutdown and restart. They are one-off

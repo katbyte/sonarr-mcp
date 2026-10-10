@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/katbyte/go-kt/mcp/acctest"
 )
 
 // Journeys: whole sessions the way a model drives them - the overview, the
@@ -17,9 +19,9 @@ import (
 func auditCount(t *testing.T, name string, args map[string]any) int {
 	t.Helper()
 
-	for _, row := range rows(t, call(t, "audit_all", args)["audits"], "audits") {
-		if str(row["audit"]) == name {
-			return num(t, row["findings"], name)
+	for _, row := range acctest.Rows(t, call(t, "audit_all", args)["audits"], "audits") {
+		if acctest.Str(row["audit"]) == name {
+			return acctest.Num(t, row["findings"], name)
 		}
 	}
 	t.Fatalf("audit_all has no %s", name)
@@ -35,13 +37,13 @@ func TestJourneyWrongSeriesType(t *testing.T) {
 		t.Fatal("audit_all counts nothing wrong with series settings, and Cowboy Bebop is typed standard")
 	}
 	f := only(t, call(t, "audit_series_settings", nil), "problem", "anime not typed anime")
-	if !strings.Contains(str(f["fix"]), "series_edit") {
+	if !strings.Contains(acctest.Str(f["fix"]), "series_edit") {
 		t.Fatalf("the finding does not name its fix: %v", f)
 	}
 
-	edited := call(t, "series_edit", map[string]any{"series": str(f["series"]), "series_type": "anime"})
+	edited := call(t, "series_edit", map[string]any{"series": acctest.Str(f["series"]), "series_type": "anime"})
 	t.Cleanup(func() { call(t, "series_edit", map[string]any{"series": cowboyBebop.Title, "series_type": "standard"}) })
-	if !strings.Contains(strings.Join(strs(t, edited["changed"], "changed"), " "), "series_type: standard -> anime") {
+	if !strings.Contains(strings.Join(acctest.Strs(t, edited["changed"], "changed"), " "), "series_type: standard -> anime") {
 		t.Errorf("series_edit = %v", edited)
 	}
 
@@ -49,7 +51,7 @@ func TestJourneyWrongSeriesType(t *testing.T) {
 		t.Errorf("audit_series_settings went from %d to %d, want one fewer", before, after)
 	}
 	// an anime series is searched and named by absolute number
-	if got := call(t, "series_get", map[string]any{"series": cowboyBebop.Title}); str(got["series_type"]) != "anime" {
+	if got := call(t, "series_get", map[string]any{"series": cowboyBebop.Title}); acctest.Str(got["series_type"]) != "anime" {
 		t.Errorf("series_get after the fix = %v", got["series_type"])
 	}
 }
@@ -58,13 +60,13 @@ func TestJourneyWrongSeriesType(t *testing.T) {
 // download completing, and one fewer missing.
 func TestJourneyMissingEpisode(t *testing.T) {
 	missing := only(t, call(t, "audit_missing_episodes", map[string]any{"series": firefly.Title}), "subject", "season 1")
-	if !strings.Contains(str(missing["detail"]), "S01E08") {
+	if !strings.Contains(acctest.Str(missing["detail"]), "S01E08") {
 		t.Fatalf("Firefly's gap does not include E08: %v", missing)
 	}
 
 	search := call(t, "episode_search", map[string]any{"series": firefly.Title, "episodes": []any{"S01E08"}})
-	queuedRows := rows(t, search["queued"], "queued")
-	if len(queuedRows) != 1 || str(queuedRows[0]["episode"]) != "S01E08" {
+	queuedRows := acctest.Rows(t, search["queued"], "queued")
+	if len(queuedRows) != 1 || acctest.Str(queuedRows[0]["episode"]) != "S01E08" {
 		t.Fatalf("episode_search queued = %v", search["queued"])
 	}
 	job, ok := sab.FindJob("Firefly.S01E08")
@@ -74,16 +76,16 @@ func TestJourneyMissingEpisode(t *testing.T) {
 	t.Cleanup(func() {
 		clearDownload(t, job.ID)
 		files := call(t, "file_list", map[string]any{"series": firefly.Title, "season": 1})
-		for _, f := range rowsOf(files["files"]) {
-			if str(f["episodes"]) == "S01E08" {
-				call(t, "file_delete", map[string]any{"file_ids": []any{numOr0(f["id"])}})
+		for _, f := range acctest.RowsOf(files["files"]) {
+			if acctest.Str(f["episodes"]) == "S01E08" {
+				call(t, "file_delete", map[string]any{"file_ids": []any{acctest.NumOr0(f["id"])}, "confirm": true})
 			}
 		}
 	})
 	completeWith(t, job, 45)
 	eventually(t, "episode_list", map[string]any{"series": firefly.Title, "season": 1}, "S01E08 imported", func(out map[string]any) bool {
-		for _, e := range rowsOf(out["episodes"]) {
-			if str(e["episode"]) == "S01E08" && e["has_file"] == true {
+		for _, e := range acctest.RowsOf(out["episodes"]) {
+			if acctest.Str(e["episode"]) == "S01E08" && e["has_file"] == true {
 				return true
 			}
 		}
@@ -92,12 +94,12 @@ func TestJourneyMissingEpisode(t *testing.T) {
 	})
 
 	after := only(t, call(t, "audit_missing_episodes", map[string]any{"series": firefly.Title}), "subject", "season 1")
-	if strings.Contains(str(after["detail"]), "S01E08") || !strings.Contains(str(after["detail"]), "7 missing") {
+	if strings.Contains(acctest.Str(after["detail"]), "S01E08") || !strings.Contains(acctest.Str(after["detail"]), "7 missing") {
 		t.Errorf("after the download = %v", after)
 	}
 	// Sonarr named the new file to the format as it imported it
-	file := findRow(t, rows(t, call(t, "file_list", map[string]any{"series": firefly.Title, "season": 1})["files"], "files"), "episodes", "S01E08")
-	if str(file["relative_path"]) != "Season 1/Firefly - S01E08 - Ariel WEBDL-1080p.mkv" {
+	file := findRow(t, acctest.Rows(t, call(t, "file_list", map[string]any{"series": firefly.Title, "season": 1})["files"], "files"), "episodes", "S01E08")
+	if acctest.Str(file["relative_path"]) != "Season 1/Firefly - S01E08 - Ariel WEBDL-1080p.mkv" {
 		t.Errorf("the imported file = %v", file["relative_path"])
 	}
 }
@@ -121,16 +123,16 @@ func TestJourneyFilesGoneFromDisk(t *testing.T) {
 	})
 
 	f := only(t, call(t, "audit_missing_files", map[string]any{"series": firefly.Title}), "problem", "files gone from disk")
-	if !strings.Contains(str(f["detail"]), "S01E02") || !strings.Contains(str(f["fix"]), "series_rescan") {
+	if !strings.Contains(acctest.Str(f["detail"]), "S01E02") || !strings.Contains(acctest.Str(f["fix"]), "series_rescan") {
 		t.Fatalf("the missing file = %v", f)
 	}
 	call(t, "series_rescan", map[string]any{"series": firefly.Title})
 
-	if n := len(rowsOf(call(t, "audit_missing_files", map[string]any{"series": firefly.Title})["findings"])); n != 0 {
+	if n := len(acctest.RowsOf(call(t, "audit_missing_files", map[string]any{"series": firefly.Title})["findings"])); n != 0 {
 		t.Errorf("after the rescan %d files are still recorded but gone", n)
 	}
 	gap := only(t, call(t, "audit_missing_episodes", map[string]any{"series": firefly.Title}), "subject", "season 1")
-	if !strings.Contains(str(gap["detail"]), "S01E02") {
+	if !strings.Contains(acctest.Str(gap["detail"]), "S01E02") {
 		t.Errorf("S01E02 is not missing after its file went: %v", gap)
 	}
 }
@@ -141,24 +143,24 @@ func TestJourneyRenameToFormat(t *testing.T) {
 	skipUnlessReady(t)
 
 	f := only(t, call(t, "audit_naming", nil), "series", cowboyBebop.Title)
-	if !strings.Contains(str(f["detail"]), "Session #2 - Stray Dog Strut") {
+	if !strings.Contains(acctest.Str(f["detail"]), "Session #2 - Stray Dog Strut") {
 		t.Fatalf("the rename the audit proposes = %v", f)
 	}
 	plan := call(t, "series_rename", map[string]any{"series": cowboyBebop.Title, "dry_run": true})
-	renames := rows(t, plan["renamed"], "renamed")
+	renames := acctest.Rows(t, plan["renamed"], "renamed")
 	done := call(t, "series_rename", map[string]any{"series": cowboyBebop.Title})
-	if len(rows(t, done["renamed"], "renamed")) != len(renames) || str(object(t, done["command"], "command")["status"]) != "completed" {
+	if len(acctest.Rows(t, done["renamed"], "renamed")) != len(renames) || acctest.Str(acctest.Object(t, done["command"], "command")["status"]) != "completed" {
 		t.Fatalf("series_rename = %v", done)
 	}
 	t.Cleanup(func() {
 		// back to the fixture's names
 		for _, r := range renames {
-			_ = os.Rename(hostPath(str(r["to"])), hostPath(str(r["from"])))
+			_ = os.Rename(hostPath(acctest.Str(r["to"])), hostPath(acctest.Str(r["from"])))
 		}
 		call(t, "series_rescan", map[string]any{"series": cowboyBebop.Title})
 	})
 	for _, r := range renames {
-		if _, err := os.Stat(hostPath(str(r["to"]))); err != nil {
+		if _, err := os.Stat(hostPath(acctest.Str(r["to"]))); err != nil {
 			t.Errorf("not renamed to %s: %v", r["to"], err)
 		}
 	}
@@ -174,7 +176,7 @@ func TestJourneyRenameToFormat(t *testing.T) {
 // the setting it names.
 func TestJourneyMonitorNewSeasons(t *testing.T) {
 	f := only(t, call(t, "audit_monitoring", nil), "series", severance.Title)
-	if !strings.Contains(str(f["fix"]), "monitor_new_items all") {
+	if !strings.Contains(acctest.Str(f["fix"]), "monitor_new_items all") {
 		t.Fatalf("the finding = %v", f)
 	}
 
@@ -190,7 +192,7 @@ func TestJourneyMonitorNewSeasons(t *testing.T) {
 		call(t, "season_monitor", map[string]any{"series": severance.Title, "seasons": []any{2}, "monitored": true})
 	})
 	latest := findings(t, call(t, "audit_monitoring", nil), "series", severance.Title)
-	if len(latest) != 1 || str(latest[0]["problem"]) != "latest season not monitored" {
+	if len(latest) != 1 || acctest.Str(latest[0]["problem"]) != "latest season not monitored" {
 		// Severance may have a third season listed by now, in which case the
 		// latest is not the one unmonitored here
 		if len(latest) != 0 || !hasSeason(t, severance.Title, 3) {
@@ -203,8 +205,8 @@ func TestJourneyMonitorNewSeasons(t *testing.T) {
 func hasSeason(t *testing.T, series string, season int) bool {
 	t.Helper()
 
-	for _, s := range rows(t, call(t, "series_get", map[string]any{"series": series})["seasons"], "seasons") {
-		if num(t, s["season"], "season") == season {
+	for _, s := range acctest.Rows(t, call(t, "series_get", map[string]any{"series": series})["seasons"], "seasons") {
+		if acctest.Num(t, s["season"], "season") == season {
 			return true
 		}
 	}
@@ -234,12 +236,12 @@ func TestJourneyFolderRenamed(t *testing.T) {
 	})
 
 	f := only(t, call(t, "audit_missing_folders", nil), "series", cowboyBebop.Title)
-	if str(f["problem"]) != "series folder renamed" || !strings.Contains(str(f["fix"]), `series_edit path "/tv/`+renamed+`"`) {
+	if acctest.Str(f["problem"]) != "series folder renamed" || !strings.Contains(acctest.Str(f["fix"]), `series_edit path "/tv/`+renamed+`"`) {
 		t.Fatalf("the renamed folder = %v", f)
 	}
 	// and from the other side, without offering to add the show again
 	u := only(t, call(t, "audit_unmapped_folders", nil), "subject", "/tv/"+renamed)
-	if str(u["problem"]) != "folder of a series that moved" || !strings.Contains(str(u["fix"]), "series_edit "+cowboyBebop.Title) {
+	if acctest.Str(u["problem"]) != "folder of a series that moved" || !strings.Contains(acctest.Str(u["fix"]), "series_edit "+cowboyBebop.Title) {
 		t.Fatalf("the folder left behind = %v", u)
 	}
 
@@ -248,7 +250,7 @@ func TestJourneyFolderRenamed(t *testing.T) {
 
 	// Sonarr holds the series where it is now, with its files
 	got := call(t, "series_get", map[string]any{"series": cowboyBebop.Title})
-	if str(got["path"]) != "/tv/"+renamed || numOr0(got["episodes_have"]) != cowboyBebop.Files {
+	if acctest.Str(got["path"]) != "/tv/"+renamed || acctest.NumOr0(got["episodes_have"]) != cowboyBebop.Files {
 		t.Errorf("after the move = %v at %v", got["episodes_have"], got["path"])
 	}
 	if gone := findings(t, call(t, "audit_missing_files", nil), "series", cowboyBebop.Title); len(gone) != 0 {

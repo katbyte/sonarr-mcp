@@ -8,7 +8,8 @@ import (
 	"strings"
 
 	"github.com/katbyte/go-kt/version"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	apiclient "github.com/katbyte/pandorest/client"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -114,24 +115,27 @@ func registerServerTools(r *registry) {
 		NextExecution   string `json:"next_execution,omitempty"`
 	}
 	type tasksOut struct {
+		pageOut
 		Tasks []taskRow `json:"tasks"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "task_list",
 		Description: "Sonarr's scheduled tasks - RSS sync, refreshing series, checking downloads, backups, housekeeping - with when each last ran, how long it took, and when it runs next.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, tasksOut, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in pageIn) (*mcp.CallToolResult, tasksOut, error) {
 		res, err := client.GetSystemTask(ctx)
 		if err != nil {
 			return nil, tasksOut{}, err
 		}
-		out := tasksOut{}
+		rows := make([]taskRow, 0, len(res.Model))
 		for _, t := range res.Model {
-			out.Tasks = append(out.Tasks, taskRow{
+			rows = append(rows, taskRow{
 				Name: t.Name, Command: t.TaskName, IntervalMinutes: t.Interval,
 				LastExecution: t.LastExecution, LastDuration: t.LastDuration, NextExecution: t.NextExecution,
 			})
 		}
-		slices.SortFunc(out.Tasks, func(a, b taskRow) int { return strings.Compare(a.Name, b.Name) })
+		slices.SortFunc(rows, func(a, b taskRow) int { return strings.Compare(a.Name, b.Name) })
+		out := tasksOut{}
+		out.Tasks, out.pageOut = pageRows(rows, in)
 
 		return nil, out, nil
 	})
@@ -162,20 +166,37 @@ func registerServerTools(r *registry) {
 		return nil, commandOut{}, fmt.Errorf("no scheduled task %q (have: %s)", in.Task, strings.Join(known, ", "))
 	})
 
+	type commandsIn struct {
+		CommandID int `json:"command_id,omitempty" jsonschema:"only this command, by the command_id a tool that started it answered: how a search, refresh or rename still running when its wait ended is followed"`
+		pageIn
+	}
 	type commandsOut struct {
+		pageOut
 		Commands []commandOut `json:"commands" jsonschema:"running and queued first, then the recently finished"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "command_list",
-		Description: "What Sonarr is doing and has just done: the commands running, queued and recently finished - searches, refreshes, imports, renames - with their outcome and message.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, commandsOut, error) {
+		Description: "What Sonarr is doing and has just done: the commands running, queued and recently finished - searches, refreshes, imports, renames - with their outcome and message. Sonarr runs housekeeping of its own every minute, so follow a command a tool started by its command_id rather than looking for it in the list.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in commandsIn) (*mcp.CallToolResult, commandsOut, error) {
+		if in.CommandID != 0 {
+			one, err := client.GetCommandById(ctx, in.CommandID)
+			switch {
+			case apiclient.IsNotFound(err):
+				return nil, commandsOut{}, fmt.Errorf("sonarr has no command %d: it drops finished commands after a while, so check the id", in.CommandID)
+			case err != nil:
+				return nil, commandsOut{}, err
+			}
+			return nil, commandsOut{Total: 1, Commands: []commandOut{projectCommand(one.Model)}}, nil
+		}
+
 		res, err := client.GetCommand(ctx)
 		if err != nil {
 			return nil, commandsOut{}, err
 		}
-		out := commandsOut{}
-		for i := range res.Model {
-			out.Commands = append(out.Commands, projectCommand(&res.Model[i]))
+		commands, paged := pageRows(res.Model, in.pageIn)
+		out := commandsOut{pageOut: paged, Commands: make([]commandOut, 0, len(commands))}
+		for i := range commands {
+			out.Commands = append(out.Commands, projectCommand(&commands[i]))
 		}
 
 		return nil, out, nil
@@ -183,7 +204,7 @@ func registerServerTools(r *registry) {
 
 	type logIn struct {
 		Level string `json:"level,omitempty" jsonschema:"the least severe level to include: trace, debug, info, warn (default), error or fatal"`
-		Limit int    `json:"limit,omitempty" jsonschema:"entries to return, newest first, default 50"`
+		pageIn
 	}
 	type logRow struct {
 		Time      string `json:"time"`
@@ -193,8 +214,8 @@ func registerServerTools(r *registry) {
 		Exception string `json:"exception,omitempty" jsonschema:"the first line of the exception, when there was one"`
 	}
 	type logOut struct {
-		Total   int      `json:"total_at_level" jsonschema:"entries at this level and above in Sonarr's log table"`
-		Entries []logRow `json:"entries"`
+		pageOut
+		Entries []logRow `json:"entries" jsonschema:"newest first"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "log_list",
@@ -207,14 +228,21 @@ func registerServerTools(r *registry) {
 		if !slices.Contains(logLevels, level) {
 			return nil, logOut{}, fmt.Errorf("level must be one of %s, got %q", strings.Join(logLevels, ", "), in.Level)
 		}
-		res, err := client.GetLog(ctx, sonarr.GetLogOperationOptions{
-			Page: 1, PageSize: limitOr(in.Limit, 50), SortKey: "time", SortDirection: sonarr.SortDirectionDescending, Level: level,
+		// Sonarr pages its log table itself, and total is the entries at this
+		// level and above in it
+		records, paged, err := window(in.pageIn, func(page, size int) ([]sonarr.LogResource, int, error) {
+			res, err := client.GetLog(ctx, sonarr.GetLogOperationOptions{Page: new(page), PageSize: new(size), SortKey: "time", SortDirection: sonarr.SortDirectionDescending, Level: level})
+			if err != nil {
+				return nil, 0, err
+			}
+
+			return res.Model.Records, res.Model.TotalRecords, nil
 		})
 		if err != nil {
 			return nil, logOut{}, err
 		}
-		out := logOut{Total: res.Model.TotalRecords}
-		for _, e := range res.Model.Records {
+		out := logOut{pageOut: paged, Entries: make([]logRow, 0, len(records))}
+		for _, e := range records {
 			out.Entries = append(out.Entries, logRow{
 				Time: e.Time, Level: e.Level, Logger: e.Logger, Message: e.Message, Exception: firstLine(e.Exception),
 			})

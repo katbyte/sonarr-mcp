@@ -15,10 +15,32 @@ github.com/gookit/color
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/katbyte/go-kt v0.2.0
+# github.com/katbyte/go-kt v0.6.0
 ## explicit; go 1.26
+github.com/katbyte/go-kt/chttp
 github.com/katbyte/go-kt/clog
+github.com/katbyte/go-kt/lock
+github.com/katbyte/go-kt/mcp/acctest
+github.com/katbyte/go-kt/mcp/registry
+github.com/katbyte/go-kt/mcp/server
+github.com/katbyte/go-kt/test/env
+github.com/katbyte/go-kt/test/replayproxy
+github.com/katbyte/go-kt/test/services/arrserver
+github.com/katbyte/go-kt/test/services/newznab
+github.com/katbyte/go-kt/test/services/sabnzbd
 github.com/katbyte/go-kt/version
+# github.com/katbyte/pandorest v0.3.2
+## explicit; go 1.27.0
+github.com/katbyte/pandorest
+github.com/katbyte/pandorest/client
+github.com/katbyte/pandorest/config
+github.com/katbyte/pandorest/definitions
+github.com/katbyte/pandorest/differ
+github.com/katbyte/pandorest/generator
+github.com/katbyte/pandorest/importer
+github.com/katbyte/pandorest/importer/workarounds
+github.com/katbyte/pandorest/openapi
+github.com/katbyte/pandorest/sweep
 # github.com/modelcontextprotocol/go-sdk v1.8.0
 ## explicit; go 1.25.0
 github.com/modelcontextprotocol/go-sdk/auth

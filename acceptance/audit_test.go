@@ -10,7 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/go-kt/mcp/acctest"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 // The audits against the library as seeded: each finds what its fixture
@@ -24,8 +25,8 @@ func audit(t *testing.T, name string, args map[string]any) map[string]any {
 	t.Helper()
 
 	out := call(t, name, args)
-	for _, f := range rowsOf(out["findings"]) {
-		t.Logf("%s: %s | %s | %s | %s", name, str(f["series"]), str(f["subject"]), str(f["problem"]), str(f["detail"]))
+	for _, f := range acctest.RowsOf(out["findings"]) {
+		t.Logf("%s: %s | %s | %s | %s", name, acctest.Str(f["series"]), acctest.Str(f["subject"]), acctest.Str(f["problem"]), acctest.Str(f["detail"]))
 	}
 
 	return out
@@ -58,7 +59,7 @@ func TestAuditMissingEpisodes(t *testing.T) {
 	// Firefly holds E01-E06 of fourteen: the rest of the season is missing,
 	// which is a gap, not a whole season
 	f := only(t, out, "series", firefly.Title, "subject", "season 1")
-	if str(f["problem"]) != "episodes missing" || !strings.Contains(str(f["detail"]), "8 missing: S01E07") {
+	if acctest.Str(f["problem"]) != "episodes missing" || !strings.Contains(acctest.Str(f["detail"]), "8 missing: S01E07") {
 		t.Errorf("Firefly = %v", f)
 	}
 	// Breaking Bad has no files, so its seasons are missing whole
@@ -69,13 +70,13 @@ func TestAuditMissingEpisodes(t *testing.T) {
 	// unmonitored, so neither is missing anything
 	none(t, out, "series", chernobyl.Title)
 	none(t, out, "subject", "season 0")
-	if num(t, out["total_findings"], "total_findings") != len(rows(t, out["findings"], "findings")) {
+	if acctest.Num(t, out["total_findings"], "total_findings") != len(acctest.Rows(t, out["findings"], "findings")) {
 		t.Error("total_findings disagrees with the findings under the default limit")
 	}
 
 	// one series, and the limit caps the list but not the count
 	one := audit(t, "audit_missing_episodes", map[string]any{"series": breakingBad.Title, "limit": 2})
-	if len(rows(t, one["findings"], "findings")) != 2 || num(t, one["total_findings"], "total_findings") < 5 {
+	if len(acctest.Rows(t, one["findings"], "findings")) != 2 || acctest.Num(t, one["total_findings"], "total_findings") < 5 {
 		t.Errorf("limit 2 of Breaking Bad = %v", one)
 	}
 	none(t, one, "series", firefly.Title)
@@ -87,7 +88,7 @@ func TestAuditCutoffUnmet(t *testing.T) {
 	// E04's video is 360p and E06 is SDTV: both below HD-1080p's cutoff
 	f := only(t, out, "series", firefly.Title)
 	for _, want := range []string{"2 below HD-1080p", "S01E04 SDTV", "S01E06 SDTV"} {
-		if !strings.Contains(str(f["detail"]), want) {
+		if !strings.Contains(acctest.Str(f["detail"]), want) {
 			t.Errorf("Firefly detail %q lacks %q", f["detail"], want)
 		}
 	}
@@ -100,11 +101,11 @@ func TestAuditUnmappedFolders(t *testing.T) {
 	out := audit(t, "audit_unmapped_folders", nil)
 
 	f := only(t, out, "subject", "/tv/"+theExpanse.Folder)
-	if str(f["problem"]) != "folder not in Sonarr" || !strings.Contains(str(f["fix"]), "series_import") {
+	if acctest.Str(f["problem"]) != "folder not in Sonarr" || !strings.Contains(acctest.Str(f["fix"]), "series_import") {
 		t.Errorf("The Expanse = %v", f)
 	}
 	// what is in it, so a model can tell a show from an empty folder
-	if !strings.Contains(str(f["detail"]), strconv.Itoa(theExpanse.Files)+" video files") {
+	if !strings.Contains(acctest.Str(f["detail"]), strconv.Itoa(theExpanse.Files)+" video files") {
 		t.Errorf("The Expanse detail = %v", f["detail"])
 	}
 	// a series' own folder is mapped
@@ -115,10 +116,10 @@ func TestAuditUnmappedFolders(t *testing.T) {
 func TestAuditMissingFolders(t *testing.T) {
 	out := audit(t, "audit_missing_folders", nil)
 
-	if n := num(t, out["total_findings"], "total_findings"); n != 0 {
+	if n := acctest.Num(t, out["total_findings"], "total_findings"); n != 0 {
 		t.Errorf("audit_missing_folders found %d, want none", n)
 	}
-	if n := num(t, out["scanned"], "scanned"); n < len(importedSeed) {
+	if n := acctest.Num(t, out["scanned"], "scanned"); n < len(importedSeed) {
 		t.Errorf("audit_missing_folders scanned %d series", n)
 	}
 
@@ -135,8 +136,8 @@ func TestAuditMissingFolders(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := only(t, gone, "series", chernobyl.Title)
-	if str(f["problem"]) != "series folder missing" || !strings.Contains(str(f["detail"]), "records 5 files there") ||
-		!strings.Contains(str(f["fix"]), "series_edit path") {
+	if acctest.Str(f["problem"]) != "series folder missing" || !strings.Contains(acctest.Str(f["detail"]), "records 5 files there") ||
+		!strings.Contains(acctest.Str(f["fix"]), "series_edit path") {
 		t.Errorf("the folder that went = %v", f)
 	}
 }
@@ -146,7 +147,7 @@ func TestAuditNaming(t *testing.T) {
 
 	// Chernobyl's files carry their scene names
 	f := only(t, out, "series", chernobyl.Title)
-	if !strings.Contains(str(f["detail"]), "5 of 5 files") || !strings.Contains(str(f["detail"]), "Chernobyl.S01E0") {
+	if !strings.Contains(acctest.Str(f["detail"]), "5 of 5 files") || !strings.Contains(acctest.Str(f["detail"]), "Chernobyl.S01E0") {
 		t.Errorf("Chernobyl = %v", f)
 	}
 	// Severance's are named to the format already
@@ -163,10 +164,10 @@ func TestAuditNaming(t *testing.T) {
 		}
 	})
 	off := audit(t, "audit_naming", nil)
-	if f := only(t, off, "problem", "renaming is off"); !strings.Contains(str(f["fix"]), "Rename Episodes") {
+	if f := only(t, off, "problem", "renaming is off"); !strings.Contains(acctest.Str(f["fix"]), "Rename Episodes") {
 		t.Errorf("renaming off = %v", f)
 	}
-	if n := num(t, off["total_findings"], "total_findings"); n != 1 {
+	if n := acctest.Num(t, off["total_findings"], "total_findings"); n != 1 {
 		t.Errorf("renaming off found %d, want the one", n)
 	}
 	// and series_rename will not pretend there is nothing to do
@@ -179,7 +180,7 @@ func TestAuditMonitoring(t *testing.T) {
 	out := audit(t, "audit_monitoring", nil)
 
 	f := only(t, out, "series", severance.Title)
-	if str(f["problem"]) != "new seasons will not be monitored" || !strings.Contains(str(f["fix"]), "monitor_new_items all") {
+	if acctest.Str(f["problem"]) != "new seasons will not be monitored" || !strings.Contains(acctest.Str(f["fix"]), "monitor_new_items all") {
 		t.Errorf("Severance = %v", f)
 	}
 	// the ended series have no new seasons to miss
@@ -191,8 +192,8 @@ func TestAuditMonitoring(t *testing.T) {
 	call(t, "series_edit", map[string]any{"series": severance.Title, "monitored": false})
 	t.Cleanup(func() { call(t, "series_edit", map[string]any{"series": severance.Title, "monitored": true}) })
 	off := audit(t, "audit_monitoring", nil)
-	if f := only(t, off, "series", severance.Title); str(f["problem"]) != "continuing series not monitored" ||
-		!strings.Contains(str(f["fix"]), "series_edit monitored true") {
+	if f := only(t, off, "series", severance.Title); acctest.Str(f["problem"]) != "continuing series not monitored" ||
+		!strings.Contains(acctest.Str(f["fix"]), "series_edit monitored true") {
 		t.Errorf("Severance unmonitored = %v", f)
 	}
 	call(t, "series_edit", map[string]any{"series": severance.Title, "monitored": true})
@@ -200,8 +201,8 @@ func TestAuditMonitoring(t *testing.T) {
 	// and a monitored series with every season turned off searches for
 	// nothing, which no other finding would say
 	var seasons []any
-	for _, s := range rows(t, call(t, "series_get", map[string]any{"series": severance.Title})["seasons"], "seasons") {
-		if n := num(t, s["season"], "season"); n > 0 {
+	for _, s := range acctest.Rows(t, call(t, "series_get", map[string]any{"series": severance.Title})["seasons"], "seasons") {
+		if n := acctest.Num(t, s["season"], "season"); n > 0 {
 			seasons = append(seasons, n)
 		}
 	}
@@ -210,8 +211,8 @@ func TestAuditMonitoring(t *testing.T) {
 		call(t, "season_monitor", map[string]any{"series": severance.Title, "seasons": seasons, "monitored": true})
 	})
 	none := audit(t, "audit_monitoring", nil)
-	if f := only(t, none, "series", severance.Title); str(f["problem"]) != "nothing monitored" ||
-		!strings.Contains(str(f["fix"]), "season_monitor") {
+	if f := only(t, none, "series", severance.Title); acctest.Str(f["problem"]) != "nothing monitored" ||
+		!strings.Contains(acctest.Str(f["fix"]), "season_monitor") {
 		t.Errorf("Severance with no season monitored = %v", f)
 	}
 }
@@ -220,11 +221,11 @@ func TestAuditSeriesSettings(t *testing.T) {
 	out := audit(t, "audit_series_settings", nil)
 
 	anime := only(t, out, "series", cowboyBebop.Title)
-	if str(anime["problem"]) != "anime not typed anime" || !strings.Contains(str(anime["fix"]), "series_type anime") {
+	if acctest.Str(anime["problem"]) != "anime not typed anime" || !strings.Contains(acctest.Str(anime["fix"]), "series_type anime") {
 		t.Errorf("Cowboy Bebop = %v", anime)
 	}
 	folder := only(t, out, "series", chernobyl.Title)
-	if str(folder["problem"]) != "folder not named to the format" || !strings.Contains(str(folder["detail"]), `"Chernobyl"`) {
+	if acctest.Str(folder["problem"]) != "folder not named to the format" || !strings.Contains(acctest.Str(folder["detail"]), `"Chernobyl"`) {
 		t.Errorf("Chernobyl = %v", folder)
 	}
 	none(t, out, "series", firefly.Title)
@@ -240,7 +241,7 @@ func TestAuditProfiles(t *testing.T) {
 		t.Error("no unused quality profile reported; Sonarr's other defaults are all unused")
 	}
 	tag := only(t, out, "subject", unusedTag)
-	if str(tag["problem"]) != "tag unused" || str(tag["fix"]) != "tag_delete "+unusedTag {
+	if acctest.Str(tag["problem"]) != "tag unused" || acctest.Str(tag["fix"]) != "tag_delete "+unusedTag {
 		t.Errorf("the unused tag = %v", tag)
 	}
 	// anime is on Cowboy Bebop
@@ -259,7 +260,7 @@ func TestAuditProfiles(t *testing.T) {
 	call(t, "tag_create", map[string]any{"label": scopingTag})
 	// the test deletes it as the fix; the cleanup is for a run that stops first
 	t.Cleanup(func() { _, _ = invoke("tag_delete", map[string]any{"label": scopingTag}) })
-	tagID := num(t, findRow(t, rows(t, call(t, "tag_list", nil)["tags"], "tags"), "label", scopingTag)["id"], "id")
+	tagID := acctest.Num(t, findRow(t, acctest.Rows(t, call(t, "tag_list", nil)["tags"], "tags"), "label", scopingTag)["id"], "id")
 	indexers, err := api.GetIndexer(ctx)
 	if err != nil || len(indexers.Model) == 0 {
 		t.Fatalf("reading the indexers: %v", err)
@@ -275,11 +276,11 @@ func TestAuditProfiles(t *testing.T) {
 	})
 
 	again := audit(t, "audit_profiles", nil)
-	if f := only(t, again, "subject", "Test switched off"); str(f["problem"]) != "release profile disabled" {
+	if f := only(t, again, "subject", "Test switched off"); acctest.Str(f["problem"]) != "release profile disabled" {
 		t.Errorf("the disabled release profile = %v", f)
 	}
 	scoped := only(t, again, "subject", scopingTag)
-	if str(scoped["problem"]) != "tag scopes settings but no series" || !strings.Contains(str(scoped["detail"]), "indexer") {
+	if acctest.Str(scoped["problem"]) != "tag scopes settings but no series" || !strings.Contains(acctest.Str(scoped["detail"]), "indexer") {
 		t.Errorf("the tag that scopes an indexer = %v", scoped)
 	}
 
@@ -299,7 +300,7 @@ func TestAuditRuntime(t *testing.T) {
 	out := audit(t, "audit_runtime", nil)
 
 	f := only(t, out, "series", firefly.Title)
-	if !strings.HasPrefix(str(f["subject"]), "S01E05 ") || str(f["problem"]) != "shorter than it should be" || !strings.Contains(str(f["detail"]), "runs 5 minutes") {
+	if !strings.HasPrefix(acctest.Str(f["subject"]), "S01E05 ") || acctest.Str(f["problem"]) != "shorter than it should be" || !strings.Contains(acctest.Str(f["detail"]), "runs 5 minutes") {
 		t.Errorf("Firefly E05 = %v", f)
 	}
 
@@ -313,7 +314,7 @@ func TestAuditLanguage(t *testing.T) {
 
 	// E05 is the German dub, with a German audio track
 	f := only(t, out, "series", chernobyl.Title)
-	if !strings.HasPrefix(str(f["subject"]), "S01E05 ") || str(f["problem"]) != "no audio in the language" || !strings.Contains(str(f["detail"]), "ger") {
+	if !strings.HasPrefix(acctest.Str(f["subject"]), "S01E05 ") || acctest.Str(f["problem"]) != "no audio in the language" || !strings.Contains(acctest.Str(f["detail"]), "ger") {
 		t.Errorf("Chernobyl E05 = %v", f)
 	}
 	// Cowboy Bebop is in its original Japanese
@@ -354,7 +355,7 @@ func TestAuditQualityMismatch(t *testing.T) {
 
 	out := audit(t, "audit_quality_mismatch", map[string]any{"series": firefly.Title})
 	f := only(t, out, "series", firefly.Title)
-	if str(f["problem"]) != "labelled better than it is" || !strings.Contains(str(f["detail"]), "640x360") || !strings.Contains(str(f["fix"]), "file_edit file "+strconv.Itoa(e04)) {
+	if acctest.Str(f["problem"]) != "labelled better than it is" || !strings.Contains(acctest.Str(f["detail"]), "640x360") || !strings.Contains(acctest.Str(f["fix"]), "file_edit file "+strconv.Itoa(e04)) {
 		t.Errorf("E04 recorded as 1080p = %v", f)
 	}
 
@@ -364,7 +365,7 @@ func TestAuditQualityMismatch(t *testing.T) {
 	call(t, "file_edit", map[string]any{"file_ids": []any{e01}, "quality": "SDTV"})
 	t.Cleanup(func() { call(t, "file_edit", map[string]any{"file_ids": []any{e01}, "quality": "WEBDL-1080p"}) })
 	worse := only(t, audit(t, "audit_quality_mismatch", map[string]any{"series": firefly.Title}), "problem", "labelled worse than it is")
-	if !strings.Contains(str(worse["detail"]), "1920x1080") || !strings.Contains(str(worse["fix"]), "stops trying to upgrade") {
+	if !strings.Contains(acctest.Str(worse["detail"]), "1920x1080") || !strings.Contains(acctest.Str(worse["fix"]), "stops trying to upgrade") {
 		t.Errorf("E01 recorded as SDTV = %v", worse)
 	}
 }
@@ -398,22 +399,22 @@ func TestAuditUntrackedAndMissingFiles(t *testing.T) {
 
 	untracked := audit(t, "audit_untracked_files", map[string]any{"series": firefly.Title})
 	ready := only(t, untracked, "subject", "Season 1/Firefly.S01E07")
-	if str(ready["problem"]) != "not imported" || !strings.Contains(str(ready["detail"]), "S01E07") {
+	if acctest.Str(ready["problem"]) != "not imported" || !strings.Contains(acctest.Str(ready["detail"]), "S01E07") {
 		t.Errorf("the dropped file = %v", ready)
 	}
 	odd := only(t, untracked, "subject", "Season 1/bonus footage.mkv")
-	if str(odd["problem"]) != "cannot tell which episode" {
+	if acctest.Str(odd["problem"]) != "cannot tell which episode" {
 		t.Errorf("the unnamed file = %v", odd)
 	}
 	spare := only(t, untracked, "subject", "Season 1/Firefly.S01E01")
-	if str(spare["problem"]) != "rejected" || !strings.Contains(str(spare["detail"]), "Sonarr says:") ||
-		!strings.Contains(str(spare["fix"]), "import_apply to import it anyway") {
+	if acctest.Str(spare["problem"]) != "rejected" || !strings.Contains(acctest.Str(spare["detail"]), "Sonarr says:") ||
+		!strings.Contains(acctest.Str(spare["fix"]), "import_apply to import it anyway") {
 		t.Errorf("the worse copy = %v", spare)
 	}
 
 	missing := audit(t, "audit_missing_files", map[string]any{"series": firefly.Title})
 	gone := only(t, missing, "problem", "files gone from disk")
-	if !strings.Contains(str(gone["detail"]), "S01E03") {
+	if !strings.Contains(acctest.Str(gone["detail"]), "S01E03") {
 		t.Errorf("the deleted file = %v", gone)
 	}
 
@@ -424,9 +425,9 @@ func TestAuditUntrackedAndMissingFiles(t *testing.T) {
 		return len(findings(t, out, "subject", "Season 1/Firefly.S01E07")) == 0
 	})
 	t.Cleanup(func() {
-		for _, f := range rowsOf(call(t, "file_list", map[string]any{"series": firefly.Title, "season": 1})["files"]) {
-			if str(f["episodes"]) == "S01E07" {
-				call(t, "file_delete", map[string]any{"file_ids": []any{numOr0(f["id"])}})
+		for _, f := range acctest.RowsOf(call(t, "file_list", map[string]any{"series": firefly.Title, "season": 1})["files"]) {
+			if acctest.Str(f["episodes"]) == "S01E07" {
+				call(t, "file_delete", map[string]any{"file_ids": []any{acctest.NumOr0(f["id"])}, "confirm": true})
 			}
 		}
 	})
@@ -442,7 +443,7 @@ func TestAuditUntrackedAndMissingFiles(t *testing.T) {
 	if err := os.Rename(aside, filepath.Join(bebop, "Season 1")); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(str(empty["detail"]), "records 2 files") || !strings.Contains(str(empty["fix"]), "series_rescan") {
+	if !strings.Contains(acctest.Str(empty["detail"]), "records 2 files") || !strings.Contains(acctest.Str(empty["fix"]), "series_rescan") {
 		t.Errorf("the empty folder = %v", empty)
 	}
 
@@ -452,7 +453,7 @@ func TestAuditUntrackedAndMissingFiles(t *testing.T) {
 	if n := len(findings(t, all, "series", firefly.Title)); n != 2 {
 		t.Errorf("library-wide untracked for Firefly = %d, want 2", n)
 	}
-	if n := len(rowsOf(all["findings"])); n != 2 {
+	if n := len(acctest.RowsOf(all["findings"])); n != 2 {
 		t.Errorf("library-wide untracked = %d findings, want Firefly's 2", n)
 	}
 }
@@ -464,14 +465,14 @@ func TestAuditHealth(t *testing.T) {
 	// test's back, and Sonarr rightly calls that an error: with no indexer
 	// on RSS it grabs nothing new on its own. Nothing else is wrong
 	rss := only(t, out, "subject", "IndexerRssCheck")
-	if str(rss["problem"]) != "health error" || !strings.HasPrefix(str(rss["fix"]), "see https://wiki.servarr.com/") {
+	if acctest.Str(rss["problem"]) != "health error" || !strings.HasPrefix(acctest.Str(rss["fix"]), "see https://wiki.servarr.com/") {
 		t.Errorf("the RSS check = %v", rss)
 	}
 	if errs := findings(t, out, "problem", "health error"); len(errs) != 1 {
 		t.Errorf("health errors = %v, want only the RSS one", errs)
 	}
 	none(t, out, "problem", "root folder unreachable")
-	if num(t, out["scanned"], "scanned") < 1 {
+	if acctest.Num(t, out["scanned"], "scanned") < 1 {
 		t.Errorf("scanned = %v, want at least the root folder", out["scanned"])
 	}
 }
@@ -481,14 +482,14 @@ func TestAuditHealth(t *testing.T) {
 func TestAuditAll(t *testing.T) {
 	out := call(t, "audit_all", nil)
 
-	auditRows := rows(t, out["audits"], "audits")
+	auditRows := acctest.Rows(t, out["audits"], "audits")
 	names := make([]string, 0, len(auditRows))
 	total := 0
 	for _, row := range auditRows {
-		names = append(names, str(row["audit"]))
-		total += num(t, row["findings"], "findings")
+		names = append(names, acctest.Str(row["audit"]))
+		total += acctest.Num(t, row["findings"], "findings")
 	}
-	if total != num(t, out["total_findings"], "total_findings") {
+	if total != acctest.Num(t, out["total_findings"], "total_findings") {
 		t.Errorf("rows add to %d, total_findings says %v", total, out["total_findings"])
 	}
 	// every audit tool is in the overview
@@ -500,18 +501,18 @@ func TestAuditAll(t *testing.T) {
 	for _, name := range []string{"audit_missing_episodes", "audit_naming", "audit_runtime", "audit_language"} {
 		row := findRow(t, auditRows, "audit", name)
 		own := call(t, name, nil)
-		if num(t, row["findings"], name) != num(t, own["total_findings"], name) {
+		if acctest.Num(t, row["findings"], name) != acctest.Num(t, own["total_findings"], name) {
 			t.Errorf("audit_all says %s has %v, the audit says %v", name, row["findings"], own["total_findings"])
 		}
 	}
 
 	// and for one series, only that series
 	one := call(t, "audit_all", map[string]any{"series": chernobyl.Title})
-	if num(t, one["series"], "series") != 1 {
+	if acctest.Num(t, one["series"], "series") != 1 {
 		t.Errorf("audit_all for Chernobyl covered %v series", one["series"])
 	}
-	for _, row := range rows(t, one["audits"], "audits") {
-		if str(row["audit"]) == "audit_missing_episodes" && num(t, row["findings"], "findings") != 0 {
+	for _, row := range acctest.Rows(t, one["audits"], "audits") {
+		if acctest.Str(row["audit"]) == "audit_missing_episodes" && acctest.Num(t, row["findings"], "findings") != 0 {
 			t.Errorf("Chernobyl is complete, but audit_all counts %v missing", row["findings"])
 		}
 	}
@@ -522,9 +523,9 @@ func fireflyFile(t *testing.T, episode int) int {
 	t.Helper()
 
 	out := call(t, "file_list", map[string]any{"series": firefly.Title, "season": 1})
-	f := findRow(t, rows(t, out["files"], "files"), "episodes", episodeName(1, episode))
+	f := findRow(t, acctest.Rows(t, out["files"], "files"), "episodes", episodeName(1, episode))
 
-	return num(t, f["id"], "id")
+	return acctest.Num(t, f["id"], "id")
 }
 
 // fireflyPath is where Sonarr records Firefly's file for an episode of
@@ -533,9 +534,9 @@ func fireflyPath(t *testing.T, episode int) string {
 	t.Helper()
 
 	out := call(t, "file_list", map[string]any{"series": firefly.Title, "season": 1})
-	f := findRow(t, rows(t, out["files"], "files"), "episodes", episodeName(1, episode))
+	f := findRow(t, acctest.Rows(t, out["files"], "files"), "episodes", episodeName(1, episode))
 
-	return str(out["path"]) + "/" + str(f["relative_path"])
+	return acctest.Str(out["path"]) + "/" + acctest.Str(f["relative_path"])
 }
 
 func episodeName(season, episode int) string {
@@ -555,7 +556,7 @@ func toolNames(t *testing.T) []string {
 	t.Helper()
 
 	skipUnlessReady(t)
-	res, err := session.ListTools(ctx, nil)
+	res, err := suite.Session.ListTools(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

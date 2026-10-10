@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -8,10 +9,11 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 // ago is a time that far in the past, as Sonarr writes one.
@@ -277,19 +279,171 @@ func TestFileDeleteChecksEveryFileFirst(t *testing.T) {
 	f := newFakeServer(t)
 	f.answer(t, "GET /api/v3/episodefile/7", map[string]any{"id": 7, "path": "/tv/Firefly/Season 1/Firefly - S01E01.mkv"})
 	f.answerStatus(t, "GET /api/v3/episodefile/8", http.StatusNotFound, map[string]any{"message": "NotFound"})
+	f.answer(t, "GET /api/v3/episode", []any{})
 	f.mux.HandleFunc("DELETE /api/v3/episodefile/{id}", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	cs := session(t, f, Options{EnableDelete: true})
 
-	if msg := mustFail(t, cs, "file_delete", map[string]any{"file_ids": []any{7, 8}}); !strings.Contains(msg, "no episode file 8") {
+	if msg := mustFail(t, cs, "file_delete", map[string]any{"file_ids": []any{7, 8}, "confirm": true}); !strings.Contains(msg, "no episode file 8") {
 		t.Errorf("the refusal = %q", msg)
 	}
 	if deleted := f.sent(http.MethodDelete, "/api/v3/episodefile/7"); len(deleted) != 0 {
 		t.Error("file 7 was deleted though file 8 does not exist")
 	}
 
-	out := mustCall(t, cs, "file_delete", map[string]any{"file_ids": []any{7}})
+	out := mustCall(t, cs, "file_delete", map[string]any{"file_ids": []any{7}, "confirm": true})
 	if got := strs(out["deleted"]); !slices.Equal(got, []string{"/tv/Firefly/Season 1/Firefly - S01E01.mkv"}) {
 		t.Errorf("deleted = %v", got)
+	}
+}
+
+// A file can hold two episodes, and Sonarr downloads again what it still
+// monitors: the answer names every episode a file takes with it, and warns of
+// the ones that would come back, before anything is deleted and after. With
+// Sonarr set to unmonitor what is deleted it says that instead.
+func TestFileDeleteNamesEveryEpisodeAndWarns(t *testing.T) {
+	t.Parallel()
+
+	var unmonitors atomic.Bool
+	f := newFakeServer(t)
+	f.answer(t, "GET /api/v3/episodefile/7", map[string]any{"id": 7, "seriesId": 1, "seasonNumber": 1, "size": 1 << 30, "path": "/tv/Firefly/Season 1/Firefly - S01E01-E02.mkv"})
+	f.answer(t, "GET /api/v3/episodefile/9", map[string]any{"id": 9, "seriesId": 1, "seasonNumber": 1, "size": 1 << 29, "path": "/tv/Firefly/Season 1/Firefly - S01E03.mkv"})
+	f.answer(t, "GET /api/v3/episode", []any{
+		map[string]any{"id": 11, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 1, "episodeFileId": 7, "monitored": true},
+		map[string]any{"id": 12, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 2, "episodeFileId": 7, "monitored": false},
+		map[string]any{"id": 13, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 3, "episodeFileId": 9, "monitored": false},
+		map[string]any{"id": 14, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 4, "monitored": true},
+	})
+	f.mux.HandleFunc("GET /api/v3/config/mediamanagement", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(t, w, map[string]any{"id": 1, "autoUnmonitorPreviouslyDownloadedEpisodes": unmonitors.Load()})
+	})
+	f.mux.HandleFunc("DELETE /api/v3/episodefile/{id}", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	cs := session(t, f, Options{EnableDelete: true})
+
+	would := mustCall(t, cs, "file_delete", map[string]any{"file_ids": []any{7, 9}})
+	files := rowsOf(would["files"])
+	if len(files) != 2 || text(files[0]["episodes"]) != "S01E01-E02" || !flag(files[0]["monitored"]) || text(files[0]["size"]) == "" {
+		t.Fatalf("the file of two episodes = %v", would["files"])
+	}
+	if text(files[1]["episodes"]) != "S01E03" || flag(files[1]["monitored"]) {
+		t.Errorf("the file of an unmonitored episode = %v", files[1])
+	}
+	if w := text(would["warning"]); !strings.Contains(w, "S01E01") || strings.Contains(w, "S01E02") || strings.Contains(w, "S01E04") || !strings.Contains(w, "episode_monitor") {
+		t.Errorf("the warning = %q, want the one monitored episode on these files and how to stop it coming back", w)
+	}
+
+	// nothing on the file is monitored: nothing to warn of, and the setting
+	// is not asked for
+	asked := len(f.requests("/api/v3/config/mediamanagement"))
+	if quiet := mustCall(t, cs, "file_delete", map[string]any{"file_ids": []any{9}}); text(quiet["warning"]) != "" || len(f.requests("/api/v3/config/mediamanagement")) != asked {
+		t.Errorf("a file of unmonitored episodes = %v", quiet)
+	}
+
+	done := mustCall(t, cs, "file_delete", map[string]any{"file_ids": []any{7}, "confirm": true})
+	if !strings.Contains(text(done["warning"]), "S01E01") || len(strs(done["deleted"])) != 1 || len(rowsOf(done["files"])) != 1 {
+		t.Errorf("the confirmed delete = %v", done)
+	}
+
+	// Sonarr set to unmonitor what is deleted changes the episode's flag
+	// instead, which is said too
+	unmonitors.Store(true)
+	set := mustCall(t, cs, "file_delete", map[string]any{"file_ids": []any{7}})
+	if w := text(set["warning"]); !strings.Contains(w, "stops monitoring S01E01") || strings.Contains(w, "downloads them again once") || !flag(rowsOf(set["files"])[0]["monitored"]) {
+		t.Errorf("with Sonarr unmonitoring what is deleted = %v", set)
+	}
+}
+
+// A season's flag is not a count of its episodes: episode_monitor leaves it
+// be, so a season can say unmonitored with monitored episodes in it. Asked to
+// unmonitor that season, the tool unmonitors those episodes rather than
+// finding nothing to do, and sends the series only when a flag of its own
+// changes.
+func TestSeasonMonitorSetsEpisodesTheFlagMissed(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	firefly := map[string]any{
+		"id": 1, "title": "Firefly", "year": 2002, "tvdbId": 78874, "monitored": true,
+		"seasons": []any{map[string]any{"seasonNumber": 0, "monitored": false}, map[string]any{"seasonNumber": 1, "monitored": false}, map[string]any{"seasonNumber": 2, "monitored": true}},
+	}
+	f.answer(t, "GET /api/v3/series", []any{firefly})
+	f.answer(t, "GET /api/v3/series/1", firefly)
+	f.answer(t, "GET /api/v3/episode", []any{
+		map[string]any{"id": 11, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 1, "monitored": true},
+		map[string]any{"id": 12, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 2, "monitored": false},
+		map[string]any{"id": 13, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 3, "monitored": true},
+		map[string]any{"id": 21, "seriesId": 1, "seasonNumber": 2, "episodeNumber": 1, "monitored": true},
+	})
+	f.mux.HandleFunc("PUT /api/v3/episode/monitor", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		writeJSON(t, w, []any{})
+	})
+	f.mux.HandleFunc("PUT /api/v3/series/1", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		writeJSON(t, w, firefly)
+	})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "season_monitor", map[string]any{"series": "Firefly", "seasons": []any{1}, "monitored": false})
+	if changed := strs(out["changed"]); len(changed) != 1 || !strings.Contains(changed[0], "season 1: 2 episodes monitored false") {
+		t.Errorf("changed = %v, want the two episodes the season's flag missed", changed)
+	}
+	sent := f.sent(http.MethodPut, "/api/v3/episode/monitor")
+	if len(sent) != 1 || !strings.Contains(sent[0], `"episodeIds":[11,13]`) || !strings.Contains(sent[0], `"monitored":false`) {
+		t.Errorf("the episodes sent = %v, want 11 and 13 unmonitored", sent)
+	}
+	if series := f.sent(http.MethodPut, "/api/v3/series/1"); len(series) != 0 {
+		t.Errorf("the series was sent though none of its flags changed: %v", series)
+	}
+
+	// a season with nothing left to change is still nothing to do
+	if out := mustCall(t, cs, "season_monitor", map[string]any{"series": "Firefly", "seasons": []any{0}, "monitored": false}); len(strs(out["changed"])) != 0 || len(f.sent(http.MethodPut, "/api/v3/episode/monitor")) != 1 {
+		t.Errorf("a season already as asked, episodes and all = %v", out)
+	}
+
+	// monitoring a season already monitored, with nothing in it to set, sends
+	// nothing either
+	if out := mustCall(t, cs, "season_monitor", map[string]any{"series": "Firefly", "seasons": []any{2}, "monitored": true}); len(strs(out["changed"])) != 0 || len(f.sent(http.MethodPut, "/api/v3/series/1")) != 0 {
+		t.Errorf("a monitored season of a monitored series = %v", out)
+	}
+
+	// a season the series does not have is refused, naming the ones it has
+	if msg := mustFail(t, cs, "season_monitor", map[string]any{"series": "Firefly", "seasons": []any{7}, "monitored": false}); !strings.Contains(msg, "no season 7") || !strings.Contains(msg, "0, 1, 2") {
+		t.Errorf("the refusal = %q", msg)
+	}
+	if msg := mustFail(t, cs, "season_search", map[string]any{"series": "Firefly", "season": 7}); !strings.Contains(msg, "no season 7") || !strings.Contains(msg, "0, 1, 2") {
+		t.Errorf("the search's refusal = %q", msg)
+	}
+}
+
+// Monitoring a season of a series that is not monitored does nothing unless
+// the series follows, whether or not the season's own flag had to change.
+func TestSeasonMonitorTurnsTheSeriesOn(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	firefly := map[string]any{"id": 1, "title": "Firefly", "year": 2002, "tvdbId": 78874, "monitored": false, "seasons": []any{map[string]any{"seasonNumber": 1, "monitored": true}}}
+	f.answer(t, "GET /api/v3/series", []any{firefly})
+	f.answer(t, "GET /api/v3/series/1", firefly)
+	f.answer(t, "GET /api/v3/episode", []any{map[string]any{"id": 11, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 1, "monitored": true}})
+	f.mux.HandleFunc("PUT /api/v3/series/1", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		writeJSON(t, w, firefly)
+	})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "season_monitor", map[string]any{"series": "Firefly", "seasons": []any{1}, "monitored": true})
+	if changed := strs(out["changed"]); !slices.Equal(changed, []string{"series: monitored true"}) {
+		t.Errorf("changed = %v, want the series turned on", changed)
+	}
+	sent := f.sent(http.MethodPut, "/api/v3/series/1")
+	if len(sent) != 1 {
+		t.Fatalf("the series was sent %d times, want once", len(sent))
+	}
+	var body struct {
+		Monitored bool `json:"monitored"`
+	}
+	if err := json.Unmarshal([]byte(sent[0]), &body); err != nil || !body.Monitored {
+		t.Errorf("the series sent = %s (%v), want it monitored", sent[0], err)
 	}
 }
 
@@ -656,6 +810,46 @@ func TestFindingKindsAreRegistered(t *testing.T) {
 		}
 		for _, m := range inline.FindAllStringSubmatch(string(src), -1) {
 			t.Errorf("%s: a finding's problem is written as %q; name it as a problem constant and list it in AuditProblems", file, m[1])
+		}
+	}
+}
+
+// One audit that cannot run does not take the others' counts with it, and
+// its own is left out rather than read as none: audit_all names it, says
+// why, and counts the rest.
+func TestAuditAllKeepsWhatRanAndNamesWhatDidNot(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f)
+	f.answerStatus(t, "GET /api/v3/health", http.StatusInternalServerError, map[string]any{"message": "the checks are not ready"})
+	f.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		switch p := strings.TrimPrefix(r.URL.Path, "/api/v3/"); {
+		case strings.HasPrefix(p, "config/"):
+			writeJSON(t, w, map[string]any{"id": 1})
+		case p == "queue" || p == "history" || p == "blocklist" || strings.HasPrefix(p, "wanted/"):
+			writeJSON(t, w, page())
+		default:
+			writeJSON(t, w, []any{})
+		}
+	})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "audit_all", nil)
+	if failed := strs(out["failed"]); !slices.Equal(failed, []string{"audit_health"}) {
+		t.Fatalf("failed = %v, want the one audit whose read failed", failed)
+	}
+	audits := rowsOf(out["audits"])
+	if len(audits) < 10 {
+		t.Fatalf("%d audits answered, want every one of them", len(audits))
+	}
+	for _, row := range audits {
+		_, counted := row["findings"]
+		switch name := text(row["audit"]); {
+		case name == "audit_health" && (counted || !strings.Contains(text(row["error"]), "the checks are not ready")):
+			t.Errorf("the audit that failed = %v, want its error and no count", row)
+		case name != "audit_health" && (!counted || text(row["error"]) != ""):
+			t.Errorf("%s = %v, want its count", name, row)
 		}
 	}
 }

@@ -6,243 +6,28 @@ package integration
 // running Sonarr with arguments resolved from the fixtures, and its answer
 // decoded (or its file read). The bespoke tests prove the shapes the tools
 // rely on field by field; the sweep proves the rest of the read surface
-// answers in its documented status and shape, and that it keeps doing so as
-// the definitions change: a GET the importer adds is swept on the next run
-// with nothing to write, and one that fails must be classified here.
+// answers in its documented status with something in it, that nothing the
+// server sends is lost on the way into its model, and that it keeps
+// doing so as the definitions change: a GET the importer adds is swept on the
+// next run with nothing to write, and one that fails must be classified here.
 //
-// Every operation either answers, or has a sweepCase that says why not. A
-// case whose operation starts answering fails the sweep, so a stale case is
-// noticed and removed, the way a stale importer workaround is.
+// The sweep itself is pandorest's (github.com/katbyte/pandorest/sweep); what
+// is here is this suite's fixtures and its cases. Every operation either
+// answers with something, or has a case that says why not. A case whose
+// operation starts answering fails the sweep, so a stale case is noticed and
+// removed, the way a stale importer workaround is.
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"io"
 	"net/http"
-	"path/filepath"
-	"reflect"
 	"slices"
 	"strconv"
-	"strings"
 	"testing"
-	"time"
 
-	"github.com/katbyte/sonarr-mcp/internal/pandorest/definitions"
-	"github.com/katbyte/sonarr-mcp/lib/client"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/pandorest/client"
+	"github.com/katbyte/pandorest/sweep"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
-
-// sweepCase is how the sweep treats one operation.
-type sweepCase struct {
-	// Skip leaves the operation uncalled, for the reason given.
-	Skip string
-	// Status is the error status Sonarr answers with, and Why says why that
-	// is Sonarr's behaviour rather than a bug to fix.
-	Status int
-	Why    string
-	// Path and Options supply arguments by parameter name and options field,
-	// beyond what the fixtures resolve. Sonarr's document marks no option
-	// required, so an operation that needs one (a series, a path, a search
-	// term) gets it here.
-	Path    map[string]string
-	Options map[string]any
-}
-
-// sweepFixtures resolves path parameters from the suite's fixtures. A
-// parameter is looked up by the literal path segments before its placeholder
-// and its name, most specific first ("config/indexer/id", then "indexer/id"),
-// then by the name alone, so /config/indexer/{id} and /indexer/{id} can
-// resolve to different things.
-type sweepFixtures map[string]string
-
-func (f sweepFixtures) resolvePath(path, param string) (string, bool) {
-	segments := strings.Split(strings.Trim(path, "/"), "/")
-	for i, seg := range segments {
-		if seg != "{"+param+"}" {
-			continue
-		}
-		for from := max(i-2, 0); from < i; from++ {
-			prefix := segments[from:i]
-			if slices.ContainsFunc(prefix, func(s string) bool { return strings.Contains(s, "{") }) {
-				continue
-			}
-			if v, ok := f[strings.Join(append(slices.Clone(prefix), param), "/")]; ok {
-				return v, true
-			}
-		}
-	}
-	v, ok := f[param]
-
-	return v, ok
-}
-
-// sweep calls every GET operation in the definitions.
-func sweep(t *testing.T, fixtures sweepFixtures, cases map[string]sweepCase) {
-	t.Helper()
-
-	svc, err := definitions.Load(filepath.Join("..", "api-definitions", "sonarr"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	gets := map[string]bool{}
-	for _, op := range svc.Operations() {
-		if op.Method != http.MethodGet {
-			continue
-		}
-		gets[op.Name] = true
-		c := cases[op.Name]
-
-		t.Run(op.Name, func(t *testing.T) {
-			if c.Skip != "" {
-				t.Skip(c.Skip)
-			}
-			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
-			defer cancel()
-
-			args, err := sweepArgs(ctx, op, fixtures, c)
-			if err != nil {
-				t.Fatalf("%s: %v; resolve it in the fixtures or give it a sweepCase", op.Key(), err)
-			}
-			status, decodeErr, err := sweepCall(op, args)
-			switch {
-			case err == nil && c.Status != 0:
-				t.Errorf("%s now answers; drop its sweepCase (%s)", op.Key(), c.Why)
-			case err == nil:
-			case c.Status != 0 && status == c.Status:
-				t.Logf("%s: HTTP %d, as expected: %s", op.Key(), status, c.Why)
-			case decodeErr:
-				t.Errorf("%s answers what its model cannot decode: %v", op.Key(), err)
-			default:
-				t.Errorf("%s: %v", op.Key(), err)
-			}
-		})
-	}
-
-	for name := range cases {
-		if !gets[name] {
-			t.Errorf("the sweepCase for %s names no GET operation", name)
-		}
-	}
-}
-
-// sweepArgs builds the call: the context, the path parameters, and an options
-// struct with the case's options set.
-func sweepArgs(ctx context.Context, op *definitions.Operation, fixtures sweepFixtures, c sweepCase) ([]reflect.Value, error) {
-	method := reflect.ValueOf(sc).MethodByName(op.Name)
-	if !method.IsValid() {
-		return nil, errors.New("the SDK has no such method")
-	}
-	mt := method.Type()
-	args := []reflect.Value{reflect.ValueOf(ctx)}
-
-	for _, p := range op.PathParameters {
-		value, ok := c.Path[p.Name]
-		if !ok {
-			value, ok = fixtures.resolvePath(op.Path, p.Name)
-		}
-		if !ok {
-			return nil, fmt.Errorf("no value for path parameter {%s}", p.Name)
-		}
-		v := reflect.New(mt.In(len(args))).Elem()
-		if err := setValue(v, value); err != nil {
-			return nil, fmt.Errorf("{%s}: %w", p.Name, err)
-		}
-		args = append(args, v)
-	}
-	if op.Request != nil {
-		return nil, errors.New("a GET with a request body")
-	}
-
-	if len(op.Options) > 0 {
-		options := reflect.New(mt.In(len(args))).Elem()
-		for field, value := range c.Options {
-			if err := setValue(options.FieldByName(field), value); err != nil {
-				return nil, fmt.Errorf("option %s: %w", field, err)
-			}
-		}
-		args = append(args, options)
-	}
-	if len(args) != mt.NumIn() {
-		return nil, fmt.Errorf("built %d arguments for a method that takes %d", len(args), mt.NumIn())
-	}
-
-	return args, nil
-}
-
-// setValue sets a path argument or options field from a fixture: a string, a
-// bool, a number, or a list.
-func setValue(v reflect.Value, value any) error {
-	if !v.IsValid() {
-		return errors.New("no such field")
-	}
-	s := fmt.Sprint(value)
-	switch v.Kind() {
-	case reflect.String:
-		v.SetString(s)
-	case reflect.Int, reflect.Int64:
-		n, err := strconv.ParseInt(s, 10, 64)
-		if err != nil {
-			return err
-		}
-		v.SetInt(n)
-	case reflect.Pointer:
-		b, err := strconv.ParseBool(s)
-		if err != nil || v.Type().Elem().Kind() != reflect.Bool {
-			return fmt.Errorf("cannot set %s from %q", v.Type(), s)
-		}
-		v.Set(reflect.ValueOf(&b))
-	case reflect.Slice:
-		parts := strings.Split(s, ",")
-		list := reflect.MakeSlice(v.Type(), len(parts), len(parts))
-		for i, part := range parts {
-			if err := setValue(list.Index(i), part); err != nil {
-				return err
-			}
-		}
-		v.Set(list)
-	default:
-		return fmt.Errorf("cannot set a %s", v.Type())
-	}
-
-	return nil
-}
-
-// sweepCall calls the operation, reads a streamed file, and classifies a
-// failure: the status of a *client.StatusError, or a decode error (Sonarr
-// answered in a documented status, but not the documented shape).
-func sweepCall(op *definitions.Operation, args []reflect.Value) (status int, decodeErr bool, err error) {
-	results := reflect.ValueOf(sc).MethodByName(op.Name).Call(args)
-	resp, ok := reflect.TypeAssert[*http.Response](results[0].FieldByName("HttpResponse"))
-	if !ok {
-		return 0, false, errors.New("the result has no HttpResponse")
-	}
-	if !results[1].IsNil() {
-		if err, ok = reflect.TypeAssert[error](results[1]); !ok {
-			return 0, false, errors.New("the second result is not an error")
-		}
-	}
-
-	if err == nil && resp != nil && op.Response != nil && op.Response.Type.Type == definitions.RawFile {
-		defer func() { _ = resp.Body.Close() }()
-		n, readErr := io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
-		switch {
-		case readErr != nil:
-			return 0, false, fmt.Errorf("reading the file: %w", readErr)
-		case n == 0:
-			return 0, false, errors.New("the file is empty")
-		}
-	}
-	if err == nil {
-		return 0, false, nil
-	}
-	if status = client.StatusCode(err); status != 0 {
-		return status, false, err
-	}
-
-	return 0, resp != nil, err
-}
 
 // TestReadSweep calls every GET against the fixtures, with one of each thing
 // Sonarr lists by id made for it.
@@ -261,53 +46,68 @@ func TestReadSweep(t *testing.T) {
 			len(tasks), len(logs), len(metadata), e1.EpisodeFileId)
 	}
 	command := runCommand(ctx, t, "RefreshMonitoredDownloads", nil)
+	// Sonarr runs its health checks on a schedule of its own, so the list is
+	// what the last run left: one is asked for now, so that what is swept is
+	// what Sonarr makes of itself at this moment
+	runCommand(ctx, t, "CheckHealth", nil)
 	made := sweepResources(ctx, t)
+	// a series with a history: the downloads tests, which run first, leave
+	// the only history a seeded Sonarr has
+	recent := must(sc.GetHistory(ctx, sonarr.GetHistoryOperationOptions{PageSize: new(1)})).Model.Records
+	if len(recent) == 0 {
+		t.Fatal("the fixtures are incomplete: Sonarr has no history; the downloads tests make it, so run the whole suite")
+	}
 
 	id := strconv.Itoa
-	fixtures := sweepFixtures{
-		"autotagging/id":            id(made.autoTagging),
-		"calendar/id":               id(e1.Id),
-		"command/id":                id(command.Id),
-		"customfilter/id":           id(made.customFilter),
-		"customformat/id":           id(made.customFormat),
-		"cutoff/id":                 id(e6.Id),
-		"delayprofile/id":           "1", // the default profile, which cannot be deleted
-		"detail/id":                 id(made.tag),
-		"downloadclient/id":         id(downloadClient),
-		"episode/id":                id(e1.Id),
-		"episodefile/id":            id(e1.EpisodeFileId),
-		"file/filename":             logs[0].Filename,
-		"importlist/id":             id(made.importList),
-		"importlistexclusion/id":    id(made.exclusion),
-		"indexer/id":                id(indexerID),
-		"language/id":               "1", // English
-		"languageprofile/id":        "1", // the one fixed profile
-		"localization/id":           "1", // any id answers the dictionary
-		"mediacover/seriesId":       id(ff),
-		"filename":                  "poster.jpg",
-		"metadata/id":               id(metadata[0].Id),
-		"missing/id":                id(e7.Id),
-		"notification/id":           id(made.notification),
-		"qualitydefinition/id":      "1",
-		"qualityprofile/id":         id(profileID),
-		"releaseprofile/id":         id(made.releaseProfile),
-		"remotepathmapping/id":      id(made.remotePathMapping),
-		"rootfolder/id":             id(rootFolderID),
-		"series/id":                 id(ff),
-		"tag/id":                    id(made.tag),
-		"task/id":                   id(tasks[0].Id),
-		"update/filename":           logs[0].Filename,
-		"config/downloadclient/id":  "1", // each settings section is one resource, id 1
-		"config/host/id":            "1",
-		"config/importlist/id":      "1",
-		"config/indexer/id":         "1",
-		"config/mediamanagement/id": "1",
-		"config/naming/id":          "1",
-		"config/ui/id":              "1",
+	// a path parameter is resolved by the segments before it and its name,
+	// the most of them first, then by its name alone
+	fixtures := map[string]string{
+		"autotagging/id":         id(made.autoTagging),
+		"calendar/id":            id(e1.Id),
+		"command/id":             id(command.Id),
+		"customfilter/id":        id(made.customFilter),
+		"customformat/id":        id(made.customFormat),
+		"cutoff/id":              id(e6.Id),
+		"delayprofile/id":        "1", // the default profile, which cannot be deleted
+		"detail/id":              id(made.tag),
+		"downloadclient/id":      id(downloadClient),
+		"episode/id":             id(e1.Id),
+		"episodefile/id":         id(e1.EpisodeFileId),
+		"file/filename":          logs[0].Filename,
+		"importlist/id":          id(made.importList),
+		"importlistexclusion/id": id(made.exclusion),
+		"indexer/id":             id(indexerID),
+		"language/id":            "1", // English
+		"languageprofile/id":     "1", // the one fixed profile
+		"localization/id":        "1", // any id answers the dictionary
+		"mediacover/seriesId":    id(ff),
+		"filename":               "poster.jpg",
+		"metadata/id":            id(metadata[0].Id),
+		"missing/id":             id(e7.Id),
+		"notification/id":        id(made.notification),
+		"qualitydefinition/id":   "1",
+		"qualityprofile/id":      id(profileID),
+		"releaseprofile/id":      id(made.releaseProfile),
+		"remotepathmapping/id":   id(made.remotePathMapping),
+		"rootfolder/id":          id(rootFolderID),
+		"series/id":              id(ff),
+		"tag/id":                 id(made.tag),
+		"task/id":                id(tasks[0].Id),
+		"update/filename":        logs[0].Filename,
+		"host/id":                "1", // each settings section is one resource, id 1
+		"mediamanagement/id":     "1",
+		"naming/id":              "1",
+		"ui/id":                  "1",
+		// the settings sections that share their last segment with a list of
+		// providers (/config/indexer/{id} beside /indexer/{id}) are one
+		// resource each too, id 1, whatever the provider's id is
+		"config/downloadclient/id": "1",
+		"config/importlist/id":     "1",
+		"config/indexer/id":        "1",
 	}
 
 	naming := must(sc.GetConfigNaming(ctx)).Model
-	cases := map[string]sweepCase{
+	cases := map[string]sweep.Case{
 		// the examples are the formats given applied to a sample episode, and
 		// Sonarr throws on a format left out
 		"GetConfigNamingExamples": {Options: map[string]any{
@@ -318,27 +118,45 @@ func TestReadSweep(t *testing.T) {
 		}},
 		// episodes and files are listed for a series or by id, and a list of
 		// neither is refused
+		// the calendar is the days around today unless told, and nothing in
+		// the fixtures airs now: Firefly's first run aired late in 2002
+		"GetCalendar":             {Options: map[string]any{"Start": "2002-09-01T00:00:00Z", "End": "2002-12-31T00:00:00Z", "Unmonitored": true}},
 		"GetEpisode":              {Options: map[string]any{"SeriesId": ff}},
 		"GetEpisodeFile":          {Options: map[string]any{"SeriesId": ff}},
 		"GetFileSystem":           {Options: map[string]any{"Path": "/tv/", "IncludeFiles": true}},
 		"GetFileSystemMediaFiles": {Options: map[string]any{"Path": "/tv/" + firefly.Folder}},
 		"GetFileSystemType":       {Options: map[string]any{"Path": "/tv"}},
-		"GetHistorySeries":        {Options: map[string]any{"SeriesId": ff}},
+		"GetHistorySeries":        {Options: map[string]any{"SeriesId": recent[0].SeriesId}},
 		"GetHistorySince":         {Options: map[string]any{"Date": "2000-01-01T00:00:00Z"}},
 		"GetManualImport":         {Options: map[string]any{"SeriesId": ff}},
 		"GetParse":                {Options: map[string]any{"Title": "Firefly.S01E07.Safe.720p.HDTV.x264-SDK"}},
 		// without an episode or a season, the release list is every indexer's
 		// RSS feed; an episode is the interactive search the tools use
-		"GetRelease":      {Options: map[string]any{"EpisodeId": e7.Id}},
-		"GetRename":       {Options: map[string]any{"SeriesId": ff}},
+		"GetRelease": {Options: map[string]any{"EpisodeId": e7.Id}},
+		"GetRename": {
+			Options: map[string]any{"SeriesId": ff},
+			Empty:   "Sonarr's rename preview is empty while renaming is off, which is how it is seeded; TestConfigNaming turns it on and reads Chernobyl's",
+		},
 		"GetSeriesLookup": {Options: map[string]any{"Term": "tvdb:" + id(firefly.TvdbID)}},
 		"GetLogFileUpdateByFilename": {
 			Status: http.StatusNotFound,
 			Why:    "a container is updated by replacing its image, so Sonarr never runs its updater and has no update log to read",
 		},
+		"GetHealth":        {Empty: "a seeded Sonarr has nothing wrong with it, and its checks have just run; the tool suite's TestServerHealth and TestAuditHealth read the list with the checks its own setup trips"},
+		"GetLogFileUpdate": {Empty: "a container is updated by replacing its image, so Sonarr never runs its updater and has no update log to list"},
+		"GetSystemBackup":  {Empty: "there is no backup until one is made; TestBackups makes one and reads the list with it in"},
+		"GetQueueDetails":  {Empty: "nothing is downloading when the sweep runs; TestDownloadImport reads the queue with a download in it"},
+		"GetQueueStatus":   {Empty: "nothing is downloading when the sweep runs, so every count is zero; TestDownloadImport reads it with a download in the queue"},
 	}
 
-	sweep(t, fixtures, cases)
+	svc, err := loadDefinitions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Strict: a field Sonarr sends that its document does not declare is a
+	// failure, not a value the client drops without a word. A tool that reads
+	// a series and writes it back would otherwise lose it on the way.
+	sweep.Sweep{Definitions: svc, Client: sc, StatusCode: client.StatusCode, Fixtures: sweep.Fixtures{Path: fixtures}, Cases: cases, Strict: true}.Run(t)
 }
 
 // sweepMade is what the sweep makes to read back by id.

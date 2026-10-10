@@ -80,13 +80,12 @@ linters:
         linters:
           - goconst
       # tool names, query keys, API parameters and fixture titles repeat the same short words by
-      # design in the tools, the SDK, the fakes and the suites; constants would only add indirection
-      - path: '(tools|lib/sonarr|lib/providerproxy|internal/fakes|acceptance|integration)/.*\.go'
+      # design in the tools, the SDK and the suites; constants would only add indirection
+      - path: '(tools|sdk/sonarr|lib/testenv|acceptance|integration)/.*\.go'
         linters:
           - goconst
-      # media types, type names and HTTP methods are the generator's vocabulary, and the base
-      # client's tests spell out the requests they expect
-      - path: '(internal/pandorest|lib/client)/.*\.go'
+      # the service's settings and its workarounds repeat the document's own words
+      - path: 'sdk/pandorest/.*\.go'
         linters:
           - goconst
       # the idiomatic `if err := f(); err != nil` scoping shadows err on purpose; still flag other variables
@@ -132,6 +131,7 @@ linters:
         - {name: flag-parameter, disabled: true}           # bool params plumbed from cobra flags are this CLI's architecture
         - {name: unhandled-error, disabled: true}          # errcheck covers this with sane fmt.Print* defaults and nolint support
         - {name: redundant-test-main-exit, disabled: true} # TestMain intentionally uses cleanup-then-os.Exit(code); a bare return could report success on setup failure
+        - {name: multiline-if-init, disabled: true}        # azproviderlint's AZG001 asks for the opposite: an error checked in the if that makes it
     govet:
       enable-all: true # includes nilness and other checks off by default
       disable:

@@ -2,9 +2,9 @@
 
 // The harness: scripts/testenv.sh creates the container and exports
 // SONARR_SERVER, SONARR_TOKEN and SONARR_TEST_*; runSuite starts the provider
-// proxy and the fakes, then the container, builds the SDK client with a
-// transport that records every request, seeds the library, runs the suite,
-// and checks every operation was called.
+// proxy and the fakes, then the container (lib/testenv), builds the SDK client
+// with a transport that records every request, seeds the library, runs the
+// suite, and checks every operation was called.
 //
 // What is deliberately not exercised, and why, is in notCalled (coverage.go
 // of this package): the operations that restart or stop Sonarr, restore a
@@ -14,13 +14,11 @@ package integration
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"maps"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -28,12 +26,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/internal/cassettes"
-	"github.com/katbyte/sonarr-mcp/internal/fakes/newznab"
-	"github.com/katbyte/sonarr-mcp/internal/fakes/sabnzbd"
-	"github.com/katbyte/sonarr-mcp/lib/client"
-	"github.com/katbyte/sonarr-mcp/lib/providerproxy"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/lib/testenv"
+
+	"github.com/katbyte/go-kt/test/services/newznab"
+	"github.com/katbyte/go-kt/test/services/sabnzbd"
+	"github.com/katbyte/pandorest/client"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 // seriesFixture is a series in the library and what Sonarr should hold for
@@ -81,19 +79,14 @@ func tvdbIDs(series []seriesFixture) []int {
 // profileName is the quality profile the seeded series are on.
 const profileName = "HD-1080p"
 
-// fakeKey is the API key both fakes demand, so a Sonarr that sent none would
-// be caught.
-const fakeKey = "sonarr-mcp-fake"
-
 var (
 	sc  *sonarr.Client
 	rec *recorder
 
-	proxy       *providerproxy.Proxy
-	proxyMisses []string
-	proxyDrifts []providerproxy.Drift
-
-	indexer *newznab.Server
+	proxy *testenv.Proxy
+	fakes *testenv.Fakes
+	// the fake indexer and download client, as the tests name them
+	indexer *newznab.Indexer
 	sab     *sabnzbd.Server
 
 	// what the seed made, for the tests to find
@@ -104,62 +97,29 @@ var (
 	downloadClient int
 )
 
-// recording reports whether this run should call the real providers and
-// refresh the cassettes, rather than replay them.
-func recording() bool { return os.Getenv("SONARR_TEST_RECORD") != "" }
-
-// verifying reports whether to check the cassettes against the live
-// providers without rewriting them.
-func verifying() bool { return os.Getenv("SONARR_TEST_VERIFY") != "" }
-
-// configured reports whether the container environment is present.
-func configured() bool {
-	return os.Getenv("SONARR_SERVER") != "" && os.Getenv("SONARR_TOKEN") != "" && os.Getenv("SONARR_TEST_CONTAINER") != ""
-}
-
-// dataDir is the host directory the container's /tv, /downloads and /config
-// are bind-mounted from.
-func dataDir() string { return os.Getenv("SONARR_TEST_DATA") }
-
-// envPort reads a port from the environment, with its default.
-func envPort(name string, def int) (int, error) {
-	v := os.Getenv(name)
-	if v == "" {
-		return def, nil
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil {
-		return 0, fmt.Errorf("%s=%q: %w", name, v, err)
-	}
-
-	return n, nil
-}
-
-// containerHost is how the container reaches this process.
-func containerHost() string {
-	if h := os.Getenv("SONARR_TEST_HOST"); h != "" {
-		return h
-	}
-
-	return "host.docker.internal"
-}
+// fakePorts are the ports the fakes listen on when the environment names
+// none: the suite's own, so it can run beside the tool suite.
+var fakePorts = testenv.Ports{Indexer: 18181, SAB: 18182}
 
 // runSuite starts everything, seeds the library, runs the tests, and returns
 // the exit code.
 func runSuite(m *testing.M) int {
-	if !configured() {
+	if !testenv.Configured() {
 		return m.Run() // every test skips
 	}
-	if err := startProxy(); err != nil {
+	ctx := context.Background()
+	defer stopAll()
+
+	var err error
+	if proxy, err = testenv.ListenProxy(ctx, tvdbIDs(everySeries)...); err != nil {
 		fmt.Fprintln(os.Stderr, "provider proxy:", err)
 		return 1
 	}
-	defer stopAll()
-	if err := startFakes(); err != nil {
+	if fakes, err = testenv.StartFakes(fakePorts, catalogue()); err != nil {
 		fmt.Fprintln(os.Stderr, "fakes:", err)
 		return 1
 	}
-	ctx := context.Background()
+	indexer, sab = fakes.Indexer, fakes.SAB
 	if err := startSonarr(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "sonarr:", err)
 		return 1
@@ -173,25 +133,10 @@ func runSuite(m *testing.M) int {
 	stopAll()
 
 	// a replay miss means a test ran against a 502 rather than a recording,
-	// so say so loudly even when the assertions happened to survive it
-	if len(proxyMisses) > 0 {
-		fmt.Fprintf(os.Stderr, "\nprovider proxy: %d request(s) had no recording:\n", len(proxyMisses))
-		for _, m := range proxyMisses {
-			fmt.Fprintln(os.Stderr, "  "+m)
-		}
-		fmt.Fprintln(os.Stderr, "run `make record` to capture them")
-		if code == 0 {
-			code = 1
-		}
-	}
-	// drift is only collected under SONARR_TEST_VERIFY: the providers still
-	// answer, but no longer in the shape Sonarr decodes
-	if len(proxyDrifts) > 0 {
-		fmt.Fprintf(os.Stderr, "\nprovider proxy: %d response(s) changed shape since recording:\n", len(proxyDrifts))
-		for _, d := range proxyDrifts {
-			fmt.Fprintln(os.Stderr, "  "+d.String())
-		}
-		fmt.Fprintln(os.Stderr, "\nreview the changes, then run `make record` to accept them")
+	// and a drift that a provider no longer answers in the shape Sonarr
+	// decodes; either fails the run even when the assertions survived it
+	if report := proxy.Report(); report != "" {
+		fmt.Fprint(os.Stderr, report)
 		if code == 0 {
 			code = 1
 		}
@@ -227,126 +172,28 @@ func runSuite(m *testing.M) int {
 	return code
 }
 
-// stopAll stops the fakes and the proxy, keeping what the proxy saw.
+// stopAll stops the fakes and the proxy, which keeps what it saw.
 func stopAll() {
-	for _, c := range []interface{ Close() error }{indexer, sab} {
-		if c != nil && !isNilCloser(c) {
-			_ = c.Close()
-		}
+	fakes.Stop()
+	if err := proxy.Stop(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 	}
-	indexer, sab = nil, nil
-	if proxy == nil {
-		return
-	}
-	proxyMisses = proxy.Misses()
-	proxyDrifts = proxy.Drifts()
-	if err := proxy.Close(); err != nil {
-		fmt.Fprintln(os.Stderr, "provider proxy close:", err)
-	}
-	proxy = nil
-}
-
-// isNilCloser reports whether an interface holds a nil pointer, which a
-// fake that never started leaves behind.
-func isNilCloser(c interface{ Close() error }) bool {
-	switch v := c.(type) {
-	case *newznab.Server:
-		return v == nil
-	case *sabnzbd.Server:
-		return v == nil
-	default:
-		return false
-	}
-}
-
-// startProxy brings up the record/replay proxy the container's HTTPS_PROXY
-// points at, signing with the CA scripts/testenv.sh minted and mounted into
-// the container.
-func startProxy() error {
-	port, err := envPort("SONARR_TEST_PROXY_PORT", 18180)
-	if err != nil {
-		return err
-	}
-	mode := providerproxy.Replay
-	switch {
-	case recording():
-		mode = providerproxy.Record
-	case verifying():
-		mode = providerproxy.Verify
-	}
-	opts := providerproxy.Options{
-		Mode:        mode,
-		CassetteDir: filepath.Join("testdata", "cassettes"),
-		// every interface and both stacks: the container reaches this through
-		// host.docker.internal
-		Addr: ":" + strconv.Itoa(port),
-		// services.sonarr.tv is asked with the machine's architecture, Arm64
-		// on a Mac and X64 on a runner: a cassette keyed on it would only
-		// replay where it was recorded
-		RedactQuery: []string{"arch"},
-		// the server reaching itself is not provider traffic, and nor is the
-		// probe checkReachable sends to the proxy's own address
-		IgnoreHosts: append(containerAddresses(), containerHost()),
-		Trim:        cassettes.ForSeries(tvdbIDs(everySeries)...),
-	}
-	if ca := os.Getenv("SONARR_TEST_PROXY_CA"); ca != "" {
-		opts.CACert, opts.CAKey = filepath.Join(ca, "ca.pem"), filepath.Join(ca, "ca.key")
-	}
-	p, err := providerproxy.New(opts)
-	if err != nil {
-		return err
-	}
-	proxy = p
-
-	return nil
-}
-
-// startFakes starts the indexer and the download client, on the ports
-// testenv.sh told the container about.
-func startFakes() error {
-	iport, err := envPort("SONARR_TEST_INDEXER_PORT", 18181)
-	if err != nil {
-		return err
-	}
-	sport, err := envPort("SONARR_TEST_SAB_PORT", 18182)
-	if err != nil {
-		return err
-	}
-	if indexer, err = newznab.New(newznab.Options{
-		Addr: ":" + strconv.Itoa(iport), APIKey: fakeKey, PublicHost: containerHost(), Releases: catalogue(),
-	}); err != nil {
-		return err
-	}
-	if sab, err = sabnzbd.New(sabnzbd.Options{
-		Addr: ":" + strconv.Itoa(sport), APIKey: fakeKey, PublicHost: containerHost(),
-		CompleteDir: "/downloads/complete", HostCompleteDir: filepath.Join(dataDir(), "downloads", "complete"),
-	}); err != nil {
-		return err
-	}
-	if err := waitHTTP(indexer.LocalURL() + "/api?t=caps"); err != nil {
-		return fmt.Errorf("the fake indexer never answered: %w", err)
-	}
-
-	return waitHTTP(sab.LocalURL() + "/api?mode=version")
 }
 
 // startSonarr starts the container once the proxy and fakes are listening,
 // checks it can reach them, builds the client, and waits for Sonarr.
 func startSonarr(ctx context.Context) error {
-	name := os.Getenv("SONARR_TEST_CONTAINER")
-	if out, err := exec.CommandContext(ctx, "docker", "start", name).CombinedOutput(); err != nil { //nolint:gosec // the test container's own name
-		return fmt.Errorf("docker start %s: %w: %s", name, err, out)
-	}
-	if err := checkReachable(ctx, name); err != nil {
+	if err := testenv.StartContainer(ctx, fakes); err != nil {
 		return err
 	}
 
-	c, err := sonarr.New(os.Getenv("SONARR_SERVER"), os.Getenv("SONARR_TOKEN"))
+	// the recorder goes underneath the client's own retries and redirect
+	// rule, which a client put in their place would throw away
+	rec = &recorder{base: http.DefaultTransport}
+	c, err := sonarr.New(testenv.Server(), testenv.Token(), client.WithTransport(rec))
 	if err != nil {
 		return err
 	}
-	rec = &recorder{base: http.DefaultTransport}
-	c.Client.HTTPClient = &http.Client{Timeout: 2 * time.Minute, Transport: rec}
 	sc = c
 
 	var last error
@@ -362,72 +209,6 @@ func startSonarr(ctx context.Context) error {
 	}
 
 	return fmt.Errorf("sonarr never answered: %w", last)
-}
-
-// containerAddresses are the addresses the container reaches itself on,
-// which the proxy answers without a cassette (Options.IgnoreHosts).
-func containerAddresses() []string {
-	name := os.Getenv("SONARR_TEST_CONTAINER")
-	if name == "" {
-		return nil
-	}
-	out, err := exec.CommandContext(context.Background(), "docker", "inspect", "-f", //nolint:gosec // the test container's own name
-		"{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}{{.Config.Hostname}}", name).Output()
-	if err != nil {
-		return nil
-	}
-
-	return strings.Fields(string(out))
-}
-
-// checkReachable proves, from inside the container, that Sonarr can reach
-// this process: the proxy, and the fake indexer and download client. One
-// that cannot fails every lookup, search and download with a timeout of its
-// own, which reads as dozens of unrelated failures rather than the one
-// plumbing problem it is - so say it plainly, once, before the suite runs.
-func checkReachable(ctx context.Context, name string) error {
-	var ports []string
-	for _, env := range []string{"SONARR_TEST_PROXY_PORT", "SONARR_TEST_INDEXER_PORT", "SONARR_TEST_SAB_PORT"} {
-		if p := os.Getenv(env); p != "" {
-			ports = append(ports, p)
-		}
-	}
-	var errs []error
-	for range 30 {
-		errs = errs[:0]
-		for _, port := range ports {
-			script := fmt.Sprintf("curl -s -o /dev/null -m 3 http://%s:%s/ || exit 1", containerHost(), port)
-			if out, err := exec.CommandContext(ctx, "docker", "exec", name, "sh", "-c", script).CombinedOutput(); err != nil { //nolint:gosec // the test container's own name
-				errs = append(errs, fmt.Errorf("port %s: %w: %s", port, err, out))
-			}
-		}
-		if len(errs) == 0 {
-			return nil
-		}
-		time.Sleep(time.Second)
-	}
-
-	return fmt.Errorf("%s cannot reach this process on %s: %w", name, containerHost(), errors.Join(errs...))
-}
-
-// waitHTTP polls a URL until it answers, for a fake that has just started.
-func waitHTTP(url string) error {
-	var last error
-	for range 50 {
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
-		if err != nil {
-			return err
-		}
-		resp, err := http.DefaultClient.Do(req)
-		if err == nil {
-			_ = resp.Body.Close()
-			return nil
-		}
-		last = err
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	return last
 }
 
 // skipUnlessUp skips a test when there is no container to run against, and
@@ -637,7 +418,7 @@ func seed(ctx context.Context) error {
 	for _, f := range append(slices.Clone(seeded), breakingBad) {
 		var s sonarr.SeriesResource
 		if !poll(2*time.Minute, func() bool {
-			all, err := sc.GetSeries(ctx, sonarr.GetSeriesOperationOptions{TvdbId: f.TvdbID})
+			all, err := sc.GetSeries(ctx, sonarr.GetSeriesOperationOptions{TvdbId: new(f.TvdbID)})
 			if err != nil || len(all.Model) != 1 {
 				return false
 			}
@@ -753,7 +534,7 @@ func newIndexer(ctx context.Context, name string) sonarr.IndexerResource {
 	idx := schemas[i]
 	idx.Name, idx.EnableRss, idx.EnableAutomaticSearch, idx.EnableInteractiveSearch = name, new(true), new(true), new(true)
 	idx.Fields = fields(idx.Fields, map[string]any{
-		"baseUrl": indexer.URL(), "apiPath": "/api", "apiKey": fakeKey, "categories": []int{5030, 5040, 5045},
+		"baseUrl": indexer.URL(), "apiPath": "/api", "apiKey": testenv.FakeKey, "categories": []int{5030, 5040, 5045},
 	})
 
 	return idx
@@ -770,7 +551,7 @@ func newDownloadClient(ctx context.Context, name string) sonarr.DownloadClientRe
 	dc := schemas[i]
 	dc.Name, dc.Enable = name, new(true)
 	dc.Fields = fields(dc.Fields, map[string]any{
-		"host": sab.Host(), "port": sab.Port(), "apiKey": fakeKey, "tvCategory": sab.Category(), "useSsl": false, "urlBase": "",
+		"host": sab.Host(), "port": sab.Port(), "apiKey": testenv.FakeKey, "tvCategory": sab.Category(), "useSsl": false, "urlBase": "",
 	})
 
 	return dc
@@ -813,7 +594,7 @@ func seriesByTitle(ctx context.Context, t *testing.T, title string) sonarr.Serie
 
 // episodesOf reads a series' episodes, with their files.
 func episodesOf(ctx context.Context, seriesID int) []sonarr.EpisodeResource {
-	return must(sc.GetEpisode(ctx, sonarr.GetEpisodeOperationOptions{SeriesId: seriesID, IncludeEpisodeFile: new(true)})).Model
+	return must(sc.GetEpisode(ctx, sonarr.GetEpisodeOperationOptions{SeriesId: new(seriesID), IncludeEpisodeFile: new(true)})).Model
 }
 
 // episode finds an episode of a series' first season, where every fixture's

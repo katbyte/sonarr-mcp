@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 //nolint:paralleltest // the tests share one Sonarr
@@ -31,7 +31,7 @@ func TestConfigNaming(t *testing.T) {
 	examples := must(sc.GetConfigNamingExamples(ctx, sonarr.GetConfigNamingExamplesOperationOptions{
 		RenameEpisodes: new(true), StandardEpisodeFormat: cfg.StandardEpisodeFormat, DailyEpisodeFormat: cfg.DailyEpisodeFormat,
 		AnimeEpisodeFormat: cfg.AnimeEpisodeFormat, SeriesFolderFormat: cfg.SeriesFolderFormat, SeasonFolderFormat: cfg.SeasonFolderFormat,
-		SpecialsFolderFormat: cfg.SpecialsFolderFormat, MultiEpisodeStyle: cfg.MultiEpisodeStyle,
+		SpecialsFolderFormat: cfg.SpecialsFolderFormat, MultiEpisodeStyle: new(cfg.MultiEpisodeStyle),
 	})).Model
 	var ex map[string]any
 	if err := unmarshal(examples, &ex); err != nil || ex["singleEpisodeExample"] == nil || ex["seriesFolderExample"] == nil {
@@ -42,7 +42,7 @@ func TestConfigNaming(t *testing.T) {
 	// rename preview is empty whatever they are; on, it lists Chernobyl's
 	// scene-named files
 	chernobylID := seriesIDs[chernobyl.Title]
-	if plan := must(sc.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: chernobylID})).Model; boolValue(cfg.RenameEpisodes) || len(plan) != 0 {
+	if plan := must(sc.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: new(chernobylID)})).Model; boolValue(cfg.RenameEpisodes) || len(plan) != 0 {
 		t.Errorf("with renaming %v, GetRename = %d renames, want none while it is off", boolValue(cfg.RenameEpisodes), len(plan))
 	}
 	on := cfg
@@ -53,11 +53,11 @@ func TestConfigNaming(t *testing.T) {
 	if !boolValue(res.Model.RenameEpisodes) || res.Model.StandardEpisodeFormat != cfg.StandardEpisodeFormat {
 		t.Errorf("PutConfigNamingById = %+v", res.Model)
 	}
-	plan := must(sc.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: chernobylID})).Model
+	plan := must(sc.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: new(chernobylID)})).Model
 	if len(plan) != chernobyl.Files || plan[0].EpisodeFileId == 0 || plan[0].ExistingPath == plan[0].NewPath {
 		t.Errorf("GetRename with renaming on = %+v, want the %d scene-named files", plan, chernobyl.Files)
 	}
-	season := must(sc.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: chernobylID, SeasonNumber: 1})).Model
+	season := must(sc.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: new(chernobylID), SeasonNumber: new(1)})).Model
 	if len(season) != len(plan) {
 		t.Errorf("GetRename for season 1 = %d renames, want %d", len(season), len(plan))
 	}

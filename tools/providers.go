@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/katbyte/sonarr-mcp/lib/client"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/pandorest/client"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -103,12 +103,13 @@ func registerProviderTools(r *registry) {
 		Settings          map[string]any `json:"settings"           jsonschema:"its URL, categories and the rest, without credentials"`
 	}
 	type indexersOut struct {
+		pageOut
 		Indexers []indexerRow `json:"indexers"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "indexer_list",
 		Description: "The indexers Sonarr searches: each one's kind, whether it is used for RSS, automatic and interactive search, its priority, tags and settings (without credentials).",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, indexersOut, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in pageIn) (*mcp.CallToolResult, indexersOut, error) {
 		res, err := sc.GetIndexer(ctx)
 		if err != nil {
 			return nil, indexersOut{}, err
@@ -117,8 +118,9 @@ func registerProviderTools(r *registry) {
 		if err != nil {
 			return nil, indexersOut{}, err
 		}
-		out := indexersOut{}
-		for _, i := range res.Model {
+		indexers, paged := pageRows(res.Model, in)
+		out := indexersOut{pageOut: paged, Indexers: make([]indexerRow, 0, len(indexers))}
+		for _, i := range indexers {
 			out.Indexers = append(out.Indexers, indexerRow{
 				ID: i.Id, Name: i.Name, Implementation: i.Implementation, Protocol: string(i.Protocol),
 				RSS: boolv(i.EnableRss), AutomaticSearch: boolv(i.EnableAutomaticSearch), InteractiveSearch: boolv(i.EnableInteractiveSearch),
@@ -179,12 +181,13 @@ func registerProviderTools(r *registry) {
 		Settings        map[string]any `json:"settings"         jsonschema:"its host, port, category and the rest, without credentials"`
 	}
 	type clientsOut struct {
+		pageOut
 		Clients []clientRow `json:"download_clients"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "downloadclient_list",
 		Description: "The download clients Sonarr sends releases to: each one's kind, whether it is enabled, its priority, whether Sonarr removes finished and failed downloads from it, its tags and settings (without credentials).",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, clientsOut, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in pageIn) (*mcp.CallToolResult, clientsOut, error) {
 		res, err := sc.GetDownloadClient(ctx)
 		if err != nil {
 			return nil, clientsOut{}, err
@@ -193,8 +196,9 @@ func registerProviderTools(r *registry) {
 		if err != nil {
 			return nil, clientsOut{}, err
 		}
-		out := clientsOut{}
-		for _, c := range res.Model {
+		clients, paged := pageRows(res.Model, in)
+		out := clientsOut{pageOut: paged, Clients: make([]clientRow, 0, len(clients))}
+		for _, c := range clients {
 			out.Clients = append(out.Clients, clientRow{
 				ID: c.Id, Name: c.Name, Implementation: c.Implementation, Protocol: string(c.Protocol), Enabled: boolv(c.Enable),
 				Priority: c.Priority, RemoveCompleted: boolv(c.RemoveCompletedDownloads), RemoveFailed: boolv(c.RemoveFailedDownloads),

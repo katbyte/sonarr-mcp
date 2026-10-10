@@ -24,8 +24,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/internal/fakes/newznab"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/lib/testenv"
+
+	"github.com/katbyte/go-kt/test/services/newznab"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 // bodyOf reads an answer the SDK leaves undecoded (an action's free-form
@@ -76,7 +78,7 @@ func TestIndexers(t *testing.T) {
 	}
 	// Sonarr never answers a stored key: the SDK has to send back what it
 	// read, and Sonarr keeps the key it has
-	if key := fieldValue(idx.Fields, "apiKey"); key == fakeKey {
+	if key := fieldValue(idx.Fields, "apiKey"); key == testenv.FakeKey {
 		t.Error("the indexer's API key came back in the clear")
 	}
 	if got := must(sc.GetIndexerById(ctx, idx.Id)).Model; got.Name != "SDK Indexer Two" {
@@ -208,7 +210,7 @@ func newWebhooks(t *testing.T) *webhooks {
 	if !ok {
 		t.Fatalf("listening on %s, not TCP", ln.Addr())
 	}
-	w := &webhooks{url: "http://" + containerHost() + ":" + strconv.Itoa(addr.Port) + "/hook"}
+	w := &webhooks{url: "http://" + testenv.Host() + ":" + strconv.Itoa(addr.Port) + "/hook"}
 	srv := &http.Server{ReadHeaderTimeout: 5 * time.Second, Handler: http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		var body struct {
 			EventType string `json:"eventType"`

@@ -177,10 +177,15 @@ fixtures() {
   chmod -R 777 "${DATA}"
 }
 
-# proxy_ca mints the certificate authority the suites' proxy signs with,
-# once, so every container started here trusts the same one.
+# proxy_ca mints the certificate authority the suites' proxy signs with, and
+# again when it has under a day left, so every container started here trusts
+# the same one and a cache kept for a month does not break: it is made for 30
+# days, and one minted once and never again would fail every provider call
+# from the day it ran out.
 proxy_ca() {
-  [ -f "${PROXY_CA}/ca.pem" ] && [ -f "${PROXY_CA}/ca.key" ] && return 0
+  if [ -f "${PROXY_CA}/ca.pem" ] && [ -f "${PROXY_CA}/ca.key" ] && openssl x509 -checkend 86400 -noout -in "${PROXY_CA}/ca.pem" >/dev/null 2>&1; then
+    return 0
+  fi
   command -v openssl >/dev/null || { echo "openssl is required to mint the provider proxy CA" >&2; exit 1; }
   log "minting the provider proxy CA under ${PROXY_CA}"
   mkdir -p "${PROXY_CA}"

@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/internal/fakes/newznab"
+	"github.com/katbyte/go-kt/test/services/newznab"
 )
 
 // release builds a catalogue entry for an episode of a first season.
@@ -29,14 +29,14 @@ func release(title string, tvdb, episode int, sizeGB float64, category int) newz
 func catalogue() []newznab.Release {
 	bb := breakingBad.TvdbID
 	return []newznab.Release{
-		release("Breaking.Bad.S01E01.Pilot.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 1.6, newznab.CategoryHD),
-		release("Breaking.Bad.S01E01.Pilot.720p.HDTV.x264-FAKE", bb, 1, 0.9, newznab.CategoryHD),
-		release("Breaking.Bad.S01E01.Pilot.2160p.WEB-DL.DDP5.1.HDR.HEVC-FAKE", bb, 1, 7.5, newznab.CategoryUHD),
-		release("Breaking.Bad.S01E02.Cats.in.the.Bag.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 2, 1.4, newznab.CategoryHD),
-		release("Breaking.Bad.S01E03.And.the.Bags.in.the.River.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 3, 1.4, newznab.CategoryHD),
-		release("Breaking.Bad.S01E04.Cancer.Man.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 4, 1.4, newznab.CategoryHD),
-		release("Breaking.Bad.S01E05.Gray.Matter.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 5, 1.4, newznab.CategoryHD),
-		release("Firefly.S01E07.Safe.1080p.WEB-DL.DD5.1.H.264-FAKE", firefly.TvdbID, 7, 1.3, newznab.CategoryHD),
+		release("Breaking.Bad.S01E01.Pilot.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 1.6, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E01.Pilot.720p.HDTV.x264-FAKE", bb, 1, 0.9, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E01.Pilot.2160p.WEB-DL.DDP5.1.HDR.HEVC-FAKE", bb, 1, 7.5, newznab.CategoryTVUHD),
+		release("Breaking.Bad.S01E02.Cats.in.the.Bag.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 2, 1.4, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E03.And.the.Bags.in.the.River.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 3, 1.4, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E04.Cancer.Man.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 4, 1.4, newznab.CategoryTVHD),
+		release("Breaking.Bad.S01E05.Gray.Matter.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 5, 1.4, newznab.CategoryTVHD),
+		release("Firefly.S01E07.Safe.1080p.WEB-DL.DD5.1.H.264-FAKE", firefly.TvdbID, 7, 1.3, newznab.CategoryTVHD),
 	}
 }
 

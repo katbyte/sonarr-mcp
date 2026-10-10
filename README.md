@@ -57,7 +57,7 @@ and images inside it; `series_list` rows carry what a list needs).
   indexers and download clients (and test them), tasks, commands and logs. Each sits in a
   toolset a session can load on its own, so a client spends under a thousand tokens of
   context by default rather than nine thousand.
-- **A Go SDK.** `lib/sonarr` is a complete typed client for Sonarr's v3 API - all 228
+- **A Go SDK.** `sdk/sonarr` is a complete typed client for Sonarr's v3 API - all 228
   operations, generated from Sonarr's own OpenAPI document, standard library only, no
   knowledge of MCP. Useful on its own, whether or not you care about AI.
 - **Tested against a real Sonarr.** Every tool runs against Sonarr in Docker, with a fake
@@ -85,8 +85,8 @@ All options can be passed as command-line flags, environment variables, or via a
 | `SONARR_READ_ONLY` | `--read-only` | register only tools that never change Sonarr's state |
 | `SONARR_ENABLE_DELETE` | `--enable-delete` | register `series_delete` (optionally with its files) and `file_delete`, which delete from disk |
 | `SONARR_TOOLSETS` | `--toolsets` | groups of tools to register, default `core`: `all`, `core`, `curation`, `library`, `admin`, or a resource family like `series` (`core` is always included) |
-| `SONARR_ALLOW_TOOLS` | `--allow-tools` | only register these tools (names, `series_*` globs, or `essential`) |
-| `SONARR_DENY_TOOLS` | `--deny-tools` | never register these tools (names or globs such as `*_delete`) |
+| `SONARR_ALLOW_TOOLS` | `--allow-tools` | register these tools by name (names, `series_*` globs, or `essential`): on its own only these, beside `--toolsets` these as well as the sets |
+| `SONARR_DENY_TOOLS` | `--deny-tools` | never register these tools, whatever asked for them (names or globs such as `*_delete`) |
 | `SONARR_LOG` | | log level (`WARN` default; `DEBUG`, `TRACE`, ...) |
 | `SONARR_LISTEN` | `--listen` | serve MCP over HTTP on this address (e.g. `:8080`) instead of stdio |
 | `SONARR_AUTH_TOKEN` | `--auth-token` | bearer token required on the HTTP endpoint (required with `--listen`) |
@@ -193,10 +193,9 @@ name.
 | providers | `indexer_list`, `indexer_test`, `downloadclient_list`, `downloadclient_test` (as Sonarr's Test button, saying what is wrong with each that fails; credentials never shown) |
 | audits | the 16 audits and `audit_all` in [the table above](#the-audits) |
 
-`series_delete` (which removes a series, and its files if asked) and `file_delete` (which
-deletes files from disk) are only registered when `--enable-delete` / `SONARR_ENABLE_DELETE` is
-set. `--read-only` registers the 43 read tools and
-nothing else, so a write tool is absent from `tools/list` rather than refused when called.
+Every list is paged the same way: it takes `limit` (100 unless given, 1000 at most) and `offset`, and answers `total`, `offset` and, while there is another page, the `next_offset` to pass back.
+
+`series_delete` (which removes a series, and its files if asked) and `file_delete` (which deletes files from disk) are only registered when `--enable-delete` / `SONARR_ENABLE_DELETE` is set, and even then change nothing without `confirm`: called without it, each answers `would_delete`, what a confirmed call would remove. `file_delete` also names every episode each file holds and warns when Sonarr still monitors them, since it downloads those again once the files are gone, or stops monitoring them when it is set to unmonitor what is deleted. `--read-only` registers the 43 read tools and nothing else, so a write tool is absent from `tools/list` rather than refused when called.
 
 ### Choosing which tools load
 
@@ -245,18 +244,18 @@ sonarr-mcp tools --read-only -q     # names only
 
 ### Narrowing further
 
-`--allow-tools` and `--deny-tools` narrow whatever the toolsets left, and take comma-separated
-tool names, globs with a leading or trailing `*`, or the `essential` preset (`series_list`,
-`series_get`, `calendar_list`, `queue_list`, `series_search`):
+`--allow-tools` and `--deny-tools` take comma-separated tool names, globs with a leading or trailing `*`, or the `essential` preset (`series_list`, `series_get`, `calendar_list`, `queue_list`, `series_search`). An allow list with no `--toolsets` is the whole of what loads: only the tools it names. Beside `--toolsets` it adds to them: the sets, and the tools named as well. `--deny-tools` takes tools out of whatever was asked for, which is how a set is narrowed.
 
 ```sh
-SONARR_ALLOW_TOOLS=essential
-SONARR_ALLOW_TOOLS=series_*,episode_list,queue_list
+SONARR_ALLOW_TOOLS=essential                           # exactly those five
+SONARR_ALLOW_TOOLS=series_*,episode_list,queue_list    # every series_ tool, and two more
+SONARR_ALLOW_TOOLS=audit_*                             # the audits alone
+SONARR_TOOLSETS=curation SONARR_ALLOW_TOOLS=task_list,task_run   # curation, and two tools from admin as well
+SONARR_TOOLSETS=curation SONARR_DENY_TOOLS=*_search    # curation without the tools that search the indexers
 SONARR_DENY_TOOLS=*_delete,*_search
 ```
 
-A pattern that matches no tool aborts startup and names it, so a typo cannot silently hide a
-tool.
+A pattern that matches no tool aborts startup and names it, so a typo cannot silently hide a tool. Neither list gets a tool past `--read-only` or the delete switch.
 
 ### A typical session
 
@@ -281,16 +280,18 @@ tool.
 
 ## Using the client on its own
 
-`lib/sonarr` is a complete Go client for Sonarr's v3 API that depends on nothing but the
-standard library and the shared base client in `lib/client`, and knows nothing of MCP. If you
-only want to talk to Sonarr from Go, take the package and ignore the rest:
+`sdk/sonarr` is a complete Go client for Sonarr's v3 API, built on the base client the katbyte SDKs share ([pandorest](https://github.com/katbyte/pandorest)'s `client`), and knows nothing of MCP. If you only want to talk to Sonarr from Go, take the package and ignore the rest:
 
 ```go
-import "github.com/katbyte/sonarr-mcp/lib/sonarr"
+import "github.com/katbyte/sonarr-mcp/sdk/sonarr"
 
 c, err := sonarr.New("http://nas:8989", os.Getenv("SONARR_TOKEN"))
 series, err := c.GetSeries(ctx, sonarr.GetSeriesOperationOptions{})
 for _, s := range series.Model { ... }
+
+specials, err := c.GetEpisode(ctx, sonarr.GetEpisodeOperationOptions{
+    SeriesId: new(series.Model[0].Id), SeasonNumber: new(0),
+}) // a number or a flag is a pointer, so 0 and false can be asked for
 
 missing, err := c.GetWantedMissingComplete(ctx, sonarr.GetWantedMissingOperationOptions{
     Monitored: new(true), IncludeSeries: new(true),
@@ -298,19 +299,7 @@ missing, err := c.GetWantedMissingComplete(ctx, sonarr.GetWantedMissingOperation
 for _, e := range missing.Items { ... }
 ```
 
-It is generated from Sonarr's own OpenAPI document (`docs/`, see
-[docs/README.md](docs/README.md)) by `internal/pandorest`, a generator kept in this
-repository and modelled on [hashicorp/pandora](https://github.com/hashicorp/pandora): an
-importer normalises the spec into checked-in definitions (`api-definitions/`, one file per
-tag) through named workarounds for the spec's known bugs, a differ reports what a spec
-refresh changes, and a generator writes one file per operation and model from the
-definitions. That is **a method for every one of Sonarr's 228 operations**, each with typed
-options, a typed body, a `{Model, HttpResponse}` result, the status codes the operation
-answers with (anything else is an error), and a `Complete` pager on every paged list. `make
-apicheck` proves the coverage claim against the spec, `make gencheck` (and the unit tests)
-fail when the generated code is stale, and the integration suite proves the shapes **against
-a running Sonarr** - which is the only thing that catches the server answering differently
-from what its spec says. See [internal/pandorest/README.md](internal/pandorest/README.md).
+It is generated from Sonarr's own OpenAPI document (`api-defs/`, see [api-defs/README.md](api-defs/README.md)) by [pandorest](https://github.com/katbyte/pandorest), the generator the katbyte MCP servers share, modelled on [hashicorp/pandora](https://github.com/hashicorp/pandora): an importer normalises the spec into checked-in definitions (`api-defs/sonarr-<version>/`, one file per tag) through named workarounds for the spec's known bugs, a differ reports what a spec refresh changes, and a generator writes one file per operation and model from the definitions. What is this repository's own is in `sdk/pandorest`, the service's settings and the workarounds for its document, and in `sdk/sonarr/service.go`, the one hand-written file beside the generated ones: how Sonarr's refusals read and what is known of them. That is **a method for every one of Sonarr's 228 operations**, each with typed options, a typed body, a `{Model, HttpResponse}` result, the status codes the operation answers with (anything else is an error), and a `Complete` pager on every paged list. `make apicheck` proves the coverage claim against the spec, `make gencheck` (and the unit tests) fail when the generated code is stale, and the integration suite proves the shapes **against a running Sonarr** - which is the only thing that catches the server answering differently from what its spec says.
 
 ## Development
 
@@ -333,7 +322,7 @@ you already believed. Two suites, each in its own container:
 
 | | Covers | Command |
 |---|---|---|
-| `integration/` | the `lib/sonarr` client: every one of its operations is called against the server - all but the four that restart, stop or restore Sonarr, which are named with the reason - checking that each request is one Sonarr accepts and each answer decodes with its fields populated, and a run that leaves an operation neither called nor explained fails | `make testacc-integration` |
+| `integration/` | the `sdk/sonarr` client: every one of its operations is called against the server - all but the four that restart, stop or restore Sonarr, which are named with the reason - checking that each request is one Sonarr accepts and each answer decodes with its fields populated, and a run that leaves an operation neither called nor explained fails | `make testacc-integration` |
 | `acceptance/` | the tools: name resolution, projections, every audit against a library seeded with what it exists to find, searches that grab from the fake indexer and downloads the fake SABnzbd completes, imports, renames, and journeys that chain them (an audit's finding, the fix it names, the audit again to see it gone), and the built binary itself over stdio and HTTP (flags and environment reaching the server, the bearer check, refusing to start without a key or a token) | `make testacc-acceptance` |
 
 ```bash
@@ -347,7 +336,7 @@ Coverage has to span every suite or it lies: `go test -cover ./...` reports a fr
 `tools/`, because almost everything real happens in the live suites behind the `integration`
 tag. `make cover` runs each into its own binary coverage directory and merges them with
 `go tool covdata` - stdlib tooling, no third-party merger - which is what the badge reports.
-The generated `lib/sonarr` is left out of the number and reported on a line of its own: it is
+The generated `sdk/sonarr` is left out of the number and reported on a line of its own: it is
 one mechanical method per operation, and what proves it is that the integration suite calls
 224 of its 228 operations against a real Sonarr, not a line count.
 
@@ -359,10 +348,10 @@ seeded library never produces one of them and nothing says why. The few that a r
 cannot be made to produce (a download stuck for a day, a disk nearly full, a folder the
 scan will not account for) are listed with their reason and the unit test that covers them
 instead. Nothing in either suite talks to a real indexer or download
-client: a fake Newznab indexer and a fake SABnzbd (`internal/fakes`) run inside the test
+client: a fake Newznab indexer and a fake SABnzbd (go-kt's `test/services`) run inside the test
 process, serve releases for the fixture series and write a finished download's files when the
 test says so. Sonarr's own calls out to TheTVDB (through SkyHook), services.sonarr.tv, XEM and
-the artwork CDN go through a record/replay proxy (`lib/providerproxy`) - the container is
+the artwork CDN go through a record/replay proxy (go-kt's `test/replayproxy`) - the container is
 started with `HTTPS_PROXY` pointing at it and trusts its certificate authority - so neither
 suite needs a network:
 

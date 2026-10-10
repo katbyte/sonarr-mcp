@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	apiclient "github.com/katbyte/sonarr-mcp/lib/client"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	apiclient "github.com/katbyte/pandorest/client"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -85,7 +85,7 @@ func projectFile(f *sonarr.EpisodeFileResource, episodes []int) fileRow {
 
 // seriesFiles reads a series' files, with their episodes, in episode order.
 func (r *registry) seriesFiles(ctx context.Context, seriesID int) ([]sonarr.EpisodeFileResource, map[int][]int, error) {
-	res, err := r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: seriesID})
+	res, err := r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: new(seriesID)})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -116,11 +116,13 @@ func registerFileTools(r *registry) {
 	type listIn struct {
 		Series string `json:"series"           jsonschema:"the series: title, Sonarr id or tvdb:<id>"`
 		Season *int   `json:"season,omitempty" jsonschema:"only this season; 0 is the specials"`
+		pageIn
 	}
 	type listOut struct {
-		Series string    `json:"series"`
-		Path   string    `json:"path"`
-		Files  []fileRow `json:"files"`
+		Series string `json:"series"`
+		Path   string `json:"path"`
+		pageOut
+		Files []fileRow `json:"files"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "file_list",
@@ -134,13 +136,15 @@ func registerFileTools(r *registry) {
 		if err != nil {
 			return nil, listOut{}, err
 		}
-		out := listOut{Series: s.Title, Path: s.Path}
+		rows := make([]fileRow, 0, len(files))
 		for i := range files {
 			if in.Season != nil && files[i].SeasonNumber != *in.Season {
 				continue
 			}
-			out.Files = append(out.Files, projectFile(&files[i], byFile[files[i].Id]))
+			rows = append(rows, projectFile(&files[i], byFile[files[i].Id]))
 		}
+		out := listOut{Series: s.Title, Path: s.Path}
+		out.Files, out.pageOut = pageRows(rows, in.pageIn)
 
 		return nil, out, nil
 	})
@@ -203,21 +207,32 @@ func registerFileTools(r *registry) {
 	})
 
 	type deleteIn struct {
-		FileIDs []int `json:"file_ids" jsonschema:"the ids of the episode files to delete from disk"`
+		FileIDs []int `json:"file_ids"          jsonschema:"the ids of the episode files to delete from disk"`
+		Confirm bool  `json:"confirm,omitempty" jsonschema:"true to delete; without it nothing changes and the answer lists what a confirmed call would delete"`
+	}
+	type deleteRow struct {
+		ID        int    `json:"id"`
+		Path      string `json:"path"`
+		Size      string `json:"size"`
+		Episodes  string `json:"episodes"  jsonschema:"every episode the file holds, S01E02 or S01E02-E03: each of them loses it"`
+		Monitored bool   `json:"monitored" jsonschema:"Sonarr is still monitoring an episode the file holds"`
 	}
 	type deleteOut struct {
-		Deleted []string `json:"deleted" jsonschema:"the paths deleted"`
+		Deleted     []string    `json:"deleted"                jsonschema:"the paths deleted"`
+		WouldDelete []string    `json:"would_delete,omitempty" jsonschema:"without confirm: the paths a confirmed call deletes; nothing has changed"`
+		Files       []deleteRow `json:"files"                  jsonschema:"each file named: its size, every episode that loses it, and whether Sonarr still monitors them"`
+		Warning     string      `json:"warning,omitempty"      jsonschema:"when the files hold monitored episodes: whether Sonarr downloads them again or stops monitoring them, and how to have it the other way"`
 	}
 	add(r, deleteTool, &mcp.Tool{
 		Name:        "file_delete",
-		Description: "Delete episode files from disk (to Sonarr's recycling bin, when one is set). Their episodes become missing, and are searched for again if monitored.",
+		Description: "Delete episode files from disk (to Sonarr's recycling bin, when one is set). Every episode a file holds becomes missing, and a monitored one is downloaded again, or stops being monitored when Sonarr is set to unmonitor what is deleted: the answer warns which. Nothing changes without confirm: the answer lists the files a confirmed call would delete and the episodes on them.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in deleteIn) (*mcp.CallToolResult, deleteOut, error) {
 		if len(in.FileIDs) == 0 {
 			return nil, deleteOut{}, errors.New("name the file_ids to delete")
 		}
 		// each file is read by its id first: asked for a list, Sonarr answers
 		// 500 when any id is unknown, and the path is what the answer reports
-		paths := make([]string, 0, len(in.FileIDs))
+		files := make([]*sonarr.EpisodeFileResource, 0, len(in.FileIDs))
 		for _, id := range in.FileIDs {
 			res, err := client.GetEpisodeFileById(ctx, id)
 			switch {
@@ -226,9 +241,59 @@ func registerFileTools(r *registry) {
 			case err != nil:
 				return nil, deleteOut{}, err
 			}
-			paths = append(paths, res.Model.Path)
+			files = append(files, res.Model)
 		}
+
+		// a file can hold two episodes, and deleting it takes both; and an
+		// episode still monitored is one Sonarr goes and gets again, so what is
+		// said of each file is read from its episodes' own flags
 		out := deleteOut{}
+		paths := make([]string, 0, len(files))
+		episodes := map[int][]sonarr.EpisodeResource{}
+		var wanted []string
+		for _, f := range files {
+			if _, read := episodes[f.SeriesId]; !read {
+				eps, err := r.episodesOf(ctx, f.SeriesId, nil, false)
+				if err != nil {
+					return nil, deleteOut{}, err
+				}
+				episodes[f.SeriesId] = eps
+			}
+			row := deleteRow{ID: f.Id, Path: f.Path, Size: humanSize(f.Size)}
+			var numbers []int
+			for _, e := range episodes[f.SeriesId] {
+				if e.EpisodeFileId != f.Id {
+					continue
+				}
+				numbers = append(numbers, e.EpisodeNumber)
+				if boolv(e.Monitored) {
+					row.Monitored = true
+					wanted = append(wanted, episodeLabel(e.SeasonNumber, e.EpisodeNumber))
+				}
+			}
+			row.Episodes = episodeLabel(f.SeasonNumber, numbers...)
+			out.Files = append(out.Files, row)
+			paths = append(paths, f.Path)
+		}
+		if len(wanted) > 0 {
+			// Sonarr unmonitors the episodes of a file deleted through it when
+			// its Unmonitor Deleted Episodes setting is on, which is a change
+			// nobody asked for either, so both ways are said
+			media, err := client.GetConfigMediaManagement(ctx)
+			if err != nil {
+				return nil, deleteOut{}, err
+			}
+			out.Warning = fmt.Sprintf("Sonarr still monitors %s, so it downloads them again once their files are gone. To keep them gone, unmonitor them first with episode_monitor.", strings.Join(wanted, ", "))
+			if boolv(media.Model.AutoUnmonitorPreviouslyDownloadedEpisodes) {
+				out.Warning = fmt.Sprintf("Sonarr's Unmonitor Deleted Episodes setting is on, so it stops monitoring %s when their files go and does not download them again. To have them back, monitor them again with episode_monitor.", strings.Join(wanted, ", "))
+			}
+		}
+		if !in.Confirm {
+			out.WouldDelete = paths
+
+			return nil, out, nil
+		}
+
 		for i, id := range in.FileIDs {
 			if _, err := client.DeleteEpisodeFileById(ctx, id); err != nil {
 				return nil, out, err

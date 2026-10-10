@@ -12,8 +12,8 @@ import (
 	"time"
 	"unicode"
 
-	apiclient "github.com/katbyte/sonarr-mcp/lib/client"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	apiclient "github.com/katbyte/pandorest/client"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"golang.org/x/text/unicode/norm"
 )
 

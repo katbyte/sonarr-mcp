@@ -55,3 +55,60 @@ func TestExplicitToolsetsOverrideTheDefault(t *testing.T) {
 		t.Errorf("--toolsets all registered %d tools, want the whole surface", len(got))
 	}
 }
+
+// An allow list with no --toolsets is the whole of what loads, chosen from
+// every tool, with the default core not put beside it: narrowed by core as
+// well, --allow-tools essential loaded four of its five tools in silence.
+// Beside --toolsets it adds the tools it names to the sets.
+func TestAnAllowListChoosesFromEveryTool(t *testing.T) {
+	t.Parallel()
+
+	names := func(f FlagData) []string {
+		list, err := tools.Describe(f.ToolOptions())
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := make([]string, 0, len(list))
+		for _, ti := range list {
+			out = append(out, ti.Name)
+		}
+
+		return out
+	}
+	with := func(base []string, more ...string) []string {
+		out := slices.Clone(base)
+		for _, name := range more {
+			if !slices.Contains(out, name) {
+				out = append(out, name)
+			}
+		}
+		slices.Sort(out)
+
+		return out
+	}
+	essential := []string{"essential"}
+	want := slices.Clone(tools.EssentialTools)
+	slices.Sort(want)
+
+	if got := names(FlagData{AllowTools: essential}); !slices.Equal(got, want) {
+		t.Errorf("--allow-tools essential = %v, want %v", got, want)
+	}
+	if got := names(FlagData{AllowTools: []string{"tag_*"}}); !slices.Equal(got, []string{"tag_create", "tag_delete", "tag_list"}) {
+		t.Errorf("--allow-tools tag_* = %v", got)
+	}
+
+	// beside --toolsets it adds to them: the sets, and the tools named as well
+	sets := []string{"library"}
+	library := names(FlagData{Toolsets: sets})
+	if got := names(FlagData{Toolsets: sets, AllowTools: essential}); !slices.Equal(got, with(library, want...)) || !slices.Contains(got, "series_search") {
+		t.Errorf("--toolsets library --allow-tools essential = %v, want %v", got, with(library, want...))
+	}
+	if got := names(FlagData{Toolsets: sets, AllowTools: []string{"task_list"}}); !slices.Equal(got, with(library, "task_list")) {
+		t.Errorf("--toolsets library --allow-tools task_list = %v", got)
+	}
+
+	// with neither, the default is still core
+	if opts := (&FlagData{}).ToolOptions(); !slices.Equal(opts.Toolsets, DefaultToolsets) {
+		t.Errorf("no flags = %v, want the default %v", opts.Toolsets, DefaultToolsets)
+	}
+}

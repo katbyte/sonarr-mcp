@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -85,9 +85,9 @@ func registerReleaseTools(r *registry) {
 			if picked, err = pickEpisodes(eps, []string{in.Episode}); err != nil {
 				return nil, searchOut{}, err
 			}
-			opts.EpisodeId = picked[0].Id
+			opts.EpisodeId = new(picked[0].Id)
 		case in.Season != nil:
-			opts.SeriesId, opts.SeasonNumber = s.Id, *in.Season
+			opts.SeriesId, opts.SeasonNumber = new(s.Id), in.Season
 			if *in.Season == 0 {
 				return nil, searchOut{}, errors.New("sonarr does not search the specials as a season; search their episodes one at a time")
 			}

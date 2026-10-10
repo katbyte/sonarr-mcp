@@ -14,11 +14,10 @@ on:
       - 'scripts/testenv.sh'
       - 'acceptance/**'
       - 'integration/**'
-      - 'lib/providerproxy/**'
-      # internal/pandorest's tests re-import the spec and regenerate the SDK,
-      # failing when api-definitions/ or lib/sonarr are stale
-      - 'docs/*-openapi.json'
-      - 'api-definitions/**'
+      - 'lib/testenv/**'
+      # sdk/pandorest's tests hold the definitions to the spec and the SDK to
+      # the definitions, failing when api-defs/ or sdk/sonarr are stale
+      - 'api-defs/**'
       - '.github/workflows/pr-integration.yaml'
   workflow_dispatch:
 
@@ -43,7 +42,7 @@ jobs:
   # one job per suite, so a failure names which layer broke: the client's
   # view of the API, or the tools' behaviour on top of it
   integration:
-    name: integration (lib/sonarr against a real Sonarr)
+    name: integration (sdk/sonarr against a real Sonarr)
     runs-on: ubuntu-latest
     # a runner is far slower than a developer's machine at this: the suite
     # takes a minute here and twenty there, most of it waiting on Sonarr

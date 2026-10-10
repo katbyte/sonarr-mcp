@@ -47,3 +47,15 @@ updates:
       go-tools-actionlint:
         patterns:
           - "*"
+
+  # the base images the Dockerfiles pin by tag
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    groups:
+      docker-images:
+        patterns:
+          - "*"

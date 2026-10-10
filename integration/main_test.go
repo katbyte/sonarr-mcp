@@ -1,6 +1,6 @@
 //go:build integration
 
-// Package integration runs the generated SDK, lib/sonarr, against a real
+// Package integration runs the generated SDK, sdk/sonarr, against a real
 // Sonarr in Docker. It tests one thing: that every request the generated
 // methods build is one Sonarr accepts, answered in the status the
 // definitions expect, and that every answer decodes into the generated types
@@ -22,9 +22,9 @@
 // The suite seeds its own library through the SDK - the root folder, four
 // series imported from the folders scripts/testenv.sh lays out, one added
 // with no files - and runs the fake indexer and download client
-// (internal/fakes) that the searches, grabs, imports and failures go
+// (go-kt's test/services) that the searches, grabs, imports and failures go
 // through. Sonarr's calls to SkyHook, services.sonarr.tv, TheXEM and the
-// artwork CDN go through the record/replay proxy (lib/providerproxy), so a
+// artwork CDN go through the record/replay proxy (go-kt's test/replayproxy), so a
 // run needs no network; SONARR_TEST_RECORD=1 records them instead (make
 // record). The tests put back what they change, so the suite can run again
 // against a container that is still up.

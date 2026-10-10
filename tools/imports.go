@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -78,7 +78,7 @@ func (r *registry) scanFolder(ctx context.Context, folder string) ([]sonarr.Manu
 		if !inFolder(folder, s.Path) && !inFolder(s.Path, folder) {
 			continue
 		}
-		files, err := r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: s.Id})
+		files, err := r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: new(s.Id)})
 		if err != nil {
 			return nil, err
 		}

@@ -34,6 +34,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: docker build --build-arg VERSION=ci --build-arg COMMIT="${GITHUB_SHA::7}" -t sonarr-mcp .
+      # from Google's mirror of Docker Hub, which the Dockerfile names, and from Docker Hub
+      # itself when the mirror gives nothing: Docker Hub turns a runner away once its shared
+      # address has pulled too much, so it is the one asked second
+      - run: |
+          docker build --build-arg VERSION=ci --build-arg COMMIT="${GITHUB_SHA::7}" -t sonarr-mcp . ||
+            docker build --build-arg REGISTRY=docker.io/library --build-arg VERSION=ci --build-arg COMMIT="${GITHUB_SHA::7}" -t sonarr-mcp .
+      # the version the image reports is the one the build was given: a
+      # build that reports dev has lost its -X flags
       - name: smoke test the image
-        run: docker run --rm sonarr-mcp version
+        run: docker run --rm sonarr-mcp version | grep -F 'sonarr-mcp ci'

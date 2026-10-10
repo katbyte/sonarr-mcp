@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/internal/fakes/sabnzbd"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/go-kt/test/services/sabnzbd"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 // approved searches for an episode's releases the way a person does, and
@@ -28,7 +28,7 @@ import (
 func approved(ctx context.Context, t *testing.T, e *sonarr.EpisodeResource) (best sonarr.ReleaseResource, found []sonarr.ReleaseResource) {
 	t.Helper()
 
-	found = must(sc.GetRelease(ctx, sonarr.GetReleaseOperationOptions{EpisodeId: e.Id})).Model
+	found = must(sc.GetRelease(ctx, sonarr.GetReleaseOperationOptions{EpisodeId: new(e.Id)})).Model
 	i := slices.IndexFunc(found, func(r sonarr.ReleaseResource) bool { return boolValue(r.Approved) })
 	if i < 0 {
 		t.Fatalf("no approved release for S%02dE%02d: %+v", e.SeasonNumber, e.EpisodeNumber, found)
@@ -85,7 +85,7 @@ func waitQueued(ctx context.Context, t *testing.T, downloadID string, check func
 	if !poll(downloadWait, func() bool {
 		refreshDownloads(ctx, t)
 		all := must(sc.GetQueueComplete(ctx, sonarr.GetQueueOperationOptions{
-			SeriesIds: []int{seriesIDs[breakingBad.Title]}, IncludeEpisode: new(true), PageSize: 5,
+			SeriesIds: []int{seriesIDs[breakingBad.Title]}, IncludeEpisode: new(true), PageSize: new(5),
 		})).Items
 		i := slices.IndexFunc(all, func(x sonarr.QueueResource) bool { return strings.EqualFold(x.DownloadId, downloadID) })
 		if i < 0 {
@@ -103,7 +103,7 @@ func waitQueued(ctx context.Context, t *testing.T, downloadID string, check func
 // historyOf is the series' history for one download.
 func historyOf(ctx context.Context, downloadID string, event sonarr.EpisodeHistoryEventType) []sonarr.HistoryResource {
 	all := must(sc.GetHistorySeries(ctx, sonarr.GetHistorySeriesOperationOptions{
-		SeriesId: seriesIDs[breakingBad.Title], EventType: event, IncludeSeries: new(true), IncludeEpisode: new(true),
+		SeriesId: new(seriesIDs[breakingBad.Title]), EventType: event, IncludeSeries: new(true), IncludeEpisode: new(true),
 	})).Model
 
 	return slices.DeleteFunc(all, func(h sonarr.HistoryResource) bool { return !strings.EqualFold(h.DownloadId, downloadID) })
@@ -207,7 +207,7 @@ func TestDownloadImport(t *testing.T) {
 	}
 	// the paged history, filtered to the episode and to grabs and imports
 	paged := must(sc.GetHistoryComplete(ctx, sonarr.GetHistoryOperationOptions{
-		EpisodeId: e1.Id, EventType: []int{1, 3}, DownloadId: job.ID, IncludeEpisode: new(true), PageSize: 1,
+		EpisodeId: new(e1.Id), EventType: []int{1, 3}, DownloadId: job.ID, IncludeEpisode: new(true), PageSize: new(1),
 	})).Items
 	if len(paged) != 2 || paged[0].Episode == nil || paged[0].Episode.Id != e1.Id {
 		t.Errorf("GetHistoryComplete one entry a page = %+v", paged)
@@ -271,7 +271,7 @@ func TestDownloadFailure(t *testing.T) {
 		t.Fatalf("the blocklist entry = %+v, %t", entry, ok)
 	}
 	// blocklisted, the release is rejected by a search
-	again := must(sc.GetRelease(ctx, sonarr.GetReleaseOperationOptions{EpisodeId: e2.Id})).Model
+	again := must(sc.GetRelease(ctx, sonarr.GetReleaseOperationOptions{EpisodeId: new(e2.Id)})).Model
 	i := slices.IndexFunc(again, func(r sonarr.ReleaseResource) bool { return r.Guid == best.Guid })
 	if i < 0 || boolValue(again[i].Approved) || !slices.ContainsFunc(again[i].Rejections, func(r string) bool { return strings.Contains(r, "blocklisted") }) {
 		t.Errorf("the blocklisted release in a search = %+v", again)

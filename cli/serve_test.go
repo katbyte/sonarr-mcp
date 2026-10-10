@@ -6,107 +6,68 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/katbyte/go-kt/mcp/server"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// requireBearer is the only thing between --listen and everyone who can reach
-// the port.
-const testToken = "s3cret"
+const (
+	testToken  = "s3cret"
+	testListen = ":8080"
+	// testName is this tool's name, as an operator and a client are told it
+	testName = "sonarr-mcp"
+)
 
-func TestRequireBearer(t *testing.T) {
+// Serving itself is go-kt's, tested there. What is this tool's own is what it
+// hands over: the flags, and the names an operator and a client are told.
+func TestServeOptions(t *testing.T) {
 	t.Parallel()
 
-	var reached bool
-	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		reached = true
-		w.WriteHeader(http.StatusTeapot)
-	})
-
-	for _, c := range []struct {
-		name       string
-		token      string
-		header     string
-		wantStatus int
-		wantThru   bool
-	}{
-		{"no token configured lets everything through", "", "", http.StatusTeapot, true},
-		{"no token configured ignores a header", "", "Bearer anything", http.StatusTeapot, true},
-		{"the right token passes", testToken, "Bearer " + testToken, http.StatusTeapot, true},
-		{"a missing header is refused", testToken, "", http.StatusUnauthorized, false},
-		{"the wrong token is refused", testToken, "Bearer nope", http.StatusUnauthorized, false},
-		{"the bare token without the scheme is refused", testToken, testToken, http.StatusUnauthorized, false},
-		{"a prefix of the token is refused", testToken, "Bearer s3cre", http.StatusUnauthorized, false},
-		{"the token with more after it is refused", testToken, "Bearer s3cretXX", http.StatusUnauthorized, false},
-		{"the scheme is case sensitive", testToken, "bearer " + testToken, http.StatusUnauthorized, false},
-	} {
-		reached = false
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/mcp", http.NoBody)
-		if c.header != "" {
-			req.Header.Set("Authorization", c.header)
-		}
-		rec := httptest.NewRecorder()
-		requireBearer(c.token, next).ServeHTTP(rec, req)
-
-		if rec.Code != c.wantStatus {
-			t.Errorf("%s: status = %d, want %d", c.name, rec.Code, c.wantStatus)
-		}
-		if reached != c.wantThru {
-			t.Errorf("%s: handler reached = %v, want %v", c.name, reached, c.wantThru)
-		}
-		if c.wantStatus == http.StatusUnauthorized {
-			if got := rec.Header().Get("WWW-Authenticate"); !strings.Contains(got, "Bearer") {
-				t.Errorf("%s: WWW-Authenticate = %q, want a Bearer challenge", c.name, got)
-			}
-		}
+	f := &FlagData{Listen: testListen, AuthToken: testToken, AllowNoAuth: true}
+	if got, want := f.serveOptions(), (server.Options{Listen: testListen, AuthToken: testToken, AllowNoAuth: true, Name: testName, EnvPrefix: "SONARR"}); got != want {
+		t.Errorf("serveOptions = %+v, want %+v", got, want)
 	}
 }
 
 // The health probe has to stay outside the auth check, or a container with a
-// token configured never becomes healthy.
-func TestMuxRoutes(t *testing.T) {
+// token configured never becomes healthy; the MCP endpoint is behind it, and
+// a client sent away is told whose token it lacks.
+func TestServeRoutes(t *testing.T) {
 	t.Parallel()
 
-	server := mcp.NewServer(&mcp.Implementation{Name: "sonarr-mcp", Version: "test"}, nil)
-	mux := newMux(server, testToken)
+	srv := mcp.NewServer(&mcp.Implementation{Name: testName, Version: "test"}, nil)
+	routes := server.Handler(srv, (&FlagData{AuthToken: testToken}).serveOptions())
 
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/healthz", http.NoBody))
-	if rec.Code != http.StatusOK {
-		t.Errorf("/healthz with a token configured = %d, want 200", rec.Code)
-	}
-	if body := rec.Body.String(); strings.TrimSpace(body) != "ok" {
-		t.Errorf("/healthz body = %q", body)
+	routes.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, server.HealthPath, http.NoBody))
+	if rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != "ok" {
+		t.Errorf("%s with a token configured = %d %q, want 200 ok", server.HealthPath, rec.Code, rec.Body.String())
 	}
 
-	// and the MCP endpoint is not
 	rec = httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodPost, mcpPath, strings.NewReader("{}")))
+	routes.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodPost, server.Path, strings.NewReader("{}")))
 	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("%s without a token = %d, want 401", mcpPath, rec.Code)
+		t.Errorf("%s without a token = %d, want 401", server.Path, rec.Code)
 	}
-
-	// healthz is a GET route, so another method must not reach it
-	rec = httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/healthz", http.NoBody))
-	if rec.Code == http.StatusOK {
-		t.Error("POST /healthz answered 200; the route is registered GET-only")
+	if got := rec.Header().Get("WWW-Authenticate"); !strings.Contains(got, "Bearer") || !strings.Contains(got, testName) {
+		t.Errorf("WWW-Authenticate = %q, want a Bearer challenge naming sonarr-mcp", got)
 	}
 }
 
 // --listen with no bearer token is an open port, so it is refused unless the
-// operator said so in as many words.
+// operator said so in as many words, and the refusal names this tool's own
+// variables.
 func TestServeNeedsAnAuthToken(t *testing.T) {
 	t.Parallel()
 
-	if err := checkAuth("", false); err == nil {
+	if err := server.CheckAuth((&FlagData{Listen: testListen}).serveOptions()); err == nil {
 		t.Error("no token and no --allow-no-auth was not refused")
-	} else if !strings.Contains(err.Error(), "SONARR_AUTH_TOKEN") || !strings.Contains(err.Error(), "allow-no-auth") {
+	} else if !strings.Contains(err.Error(), "SONARR_AUTH_TOKEN") || !strings.Contains(err.Error(), "SONARR_ALLOW_NO_AUTH") {
 		t.Errorf("the refusal does not say how to fix it: %v", err)
 	}
-	if err := checkAuth("", true); err != nil {
+	if err := server.CheckAuth((&FlagData{Listen: testListen, AllowNoAuth: true}).serveOptions()); err != nil {
 		t.Errorf("--allow-no-auth was refused: %v", err)
 	}
-	if err := checkAuth(testToken, false); err != nil {
+	if err := server.CheckAuth((&FlagData{Listen: testListen, AuthToken: testToken}).serveOptions()); err != nil {
 		t.Errorf("a token was refused: %v", err)
 	}
 }

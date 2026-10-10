@@ -1,7 +1,9 @@
 # Used by goreleaser (dockers_v2 in .goreleaser.yaml) to publish ghcr.io/katbyte/sonarr-mcp on
 # tag: the build context holds the prebuilt binary per platform, so this only copies it onto
 # alpine. Dockerfile (from source) is what make docker uses; keep the two final stages in sync.
-FROM alpine:3.24
+# alpine comes from Google's mirror of Docker Hub, which does not turn a shared release runner
+# away for having pulled too much (see release.yaml).
+FROM mirror.gcr.io/library/alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata \
     && adduser -D -H -u 65532 sonarrmcp
 ARG TARGETPLATFORM

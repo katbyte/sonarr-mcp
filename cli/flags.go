@@ -6,7 +6,8 @@ import (
 	"os"
 
 	"github.com/katbyte/go-kt/clog"
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/pandorest/client"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/katbyte/sonarr-mcp/tools"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -50,8 +51,8 @@ func configureFlags(root *cobra.Command) error {
 	pflags.Bool("read-only", false, "register only tools that never change Sonarr's state")
 	pflags.Bool("enable-delete", false, "register the tools that delete series and episode files from disk")
 	pflags.StringSlice("toolsets", nil, "groups of tools to register: all, core (default), curation, library, admin, or a resource family like series (core is always included)")
-	pflags.StringSlice("allow-tools", nil, "only register these tools: names, prefix globs like series_*, or the essential preset")
-	pflags.StringSlice("deny-tools", nil, "never register these tools: names or prefix globs like *_delete")
+	pflags.StringSlice("allow-tools", nil, "register these tools by name: names, prefix globs like series_*, or the essential preset. On its own, only these; beside --toolsets, these as well as the sets")
+	pflags.StringSlice("deny-tools", nil, "never register these tools, whatever asked for them: names or prefix globs like *_delete")
 	pflags.String("listen", "", "serve MCP over HTTP on this address (e.g. :8080) instead of stdio")
 	pflags.String("auth-token", "", "bearer token required on the HTTP endpoint (consider exporting to SONARR_AUTH_TOKEN instead)")
 	pflags.Bool("allow-no-auth", false, "serve HTTP with no bearer token: anyone who can reach the port can use every tool")
@@ -97,21 +98,27 @@ func GetFlags() *FlagData {
 	return &f
 }
 
+// NewClient is the client for the configured Sonarr. What it sends and is
+// sent goes to the log at trace (SONARR_LOG=trace), with the API key hidden.
 func (f *FlagData) NewClient() (*sonarr.Client, error) {
-	return sonarr.New(f.Server, f.Token)
+	return sonarr.New(f.Server, f.Token, client.WithLog(clog.Log))
 }
 
-// DefaultToolsets is what the binary registers when --toolsets is not given:
-// enough to find things and read them, and nothing that writes. The whole
-// surface is thousands of tokens of tool definitions before a question is
-// asked, which is a poor thing to spend a client's context on by default.
-// Ask for more with --toolsets, or --toolsets all for everything.
+// DefaultToolsets is what the binary registers when neither --toolsets nor
+// --allow-tools is given: enough to find things and read them, and nothing
+// that writes. The whole surface is thousands of tokens of tool definitions
+// before a question is asked, which is a poor thing to spend a client's
+// context on by default. Ask for more with --toolsets, or --toolsets all for
+// everything.
 var DefaultToolsets = []string{"core"}
 
-// ToolOptions maps the flags onto the tool registration options.
+// ToolOptions maps the flags onto the tool registration options. An allow
+// list with no --toolsets is the whole of what loads: it already says which
+// tools, so the default set is not put beside it. Beside --toolsets it adds
+// the tools it names to the sets.
 func (f *FlagData) ToolOptions() tools.Options {
 	sets := f.Toolsets
-	if len(sets) == 0 {
+	if len(sets) == 0 && len(f.AllowTools) == 0 {
 		sets = DefaultToolsets
 	}
 

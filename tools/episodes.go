@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -58,20 +58,12 @@ func projectEpisode(e *sonarr.EpisodeResource, now time.Time) episodeRow {
 
 // episodesOf reads a series' episodes, every season or one.
 func (r *registry) episodesOf(ctx context.Context, seriesID int, season *int, files bool) ([]sonarr.EpisodeResource, error) {
-	opts := sonarr.GetEpisodeOperationOptions{SeriesId: seriesID, IncludeEpisodeFile: new(files)}
-	if season != nil {
-		// season 0 is the specials, which the option cannot send: its zero
-		// value is left out, so they are filtered here instead
-		opts.SeasonNumber = *season
-	}
-	res, err := r.client.GetEpisode(ctx, opts)
+	// season 0 is the specials, and is asked for like any other
+	res, err := r.client.GetEpisode(ctx, sonarr.GetEpisodeOperationOptions{SeriesId: new(seriesID), SeasonNumber: season, IncludeEpisodeFile: new(files)})
 	if err != nil {
 		return nil, err
 	}
 	eps := res.Model
-	if season != nil {
-		eps = slices.DeleteFunc(eps, func(e sonarr.EpisodeResource) bool { return e.SeasonNumber != *season })
-	}
 	slices.SortFunc(eps, func(a, b sonarr.EpisodeResource) int {
 		if a.SeasonNumber != b.SeasonNumber {
 			return a.SeasonNumber - b.SeasonNumber
@@ -114,6 +106,16 @@ func pickEpisodes(eps []sonarr.EpisodeResource, refs []string) ([]sonarr.Episode
 	return out, nil
 }
 
+// noSeason refuses a season a series does not have, naming the ones it does.
+func noSeason(s *sonarr.SeriesResource, season int) error {
+	have := make([]string, 0, len(s.Seasons))
+	for _, sn := range s.Seasons {
+		have = append(have, strconv.Itoa(sn.SeasonNumber))
+	}
+
+	return fmt.Errorf("%s has no season %d (it has: %s)", s.Title, season, strings.Join(have, ", "))
+}
+
 func episodeIDs(eps []sonarr.EpisodeResource) []int {
 	out := make([]int, 0, len(eps))
 	for _, e := range eps {
@@ -130,11 +132,11 @@ func registerEpisodeTools(r *registry) {
 		Series  string `json:"series"            jsonschema:"the series: title, Sonarr id or tvdb:<id>"`
 		Season  *int   `json:"season,omitempty"  jsonschema:"only this season; 0 is the specials"`
 		Missing bool   `json:"missing,omitempty" jsonschema:"only monitored episodes that have aired and have no file"`
-		Limit   int    `json:"limit,omitempty"   jsonschema:"episodes to return, default 300"`
+		pageIn
 	}
 	type listOut struct {
-		Series   string       `json:"series"`
-		Total    int          `json:"total"`
+		Series string `json:"series"`
+		pageOut
 		Episodes []episodeRow `json:"episodes"`
 	}
 	add(r, readTool, &mcp.Tool{
@@ -150,17 +152,16 @@ func registerEpisodeTools(r *registry) {
 			return nil, listOut{}, err
 		}
 		now := time.Now()
-		out := listOut{Series: s.Title}
+		rows := make([]episodeRow, 0, len(eps))
 		for i := range eps {
 			row := projectEpisode(&eps[i], now)
 			if in.Missing && (row.HasFile || !row.Monitored || !row.Aired) {
 				continue
 			}
-			out.Total++
-			if len(out.Episodes) < limitOr(in.Limit, 300) {
-				out.Episodes = append(out.Episodes, row)
-			}
+			rows = append(rows, row)
 		}
+		out := listOut{Series: s.Title}
+		out.Episodes, out.pageOut = pageRows(rows, in.pageIn)
 
 		return nil, out, nil
 	})
@@ -222,35 +223,79 @@ func registerEpisodeTools(r *registry) {
 		if len(in.Seasons) == 0 {
 			return nil, seasonMonitorOut{}, errors.New("name the seasons to change")
 		}
+
+		// the whole series is sent back with the seasons changed, so another
+		// edit of it in the same turn waits, and the record is read once the
+		// series is this call's alone
+		unlock := r.locking().By(seriesLock(s.Id))
+		defer unlock()
+
 		cur, err := client.GetSeriesById(ctx, s.Id, sonarr.GetSeriesByIdOperationOptions{})
 		if err != nil {
 			return nil, seasonMonitorOut{}, err
 		}
 		body := *cur.Model
 		out := seasonMonitorOut{Series: body.Title}
+		var settled []int
+		write := false
 		for _, want := range in.Seasons {
 			i := slices.IndexFunc(body.Seasons, func(season sonarr.SeasonResource) bool { return season.SeasonNumber == want })
 			if i < 0 {
-				return nil, seasonMonitorOut{}, fmt.Errorf("%s has no season %d", body.Title, want)
+				return nil, seasonMonitorOut{}, noSeason(&body, want)
 			}
-			if boolv(body.Seasons[i].Monitored) != in.Monitored {
-				body.Seasons[i].Monitored = new(in.Monitored)
-				out.Changed = append(out.Changed, fmt.Sprintf("season %d: monitored %v", want, in.Monitored))
+			if boolv(body.Seasons[i].Monitored) == in.Monitored {
+				settled = append(settled, want)
+				continue
+			}
+			body.Seasons[i].Monitored = new(in.Monitored)
+			out.Changed = append(out.Changed, fmt.Sprintf("season %d: monitored %v", want, in.Monitored))
+			write = true
+		}
+
+		// a season's flag is its own, not a count of its episodes: episode_monitor
+		// changes episodes and leaves it be, so a season can say unmonitored
+		// with monitored episodes in it, which Sonarr goes on searching for.
+		// A season whose flag is already as asked is not therefore done, and
+		// Sonarr only sets the episodes of a season whose flag changed, so
+		// those episodes are set here.
+		var stragglers []int
+		if len(settled) > 0 {
+			eps, err := r.episodesOf(ctx, s.Id, nil, false)
+			if err != nil {
+				return nil, seasonMonitorOut{}, err
+			}
+			for _, season := range settled {
+				n := len(stragglers)
+				for _, e := range eps {
+					if e.SeasonNumber == season && boolv(e.Monitored) != in.Monitored {
+						stragglers = append(stragglers, e.Id)
+					}
+				}
+				if n = len(stragglers) - n; n > 0 {
+					out.Changed = append(out.Changed, fmt.Sprintf("season %d: %s monitored %v, which the season already said it was", season, countOf(n, "episode"), in.Monitored))
+				}
 			}
 		}
-		if len(out.Changed) == 0 {
-			return nil, out, nil
-		}
+
 		// the series' own flag follows: monitoring a season of an unmonitored
 		// series would otherwise do nothing
 		if in.Monitored && !boolv(body.Monitored) {
 			body.Monitored = new(true)
 			out.Changed = append(out.Changed, "series: monitored true")
+			write = true
 		}
+
 		// Sonarr sets every episode of a season whose flag changed to match
 		// it (SeriesService.UpdateSeries), as its own season toggle does
-		if _, err := client.PutSeriesById(ctx, strconv.Itoa(body.Id), body, sonarr.PutSeriesByIdOperationOptions{}); err != nil {
-			return nil, seasonMonitorOut{}, err
+		if write {
+			if _, err := client.PutSeriesById(ctx, strconv.Itoa(body.Id), body, sonarr.PutSeriesByIdOperationOptions{}); err != nil {
+				return nil, seasonMonitorOut{}, err
+			}
+		}
+		if len(stragglers) > 0 {
+			if _, err := client.PutEpisodeMonitor(ctx, sonarr.EpisodesMonitoredResource{EpisodeIds: stragglers, Monitored: new(in.Monitored)}, sonarr.PutEpisodeMonitorOperationOptions{}); err != nil {
+				return nil, out, err
+			}
 		}
 
 		return nil, out, nil
@@ -307,8 +352,10 @@ func registerEpisodeTools(r *registry) {
 		if err != nil {
 			return nil, searchOut{}, err
 		}
+		// Sonarr takes a search for a season the series does not have and
+		// reports it done, having searched for nothing
 		if !slices.ContainsFunc(s.Seasons, func(season sonarr.SeasonResource) bool { return season.SeasonNumber == in.Season }) {
-			return nil, searchOut{}, fmt.Errorf("%s has no season %d", s.Title, in.Season)
+			return nil, searchOut{}, noSeason(s, in.Season)
 		}
 		cmd, err := r.runCommand(ctx, "SeasonSearch", map[string]any{"seriesId": s.Id, "seasonNumber": in.Season}, waitFor(in.Wait))
 		if err != nil {
@@ -327,6 +374,7 @@ func registerEpisodeTools(r *registry) {
 		Days        int  `json:"days,omitempty"                jsonschema:"how many days ahead, default 7"`
 		PastDays    int  `json:"past_days,omitempty"           jsonschema:"how many days back to include as well, default 0"`
 		Unmonitored bool `json:"include_unmonitored,omitempty" jsonschema:"include episodes Sonarr is not monitoring"`
+		pageIn
 	}
 	type calendarRow struct {
 		AirDateUTC string `json:"air_date_utc"`
@@ -339,8 +387,9 @@ func registerEpisodeTools(r *registry) {
 		HasFile    bool   `json:"has_file"`
 	}
 	type calendarOut struct {
-		From     string        `json:"from"`
-		To       string        `json:"to"`
+		From string `json:"from"`
+		To   string `json:"to"`
+		pageOut
 		Episodes []calendarRow `json:"episodes"`
 	}
 	add(r, readTool, &mcp.Tool{
@@ -357,7 +406,7 @@ func registerEpisodeTools(r *registry) {
 		if err != nil {
 			return nil, calendarOut{}, err
 		}
-		out := calendarOut{From: from.Format(time.DateOnly), To: to.Format(time.DateOnly)}
+		rows := make([]calendarRow, 0, len(res.Model))
 		for _, e := range res.Model {
 			row := calendarRow{
 				AirDateUTC: e.AirDateUtc, SeriesID: e.SeriesId, Episode: episodeLabel(e.SeasonNumber, e.EpisodeNumber),
@@ -366,9 +415,11 @@ func registerEpisodeTools(r *registry) {
 			if e.Series != nil {
 				row.Series, row.Network = e.Series.Title, e.Series.Network
 			}
-			out.Episodes = append(out.Episodes, row)
+			rows = append(rows, row)
 		}
-		slices.SortStableFunc(out.Episodes, func(a, b calendarRow) int { return strings.Compare(a.AirDateUTC, b.AirDateUTC) })
+		slices.SortStableFunc(rows, func(a, b calendarRow) int { return strings.Compare(a.AirDateUTC, b.AirDateUTC) })
+		out := calendarOut{From: from.Format(time.DateOnly), To: to.Format(time.DateOnly)}
+		out.Episodes, out.pageOut = pageRows(rows, in.pageIn)
 
 		return nil, out, nil
 	})

@@ -6,35 +6,38 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/katbyte/go-kt/mcp/acctest"
 )
 
 func TestFileList(t *testing.T) {
 	out := call(t, "file_list", map[string]any{"series": firefly.Title})
 
-	files := rows(t, out["files"], "files")
-	if str(out["path"]) != "/tv/"+firefly.Folder || len(files) != firefly.Files {
+	files := acctest.Rows(t, out["files"], "files")
+	if acctest.Str(out["path"]) != "/tv/"+firefly.Folder || len(files) != firefly.Files {
 		t.Fatalf("Firefly files = %d: %v", len(files), out)
 	}
 	// in episode order, each with what its streams say
 	for i, f := range files {
-		if want := episodeName(1, i+1); str(f["episodes"]) != want {
+		if want := episodeName(1, i+1); acctest.Str(f["episodes"]) != want {
 			t.Errorf("file %d is %v, want %s", i, f["episodes"], want)
 		}
 	}
 	e04 := findRow(t, files, "episodes", "S01E04")
-	media := object(t, e04["media"], "media")
-	if str(e04["quality"]) != "SDTV" || e04["below_cutoff"] != true || str(media["resolution"]) != "640x360" ||
-		str(media["video_codec"]) != "x264" || str(media["runtime"]) == "" {
+	media := acctest.Object(t, e04["media"], "media")
+	if acctest.Str(e04["quality"]) != "SDTV" || e04["below_cutoff"] != true || acctest.Str(media["resolution"]) != "640x360" ||
+		acctest.Str(media["video_codec"]) != "x264" || acctest.Str(media["runtime"]) == "" {
 		t.Errorf("S01E04 = %v", e04)
 	}
-	if e01 := findRow(t, files, "episodes", "S01E01"); !slices.Contains(strs(t, e01["languages"], "languages"), "English") {
+	if e01 := findRow(t, files, "episodes", "S01E01"); !slices.Contains(acctest.Strs(t, e01["languages"], "languages"), "English") {
 		t.Errorf("S01E01 languages = %v", e01["languages"])
 	}
 
 	// the specials hold nothing
-	if specials := call(t, "file_list", map[string]any{"series": firefly.Title, "season": 0}); len(rowsOf(specials["files"])) != 0 {
+	if specials := call(t, "file_list", map[string]any{"series": firefly.Title, "season": 0}); len(acctest.RowsOf(specials["files"])) != 0 {
 		t.Errorf("Firefly specials = %v", specials["files"])
 	}
 }
@@ -43,16 +46,16 @@ func TestFileEdit(t *testing.T) {
 	e02 := fireflyFile(t, 2)
 	out := call(t, "file_edit", map[string]any{"file_ids": []any{e02}, "languages": []any{"japanese"}, "release_group": "FAKE"})
 
-	files := rows(t, out["files"], "files")
-	if len(files) != 1 || str(files[0]["episodes"]) != "S01E02" || !slices.Equal(strs(t, files[0]["languages"], "languages"), []string{"Japanese"}) ||
-		str(files[0]["release_group"]) != "FAKE" || str(files[0]["quality"]) != "WEBDL-1080p" {
+	files := acctest.Rows(t, out["files"], "files")
+	if len(files) != 1 || acctest.Str(files[0]["episodes"]) != "S01E02" || !slices.Equal(acctest.Strs(t, files[0]["languages"], "languages"), []string{"Japanese"}) ||
+		acctest.Str(files[0]["release_group"]) != "FAKE" || acctest.Str(files[0]["quality"]) != "WEBDL-1080p" {
 		t.Fatalf("file_edit = %v", out)
 	}
 	t.Cleanup(func() { call(t, "file_edit", map[string]any{"file_ids": []any{e02}, "languages": []any{"English"}}) })
 
 	// the language audit sees the file as recorded now
 	lang := call(t, "audit_language", map[string]any{"series": firefly.Title})
-	if f := findings(t, lang, "subject", "S01E02 "); len(f) != 1 || str(f[0]["problem"]) != "recorded in another language" {
+	if f := findings(t, lang, "subject", "S01E02 "); len(f) != 1 || acctest.Str(f[0]["problem"]) != "recorded in another language" {
 		t.Errorf("after recording S01E02 as Japanese = %v", lang["findings"])
 	}
 
@@ -78,21 +81,75 @@ func TestFileDelete(t *testing.T) {
 	}
 	call(t, "series_rescan", map[string]any{"series": severance.Title})
 	list := call(t, "file_list", map[string]any{"series": severance.Title, "season": 1})
-	e03 := findRow(t, rows(t, list["files"], "files"), "episodes", "S01E03")
+	e03 := findRow(t, acctest.Rows(t, list["files"], "files"), "episodes", "S01E03")
 
-	out := call(t, "file_delete", map[string]any{"file_ids": []any{num(t, e03["id"], "id")}})
-	if deleted := strs(t, out["deleted"], "deleted"); len(deleted) != 1 || !strings.HasSuffix(deleted[0], "In Perpetuity WEBDL-1080p.mkv") {
+	// the episode is monitored, as one being deleted to make room usually
+	// still is, and is put back as it was afterwards
+	eps := call(t, "episode_list", map[string]any{"series": severance.Title, "season": 1})
+	was := findRow(t, acctest.Rows(t, eps["episodes"], "episodes"), "episode", "S01E03")["monitored"]
+	call(t, "episode_monitor", map[string]any{"series": severance.Title, "episodes": []any{"S01E03"}, "monitored": true})
+	t.Cleanup(func() {
+		call(t, "episode_monitor", map[string]any{"series": severance.Title, "episodes": []any{"S01E03"}, "monitored": was})
+	})
+
+	// without confirm the file is named and left where it is, with the
+	// episode it holds and the warning that Sonarr would get it again
+	would := call(t, "file_delete", map[string]any{"file_ids": []any{acctest.Num(t, e03["id"], "id")}})
+	if gone := acctest.Strs(t, would["would_delete"], "would_delete"); len(gone) != 1 || !strings.HasSuffix(gone[0], "In Perpetuity WEBDL-1080p.mkv") || len(acctest.Strs(t, would["deleted"], "deleted")) != 0 {
+		t.Errorf("without confirm = %v", would)
+	}
+	if row := acctest.Rows(t, would["files"], "files"); len(row) != 1 || acctest.Str(row[0]["episodes"]) != "S01E03" || row[0]["monitored"] != true || acctest.Str(row[0]["size"]) == "" {
+		t.Errorf("the file as the preview names it = %v", would["files"])
+	}
+	if w := acctest.Str(would["warning"]); !strings.Contains(w, "S01E03") || !strings.Contains(w, "episode_monitor") {
+		t.Errorf("the warning for a monitored episode = %q", w)
+	}
+	if _, err := os.Stat(p); err != nil {
+		t.Fatalf("the file went without confirm: %v", err)
+	}
+
+	out := call(t, "file_delete", map[string]any{"file_ids": []any{acctest.Num(t, e03["id"], "id")}, "confirm": true})
+	if deleted := acctest.Strs(t, out["deleted"], "deleted"); len(deleted) != 1 || !strings.HasSuffix(deleted[0], "In Perpetuity WEBDL-1080p.mkv") {
 		t.Errorf("deleted = %v", out)
 	}
 	if _, err := os.Stat(p); !os.IsNotExist(err) {
 		t.Errorf("the file is still on disk: %v", err)
 	}
-	eps := call(t, "episode_list", map[string]any{"series": severance.Title, "season": 1})
-	if e := findRow(t, rows(t, eps["episodes"], "episodes"), "episode", "S01E03"); e["has_file"] != false {
+	// the episode is missing and Sonarr still wants it, which is what the
+	// warning said: it is left monitored, to be downloaded again
+	eps = call(t, "episode_list", map[string]any{"series": severance.Title, "season": 1})
+	if e := findRow(t, acctest.Rows(t, eps["episodes"], "episodes"), "episode", "S01E03"); e["has_file"] != false || e["monitored"] != true {
 		t.Errorf("S01E03 after its file was deleted = %v", e)
 	}
 
-	if msg := callErr(t, "file_delete", map[string]any{"file_ids": []any{999999}}); !strings.Contains(msg, "no episode file 999999") {
+	// with Sonarr set to unmonitor what is deleted, the same delete stops the
+	// episode being monitored instead, and the warning says that
+	media, err := api.GetConfigMediaManagement(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	on := *media.Model
+	on.AutoUnmonitorPreviouslyDownloadedEpisodes = new(true)
+	if _, err := api.PutConfigMediaManagementById(ctx, strconv.Itoa(on.Id), on); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = api.PutConfigMediaManagementById(ctx, strconv.Itoa(media.Model.Id), *media.Model) })
+	if err := fakeVideo(p, 57, "1920x1080"); err != nil {
+		t.Fatal(err)
+	}
+	call(t, "series_rescan", map[string]any{"series": severance.Title})
+	list = call(t, "file_list", map[string]any{"series": severance.Title, "season": 1})
+	e03 = findRow(t, acctest.Rows(t, list["files"], "files"), "episodes", "S01E03")
+	out = call(t, "file_delete", map[string]any{"file_ids": []any{acctest.Num(t, e03["id"], "id")}, "confirm": true})
+	if w := acctest.Str(out["warning"]); !strings.Contains(w, "stops monitoring S01E03") {
+		t.Errorf("the warning with Sonarr unmonitoring what is deleted = %q", w)
+	}
+	eps = call(t, "episode_list", map[string]any{"series": severance.Title, "season": 1})
+	if e := findRow(t, acctest.Rows(t, eps["episodes"], "episodes"), "episode", "S01E03"); e["has_file"] != false || e["monitored"] != false {
+		t.Errorf("S01E03 after its file was deleted with Sonarr unmonitoring what is deleted = %v", e)
+	}
+
+	if msg := callErr(t, "file_delete", map[string]any{"file_ids": []any{999999}, "confirm": true}); !strings.Contains(msg, "no episode file 999999") {
 		t.Errorf("an unknown file = %s", msg)
 	}
 	callErr(t, "file_delete", map[string]any{"file_ids": []any{}})

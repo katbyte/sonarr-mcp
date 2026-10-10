@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -10,7 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -45,6 +47,8 @@ func newFakeServer(t *testing.T) *fakeServer {
 		f.seen = append(f.seen, request{r.Method, r.URL.Path, r.URL.RawQuery})
 		f.bodies[r.Method+" "+r.URL.Path] = append(f.bodies[r.Method+" "+r.URL.Path], string(body))
 		f.mu.Unlock()
+		// a route that keeps what it is sent reads the body too
+		r.Body = io.NopCloser(bytes.NewReader(body))
 		f.mux.ServeHTTP(w, r)
 	}))
 	t.Cleanup(f.srv.Close)
@@ -119,6 +123,27 @@ func session(t *testing.T, f *fakeServer, opts Options) *mcp.ClientSession {
 	if _, err := RegisterAll(srv, client, opts); err != nil {
 		t.Fatal(err)
 	}
+
+	return connect(t, srv)
+}
+
+// hostRegistry serves the tools queued on a registry of the test's own, every
+// one of them, to an in-memory MCP client.
+func hostRegistry(t *testing.T, r *registry) *mcp.ClientSession {
+	t.Helper()
+
+	srv := mcp.NewServer(&mcp.Implementation{Name: "t", Version: "0"}, nil)
+	if _, err := r.queued().Register(srv, mcpregistry.Selection{EnableDelete: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	return connect(t, srv)
+}
+
+// connect opens an in-memory MCP client on a server.
+func connect(t *testing.T, srv *mcp.Server) *mcp.ClientSession {
+	t.Helper()
+
 	st, ct := mcp.NewInMemoryTransports()
 	ctx := context.Background()
 	if _, err := srv.Connect(ctx, st, nil); err != nil {

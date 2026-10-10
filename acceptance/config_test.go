@@ -4,29 +4,31 @@ package acceptance
 
 import (
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/lib/testenv"
+
+	"github.com/katbyte/go-kt/mcp/acctest"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
 func TestProfileList(t *testing.T) {
 	out := call(t, "profile_list", nil)
 
-	profiles := rows(t, out["profiles"], "profiles")
+	profiles := acctest.Rows(t, out["profiles"], "profiles")
 	hd := findRow(t, profiles, "name", profile)
-	allowed := strs(t, hd["allowed_qualities"], "allowed_qualities")
+	allowed := acctest.Strs(t, hd["allowed_qualities"], "allowed_qualities")
 	// best first, and nothing below 1080p
 	if len(allowed) == 0 || !strings.Contains(allowed[0], "1080p") || slices.Contains(allowed, "SDTV") {
 		t.Errorf("HD-1080p allows %v", allowed)
 	}
-	if str(hd["cutoff"]) != "HDTV-1080p" || num(t, hd["series"], "series") < 4 {
+	if acctest.Str(hd["cutoff"]) != "HDTV-1080p" || acctest.Num(t, hd["series"], "series") < 4 {
 		t.Errorf("HD-1080p = %v", hd)
 	}
-	if any := findRow(t, profiles, "name", "Any"); num(t, any["series"], "series") != 0 || !slices.Contains(strs(t, any["allowed_qualities"], "allowed"), "SDTV") {
+	if any := findRow(t, profiles, "name", "Any"); acctest.Num(t, any["series"], "series") != 0 || !slices.Contains(acctest.Strs(t, any["allowed_qualities"], "allowed"), "SDTV") {
 		t.Errorf("Any = %v", any)
 	}
 }
@@ -61,14 +63,14 @@ func TestCustomFormatList(t *testing.T) {
 	t.Cleanup(func() { _, _ = api.DeleteCustomFormatById(ctx, made.Model.Id) })
 
 	out := call(t, "customformat_list", nil)
-	cf := findRow(t, rows(t, out["custom_formats"], "custom_formats"), "name", "Test HEVC")
-	if specsOut := strs(t, cf["specifications"], "specifications"); len(specsOut) != 1 || specsOut[0] != "ReleaseTitleSpecification: x265 (required)" {
+	cf := findRow(t, acctest.Rows(t, out["custom_formats"], "custom_formats"), "name", "Test HEVC")
+	if specsOut := acctest.Strs(t, cf["specifications"], "specifications"); len(specsOut) != 1 || specsOut[0] != "ReleaseTitleSpecification: x265 (required)" {
 		t.Errorf("specifications = %v", specsOut)
 	}
-	if len(object(t, cf["scores"], "scores")) != 0 {
+	if len(acctest.Object(t, cf["scores"], "scores")) != 0 {
 		t.Errorf("scores = %v, want none", cf["scores"])
 	}
-	if f := findings(t, call(t, "audit_profiles", nil), "subject", "Test HEVC"); len(f) != 1 || str(f[0]["problem"]) != "custom format scored nowhere" {
+	if f := findings(t, call(t, "audit_profiles", nil), "subject", "Test HEVC"); len(f) != 1 || acctest.Str(f[0]["problem"]) != "custom format scored nowhere" {
 		t.Errorf("audit_profiles on an unscored format = %v", f)
 	}
 
@@ -87,11 +89,11 @@ func TestCustomFormatList(t *testing.T) {
 		t.Fatal(err)
 	}
 	scored := call(t, "customformat_list", nil)
-	cf = findRow(t, rows(t, scored["custom_formats"], "custom_formats"), "name", "Test HEVC")
-	if s := object(t, cf["scores"], "scores"); numOr0(s[profile]) != -100 {
+	cf = findRow(t, acctest.Rows(t, scored["custom_formats"], "custom_formats"), "name", "Test HEVC")
+	if s := acctest.Object(t, cf["scores"], "scores"); acctest.NumOr0(s[profile]) != -100 {
 		t.Errorf("scores after scoring = %v", s)
 	}
-	if hd := findRow(t, rows(t, call(t, "profile_list", nil)["profiles"], "profiles"), "name", profile); numOr0(object(t, hd["custom_format_scores"], "scores")["Test HEVC"]) != -100 {
+	if hd := findRow(t, acctest.Rows(t, call(t, "profile_list", nil)["profiles"], "profiles"), "name", profile); acctest.NumOr0(acctest.Object(t, hd["custom_format_scores"], "scores")["Test HEVC"]) != -100 {
 		t.Errorf("profile_list scores = %v", hd["custom_format_scores"])
 	}
 	if f := findings(t, call(t, "audit_profiles", nil), "subject", "Test HEVC"); len(f) != 0 {
@@ -122,14 +124,14 @@ func TestCustomFormatList(t *testing.T) {
 	restore()
 	if len(below) == 0 {
 		t.Error("no file is below the custom format score the profile upgrades until, with every file scoring 0 of 10")
-	} else if !strings.Contains(str(below[0]["detail"]), "custom format score") {
+	} else if !strings.Contains(acctest.Str(below[0]["detail"]), "custom format score") {
 		t.Errorf("below the format cutoff = %v", below[0])
 	}
 }
 
 func TestTags(t *testing.T) {
 	made := call(t, "tag_create", map[string]any{"label": "Kids Shows"})
-	if str(made["label"]) != "kids shows" || num(t, made["id"], "id") == 0 {
+	if acctest.Str(made["label"]) != "kids shows" || acctest.Num(t, made["id"], "id") == 0 {
 		t.Fatalf("tag_create = %v", made)
 	}
 	if msg := callErr(t, "tag_create", map[string]any{"label": "KIDS SHOWS"}); !strings.Contains(msg, "already exists") {
@@ -139,15 +141,15 @@ func TestTags(t *testing.T) {
 
 	call(t, "series_edit", map[string]any{"series": firefly.Title, "add_tags": []any{"kids shows"}})
 	list := call(t, "tag_list", nil)
-	tags := rows(t, list["tags"], "tags")
+	tags := acctest.Rows(t, list["tags"], "tags")
 	kids := findRow(t, tags, "label", "kids shows")
-	if !slices.Equal(strs(t, kids["series"], "series"), []string{firefly.Title}) || kids["in_use"] != true {
+	if !slices.Equal(acctest.Strs(t, kids["series"], "series"), []string{firefly.Title}) || kids["in_use"] != true {
 		t.Errorf("kids shows = %v", kids)
 	}
 	if four := findRow(t, tags, "label", unusedTag); four["in_use"] != false {
 		t.Errorf("%s = %v", unusedTag, four)
 	}
-	if anime := findRow(t, tags, "label", "anime"); !slices.Contains(strs(t, anime["series"], "series"), cowboyBebop.Title) {
+	if anime := findRow(t, tags, "label", "anime"); !slices.Contains(acctest.Strs(t, anime["series"], "series"), cowboyBebop.Title) {
 		t.Errorf("anime = %v", anime)
 	}
 
@@ -156,7 +158,7 @@ func TestTags(t *testing.T) {
 		t.Errorf("deleting a tag in use = %s", msg)
 	}
 	call(t, "series_edit", map[string]any{"series": firefly.Title, "remove_tags": []any{"kids shows"}})
-	if out := call(t, "tag_delete", map[string]any{"label": "Kids Shows"}); str(out["deleted"]) != "kids shows" {
+	if out := call(t, "tag_delete", map[string]any{"label": "Kids Shows"}); acctest.Str(out["deleted"]) != "kids shows" {
 		t.Errorf("tag_delete = %v", out)
 	}
 	if msg := callErr(t, "tag_delete", map[string]any{"label": "kids shows"}); !strings.Contains(msg, "no tag") {
@@ -167,17 +169,17 @@ func TestTags(t *testing.T) {
 func TestRootFolders(t *testing.T) {
 	out := call(t, "rootfolder_list", nil)
 
-	folders := rows(t, out["root_folders"], "root_folders")
+	folders := acctest.Rows(t, out["root_folders"], "root_folders")
 	tv := findRow(t, folders, "path", "/tv")
-	if tv["accessible"] != true || num(t, tv["series"], "series") < 5 || str(tv["free_space"]) == "" {
+	if tv["accessible"] != true || acctest.Num(t, tv["series"], "series") < 5 || acctest.Str(tv["free_space"]) == "" {
 		t.Errorf("/tv = %v", tv)
 	}
-	if !slices.Contains(strs(t, tv["unmapped_folders"], "unmapped_folders"), theExpanse.Folder) {
+	if !slices.Contains(acctest.Strs(t, tv["unmapped_folders"], "unmapped_folders"), theExpanse.Folder) {
 		t.Errorf("/tv unmapped = %v", tv["unmapped_folders"])
 	}
 
 	// a second root folder, next to the downloads rather than inside them
-	dir := filepath.Join(dataDir(), "downloads", "library2")
+	dir := testenv.DataDir("downloads", "library2")
 	if err := os.MkdirAll(dir, 0o777); err != nil { //nolint:gosec // the container writes it as another user
 		t.Fatal(err)
 	}
@@ -186,7 +188,7 @@ func TestRootFolders(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	added := call(t, "rootfolder_add", map[string]any{"path": "/downloads/library2"})
-	if r := object(t, added["root_folder"], "root_folder"); str(r["path"]) != "/downloads/library2" || numOr0(r["series"]) != 0 {
+	if r := acctest.Object(t, added["root_folder"], "root_folder"); acctest.Str(r["path"]) != "/downloads/library2" || acctest.NumOr0(r["series"]) != 0 {
 		t.Errorf("rootfolder_add = %v", added)
 	}
 	if msg := callErr(t, "rootfolder_add", map[string]any{"path": "/downloads/library2"}); !strings.Contains(msg, "HTTP 400") {
@@ -200,7 +202,7 @@ func TestRootFolders(t *testing.T) {
 	}
 
 	removed := call(t, "rootfolder_remove", map[string]any{"path": "/downloads/library2/"})
-	if str(removed["removed"]) != "/downloads/library2" || numOr0(removed["series_still_in_it"]) != 0 {
+	if acctest.Str(removed["removed"]) != "/downloads/library2" || acctest.NumOr0(removed["series_still_in_it"]) != 0 {
 		t.Errorf("rootfolder_remove = %v", removed)
 	}
 	if msg := callErr(t, "rootfolder_remove", map[string]any{"path": ""}); !strings.Contains(msg, "path is required") {
@@ -218,36 +220,36 @@ func TestRootFolders(t *testing.T) {
 	call(t, "rootfolder_add", map[string]any{"path": "/tv"})
 	if len(loose) < len(importedSeed) {
 		t.Errorf("%d series are outside every root folder, want all %d", len(loose), len(importedSeed))
-	} else if !strings.Contains(str(loose[0]["fix"]), "series_edit path") {
+	} else if !strings.Contains(acctest.Str(loose[0]["fix"]), "series_edit path") {
 		t.Errorf("a loose series = %v", loose[0])
 	}
 }
 
 func TestConfigGet(t *testing.T) {
 	naming := call(t, "config_get", map[string]any{"section": "naming"})
-	settings := object(t, naming["settings"], "settings")
-	if !strings.Contains(str(settings["standardEpisodeFormat"]), "{Series Title}") || settings["renameEpisodes"] != true {
+	settings := acctest.Object(t, naming["settings"], "settings")
+	if !strings.Contains(acctest.Str(settings["standardEpisodeFormat"]), "{Series Title}") || settings["renameEpisodes"] != true {
 		t.Errorf("naming = %v", settings)
 	}
 
 	// the host section holds the API key, and it never comes back
-	host := object(t, call(t, "config_get", map[string]any{"section": "host"})["settings"], "settings")
+	host := acctest.Object(t, call(t, "config_get", map[string]any{"section": "host"})["settings"], "settings")
 	for k := range host {
 		if strings.Contains(strings.ToLower(k), "apikey") || strings.Contains(strings.ToLower(k), "password") {
 			t.Errorf("the host settings include %s", k)
 		}
 	}
-	if numOr0(host["port"]) != 8989 {
+	if acctest.NumOr0(host["port"]) != 8989 {
 		t.Errorf("host = %v", host)
 	}
 
 	for _, section := range []string{"mediamanagement", "media_management", "ui", "indexer", "downloadclient", "importlist"} {
 		out := call(t, "config_get", map[string]any{"section": section})
-		if len(object(t, out["settings"], "settings")) == 0 {
+		if len(acctest.Object(t, out["settings"], "settings")) == 0 {
 			t.Errorf("%s has no settings", section)
 		}
 	}
-	if dc := object(t, call(t, "config_get", map[string]any{"section": "downloadclient"})["settings"], "s"); dc["autoRedownloadFailed"] != false {
+	if dc := acctest.Object(t, call(t, "config_get", map[string]any{"section": "downloadclient"})["settings"], "s"); dc["autoRedownloadFailed"] != false {
 		t.Errorf("the suite turned automatic re-download off, and config_get says %v", dc["autoRedownloadFailed"])
 	}
 	if msg := callErr(t, "config_get", map[string]any{"section": "secrets"}); !strings.Contains(msg, "section must be") {

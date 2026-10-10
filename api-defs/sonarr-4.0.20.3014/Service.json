@@ -1,0 +1,19 @@
+{
+  "Name": "sonarr",
+  "Package": "sonarr",
+  "Title": "Sonarr",
+  "ApiVersion": "3.0.0",
+  "Source": "api-defs/sonarr-openapi-4.0.20.3014.json",
+  "Auth": "APIKey",
+  "Workarounds": [
+    "sonarr-ui-routes",
+    "sonarr-undeclared-responses",
+    "sonarr-undeclared-write-responses",
+    "sonarr-created-accepted",
+    "sonarr-test-all-results",
+    "sonarr-command-body",
+    "sonarr-command-resource-body",
+    "sonarr-http-uri-string",
+    "sonarr-bulk-update-lists"
+  ]
+}

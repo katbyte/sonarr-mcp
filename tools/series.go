@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/katbyte/sonarr-mcp/lib/sonarr"
+	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -64,11 +64,10 @@ func registerSeriesTools(r *registry) {
 		Tag            string `json:"tag,omitempty"             jsonschema:"only series with this tag"`
 		QualityProfile string `json:"quality_profile,omitempty" jsonschema:"only series on this quality profile"`
 		Incomplete     bool   `json:"incomplete,omitempty"      jsonschema:"only series missing episodes Sonarr wants"`
-		Limit          int    `json:"limit,omitempty"           jsonschema:"series to return, default 100"`
-		Offset         int    `json:"offset,omitempty"          jsonschema:"series to skip, to page through a long list"`
+		pageIn
 	}
 	type listOut struct {
-		Total  int             `json:"total"  jsonschema:"series matching the filters, of which this page is a slice"`
+		pageOut
 		Series []seriesSummary `json:"series"`
 	}
 	add(r, readTool, &mcp.Tool{
@@ -84,7 +83,7 @@ func registerSeriesTools(r *registry) {
 			return nil, listOut{}, err
 		}
 		query := normaliseTitle(in.Query)
-		out := listOut{}
+		var rows []seriesSummary
 		for i := range all {
 			s := &all[i]
 			if query != "" && !slices.ContainsFunc(append([]string{s.Title}, alternateTitles(s)...), func(t string) bool {
@@ -100,12 +99,11 @@ func registerSeriesTools(r *registry) {
 			case in.QualityProfile != "" && !strings.EqualFold(in.QualityProfile, sum.QualityProfile):
 			case in.Incomplete && sum.EpisodesHave >= sum.EpisodesWanted:
 			default:
-				out.Total++
-				if out.Total > in.Offset && len(out.Series) < limitOr(in.Limit, 100) {
-					out.Series = append(out.Series, sum)
-				}
+				rows = append(rows, sum)
 			}
 		}
+		out := listOut{}
+		out.Series, out.pageOut = pageRows(rows, in.pageIn)
 
 		return nil, out, nil
 	})
