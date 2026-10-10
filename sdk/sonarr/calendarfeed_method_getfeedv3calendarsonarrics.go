@@ -61,6 +61,7 @@ func (o GetFeedV3CalendarSonarrIcsOperationOptions) ToQuery() *client.QueryParam
 // GetFeedV3CalendarSonarrIcs calls GET /feed/v3/calendar/sonarr.ics.
 func (c Client) GetFeedV3CalendarSonarrIcs(ctx context.Context, options GetFeedV3CalendarSonarrIcsOperationOptions) (result GetFeedV3CalendarSonarrIcsOperationResponse, err error) {
 	opts := client.RequestOptions{
+		Accept: "text/calendar",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},

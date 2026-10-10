@@ -121,7 +121,7 @@ A name the config gets wrong fails the import rather than doing nothing: a `Keep
 
 - **Names.** With `OperationIDNaming` a method is named after its operationId (`GetItems`; TMDB's `movie-details` is `MovieDetails`). With `PathNaming`, for operationIds that are machine-made, lossy or missing, it is named after the method and path: `GET /Items/{Id}/Similar` is `GetItemsByIdSimilar`. Schema names lose their dots and underscores (`QueryResult_BaseItemDto` is `QueryResultBaseItemDto`); fields keep the API's spelling (`Id`, `ImdbId`), and a field with a leading underscore beside its plain twin takes an `Underscore` prefix.
 - **Types.** `Integer` (int), `Integer64`, `Float`, `Double`, `String`, `Boolean`, `List`, `Dictionary`, `Reference` to a model or enum, `RawObject` for JSON of no declared shape (untyped objects, unions, "binary" JSON documents), `Any`, and `RawFile` for bodies that are not JSON. An inline object becomes a model named after its owner and field; an operation's inline request and response are named after the operation.
-- **Operations.** Path parameters in template order; query and header parameters as options, with lists comma-separated or one key per value as the document says, an object sent as one JSON string or, in `deepObject` style, as `name[key]=value` per key, and a header named `Accept`, `Content-Type` or `Authorization` ignored, as OpenAPI says; the JSON request body, a model whether declared or inline, or raw bytes; the success response (JSON, a file, or nothing); `ExpectedStatusCodes` from the 2xx responses; and `Pageable` for a list.
+- **Operations.** Path parameters in template order; query and header parameters as options, with lists comma-separated or one key per value as the document says, an object sent as one JSON string or, in `deepObject` style, as `name[key]=value` per key, and a header named `Accept`, `Content-Type` or `Authorization` ignored, as OpenAPI says (but for an `Accept` a workaround adds); the JSON request body, a model whether declared or inline, or raw bytes; the success response (JSON, a file, text a workaround says to read whole, or nothing); `ExpectedStatusCodes` from the 2xx responses; and `Pageable` for a list.
 - **Grouping.** One definitions file per spec tag, holding the tag's operations and the models and enums only its operations use. Anything more than one tag uses is in `Common.json`. There is one Go package per service, not per tag, because shared models would otherwise tie every package to every other.
 
 The importer is strict. An undeclared path parameter, a GET that does not say what it answers, a duplicate operationId, two operations that would make the same method name, an operation without a tag or a success response, or two schemas that would declare the same Go type fail the import with every problem listed, rather than being guessed at.
@@ -132,7 +132,37 @@ A document bug is fixed with a workaround, kept in the repository that vendors t
 
 `Apply` must first check the bug is there, and return an error when it is not: the parameter it adds already declared, the operation gone, the schema already carrying the field. A refreshed document that fixes the bug then fails the import, naming the workaround to delete, instead of the workaround silently doing nothing forever. `workarounds.Verify` is the test for that, one call in the repository's own tests: every workaround must apply to its vendored document, fail when applied a second time, and return rather than panic on a document that has lost its 200 responses.
 
+#### Ready-made workarounds
+
+The same few bugs are in most documents, so the workarounds for them are here, ready-made: a repository says which operations and why, and the patching, and the check that the bug is still there, are written once. Each is a `Workaround` like one written by hand and passes `Verify` the same way.
+
+```go
+var All = []workarounds.Workaround{
+	workarounds.UndeclaredAnswers(workarounds.About{Name: "sonarr-undeclared-responses", Service: "sonarr", Bug: "fourteen GETs declare a 200 with no content, so nothing says whether they answer JSON or a file"}, map[string]workarounds.Answer{
+		"GET /api/v3/filesystem":          workarounds.JSON(),
+		"GET /api/v3/customformat/schema": workarounds.ListOf("CustomFormatSpecificationSchema"),
+		"GET /api/v3/log/file/{filename}": workarounds.File("text/plain"),
+	}),
+	workarounds.WrongAnswers(workarounds.About{Name: "emby-parent-path-text", Service: "emby", Bug: "GET /Environment/ParentPath declares a JSON string; the server answers the bare path as text"}, map[string]workarounds.Correction{
+		"GET /Environment/ParentPath": {Declared: workarounds.JSONString(), Answers: workarounds.Text("text/plain")},
+	}),
+}
+```
+
+| Workaround | The bug it is for | It fails when |
+|---|---|---|
+| `UndeclaredAnswers` | operations declare a success with no content, so nothing says whether they answer JSON, and in what shape, or a file | one declares its answer now |
+| `WrongAnswers` | operations declare one answer and the server gives another: a JSON string sent as bare text, one record where a list is sent | one no longer declares what its correction says it does |
+| `WrongStatus` | operations are documented as one status and answer another with the same body: creates that answer 201 where the document says 200 | one no longer documents the declared status, or documents the other |
+| `UndeclaredParameters` | operations read a parameter the document leaves out | one declares it now |
+| `UndeclaredProperties` | the server sends, and reads back, fields a schema leaves out | the schema declares one now |
+| `NotAPI` | the document lists paths that are not the API's: the web interface's page, its files, its login form | one is not in the document |
+
+`ListDeclaredAsOne("Schema")` is the commonest correction, one record declared where a list of them is sent. An answer is one of `JSON()` (no declared shape, held raw), `JSONString()`, `Model("Schema")`, `ListOf("Schema")`, `Shape(schema)` for a document that keeps its schemas with its operations, `File("media/type")` and `Text("media/type")`. A file is left for its caller to read and close. Text is short text that is not JSON, a path or a version, read whole: the method's `Model` is a `*string` holding it as it was sent, whatever the server calls it, since a server that sends bare text may label it JSON. Only a workaround makes an answer text. A log is text too, and is a file.
+
 A workaround can also name an operation, by setting its `Name`: the method it gets in place of the one its path or operationId would make. That is how two paths that make the same name are told apart (`GET /audit` beside `GET /api/audit`, with `/api` left out of names), since the import fails on the clash rather than number the second.
+
+A workaround can give an operation an `Accept` option too, by adding it as a header parameter (`AddParameters` with `Param{Name: "Accept", In: openapi.InHeader}`), which no document can declare for itself. It is for a server that chooses its answer by the header, where the caller has to say which it wants: asked for JSON alone, Dockhand's slow actions do the work and then answer, and asked for anything else they answer at once with a job to follow. The option is the caller's like any header option. Left empty the call asks as it would have, and set, its value is the whole header.
 
 Workarounds are for the document's shape, what an operation takes and answers. Behaviour no document could express (a filter the server silently drops, an add it loses mid-refresh) belongs in the hand-written layer over the SDK, next to the live test that found it.
 
@@ -218,11 +248,15 @@ sweep.Sweep{
 
 A path parameter's value is looked up in `Fixtures.Path` by the literal segments before it and its name, the most segments first, then by its name alone: `/api/v3/config/indexer/{id}` finds `config/indexer/id` before `indexer/id` before `id`, so the settings under `config` take another id than the list of the same name. Case does not matter.
 
+An event stream (`text/event-stream`) never ends, so the sweep does not read one whole: it reads as far as the first event and hangs up. One that sends no event in `EventWait`, ten seconds unless set, answered with nothing, and is held to that like an empty list.
+
 Every operation either answers with something or has a `Case` that says why not: skipped, an error status, an answer that does not decode, or an empty one, each with its reason. A case whose operation starts answering fails the sweep, so a stale one is removed, the way a stale workaround is; so does a case that names no GET. A GET the importer adds is swept on the next run with nothing to write. `Strict` also fails any key the model has no field for, for a server whose document is meant to be complete.
 
 ### The base client
 
 Generated code sends every request through the `client` package, after go-azure-sdk's `sdk/client`. It is built on [go-kt](https://github.com/katbyte/go-kt)'s `chttp`: a read is asked again for a dropped connection or a gateway's answer and a write is sent once, an answer is read whole up to a limit, and every exchange is traced to a logger when one is handed in, with the credentials hidden.
+
+A call asks for what its operation is documented to answer. One that answers JSON, or nothing, sends `Accept: application/json`. One that answers a file or an event stream asks for that type first and JSON after it (`Accept: text/event-stream, application/json;q=0.9`), because some servers choose their answer by the header: asked for JSON alone, they send JSON where the document says a stream. JSON stays in the header so that a refusal can still be written as JSON. Where the choice is the caller's to make, call by call, a workaround gives the operation an `Accept` option (see Workarounds).
 
 What is common to every service is in the package. What is one service's own about being talked to is a `client.Service`, which the repository writes by hand in a file beside the generated ones and names in its config (`ClientService`). The file is the repository's: it has no generated header, so `generate` never writes it or removes it. It needs no exceptions from a linter: the package comment it would be asked for is in `doc.go`, and `Example` is a host (`nas:7878`, shown as `http://nas:7878`) or, for a hosted API, a whole address.
 
@@ -264,7 +298,7 @@ An error for an undocumented status is a `*client.StatusError`: chttp's, which i
 
 `Client.HTTPClient` is there for the generated tests, which put their canned server's own client in it. An application that wants to see or shape the traffic passes `client.WithTransport` instead, and keeps the retries and the trace.
 
-A repository can still keep a base client of its own and name it in `ClientImport`. Generated code calls `New(baseURL, authorizer, ...Option)`, `RequestOptions`, `NewRequest`, `Marshal`, `SetBody`, `Execute`, `Response.Unmarshal`, `Headers` and `QueryParams` with `Append`, `CSV`, `JSONObject`, `DeepObject`, `DefaultPageSize` and `StatusCode`, and its tests set `HTTPClient` and read `BaseURL`.
+A repository can still keep a base client of its own and name it in `ClientImport`. Generated code calls `New(baseURL, authorizer, ...Option)`, `RequestOptions` (with `Accept` for an operation that answers a file), `NewRequest`, `Marshal`, `SetBody`, `Execute`, `Response.Unmarshal`, `Headers` and `QueryParams` with `Append`, `CSV`, `JSONObject`, `DeepObject`, `DefaultPageSize` and `StatusCode`, and its tests set `HTTPClient` and read `BaseURL`.
 
 ## What was left out of Pandora
 

@@ -69,6 +69,8 @@ const (
 	// limit.
 	DefaultMaxResponse = 64 << 20
 
+	jsonMedia = "application/json"
+
 	apiKeyHeader = "X-Api-Key" //nolint:gosec // the name of the header a key travels in, and no key
 	// defaultAdvice is what a refused redirect tells its reader to do, for
 	// a Service that words none of its own

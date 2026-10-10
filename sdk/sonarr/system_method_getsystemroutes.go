@@ -20,6 +20,7 @@ type GetSystemRoutesOperationResponse struct {
 // GetSystemRoutes calls GET /api/v3/system/routes.
 func (c Client) GetSystemRoutes(ctx context.Context) (result GetSystemRoutesOperationResponse, err error) {
 	opts := client.RequestOptions{
+		Accept: "text/plain",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},

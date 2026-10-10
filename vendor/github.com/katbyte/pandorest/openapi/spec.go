@@ -63,6 +63,10 @@ type Parameter struct {
 	Style       string  `json:"style"`
 	Explode     *bool   `json:"explode"`
 	Schema      *Schema `json:"schema"`
+	// Added is set for a parameter a workaround added, which no document
+	// can say of its own: the importer keeps an added header named Accept,
+	// where it ignores a document's as OpenAPI says to.
+	Added bool `json:"-"`
 }
 
 // Exploded reports whether an array parameter is sent as one key per value
@@ -101,6 +105,35 @@ type RequestBody struct {
 type MediaType struct {
 	Schema   *Schema             `json:"schema"`
 	Examples map[string]*Example `json:"examples"`
+
+	// Text is set by a workaround for an answer that is short text and not
+	// JSON, to be read whole into a string where an answer of another type
+	// than JSON is otherwise a file left for its caller to read. No document
+	// carries it: a log file is text too, and is not to be held in memory.
+	Text bool `json:"-"`
+}
+
+// JSONMedia reports whether a media type is JSON: application/json, text/json
+// or one that ends +json, whatever its parameters.
+func JSONMedia(mediaType string) bool {
+	base := strings.TrimSpace(strings.SplitN(strings.ToLower(mediaType), ";", 2)[0])
+
+	return base == "application/json" || base == "text/json" || strings.HasSuffix(base, "+json")
+}
+
+// PickJSON returns the JSON media type of a body or response's content: plain
+// application/json when listed, else the first JSON type.
+func PickJSON(content map[string]*MediaType) (string, bool) {
+	if _, ok := content["application/json"]; ok {
+		return "application/json", true
+	}
+	for _, mediaType := range SortedKeys(content) {
+		if JSONMedia(mediaType) {
+			return mediaType, true
+		}
+	}
+
+	return "", false
 }
 
 // Example is one named example of a media type's content. TMDB's document

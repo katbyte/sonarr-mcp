@@ -1,3 +1,20 @@
+## v0.6.0 (2026-10-10)
+
+- add ready-made workarounds to `importer/workarounds`, for the bugs most documents have and each repository patched by hand: `UndeclaredAnswers` (a success with no content), `WrongAnswers` (one answer declared, another given), `WrongStatus` (a create documented as 200 that answers 201), `UndeclaredParameters`, `UndeclaredProperties` (fields the server sends that a schema leaves out) and `NotAPI` (the web interface's paths). A repository gives an `About` (name, service, bug) and says which operations; the patching and the check that the bug is still in the document are here. An answer is said with `JSON`, `JSONString`, `Model`, `ListOf`, `Shape`, `File` or `Text`
+- `workarounds.Verify` says a workaround "does not apply to the vendored document, so the bug is not there or the workaround is written wrong", where it said only that the bug was not there: a schema name misspelt in a workaround's own table read as the bug having gone
+- add text as a kind of answer: short text that is not JSON (a path, a version) is read whole into the method's `Model`, a `*string`, as it was sent and whatever the server calls it, where it was a file its caller had to read and close. Only a workaround asks for it (`workarounds.Text`), since a log is text too; nothing moves for an operation that does not. A base client of a repository's own needs `Response.Text` if it has one
+- `openapi.JSONMedia` and `openapi.PickJSON` are the importer's rules for which media types are JSON, for a workaround to share
+
+## v0.5.0 (2026-10-10)
+
+- a workaround can give an operation an `Accept` option, for a server that chooses its answer by the header where the choice is the caller's to make call by call (Dockhand's slow actions wait and answer how it went when asked for JSON alone, and answer at once with a job to follow when asked for anything else). The importer keeps a header parameter named `Accept` that a workaround adds (`AddParameters` with `Param{Name: "Accept", In: openapi.InHeader}`), where it ignores a document's own as OpenAPI says to; the option is generated like any header option, and when set its value is the whole header. Nothing moves for a repository that adds none
+
+## v0.4.0 (2026-10-10)
+
+- a call asks for what its operation is documented to answer: one that answers a file or an event stream sends that type first in `Accept` with JSON after it (`text/event-stream, application/json;q=0.9`), where every call asked for `application/json` alone. A server that chooses its answer by the header (Dockhand's dashboard stream answers JSON to a caller that asks for JSON alone) now sends what its document says. Calls that answer JSON, or nothing, are unchanged
+- generator (breaking for a base client of a repository's own): a method that answers a file sets `Accept` in its `RequestOptions`, so such a client needs the field; a regenerated package gains one line in each such method and, in its test, the check of the header (three lines, and the `strings` import where the test had none)
+- sweep: an event stream (`text/event-stream`, by its document or by what the server answers) is read as far as its first event and then hung up on, where it was read like a file and ran out of time, so that each one needed a `Skip`. One that sends no event in `EventWait` (ten seconds unless set), or ends without one, is an answer with nothing in it and takes an `Empty` or `MayBeEmpty` case like an empty list; one that answers another content type than the event stream its document says, or breaks off part way, fails
+
 ## v0.3.2 (2026-10-10)
 
 - sweep: a path parameter's fixture is looked up by as many of the literal segments before it as there are, the most of them first, where it was only ever the one: `config/indexer/id` is found before `indexer/id`, so the settings under `/config/indexer/{id}` can be given another id than the indexers at `/indexer/{id}` with no case for it. A fixture keyed by one segment or by the name alone is found as before

@@ -19,8 +19,8 @@ github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/katbyte/go-kt v0.6.1 h1:hFzQr4RRS7NhyskwGwJG+0TROv+lUZKB5teyOBuxkEs=
 github.com/katbyte/go-kt v0.6.1/go.mod h1:v9/PJ1d2AV5MqdUnMvOL+cWySDmRDCQfFB+Q1fJcERY=
-github.com/katbyte/pandorest v0.3.2 h1:39/L25gopIDyYETshlKwI98ZiD83xUiXaoVkej/myew=
-github.com/katbyte/pandorest v0.3.2/go.mod h1:/G8x/cxqKrKpao9vZfAfQ2cv6oPYs5UpIzXx8TzicHk=
+github.com/katbyte/pandorest v0.6.0 h1:pd1y1aOY/pVU4/6zJaLpXsbV84NQKTtSnrnS5gcTU1g=
+github.com/katbyte/pandorest v0.6.0/go.mod h1:/G8x/cxqKrKpao9vZfAfQ2cv6oPYs5UpIzXx8TzicHk=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=

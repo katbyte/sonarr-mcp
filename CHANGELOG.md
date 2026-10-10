@@ -36,6 +36,7 @@
 
 ### Changed
 
+- the Go client asks for what a call is documented to answer: the five calls that fetch a file (a log file, an update log, a cover, the routes, the calendar feed) ask for that type first, where every call asked for JSON alone. This comes with pandorest v0.6.0, which also brings ready-made forms of the fixes for Sonarr's API document; the ones kept here are unchanged for now
 - an audit reads eight series at a time, where it read them one after another: over three thousand series, the reads that took twelve seconds and more take two. What it finds, and the order it finds it in, is the same
 - `audit_all` keeps the counts of the audits that ran when one could not: that audit is named under `failed`, its row carries the `error` and no `findings`, so a count that is unknown is not read as none. One failing audit used to fail the whole call
 - `season_monitor` and `season_search` name the seasons a series has when asked for one it does not

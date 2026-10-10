@@ -5,6 +5,7 @@ package sonarr
 import (
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/katbyte/pandorest/client"
@@ -21,6 +22,9 @@ func TestOperationGetLogFileUpdateByFilename(t *testing.T) {
 	r, body := s.only(t)
 	_ = body
 	expectRequest(t, r, http.MethodGet, "/api/v3/log/file/update/p%2Ffilename")
+	if got := r.Header.Get("Accept"); !strings.HasPrefix(got, "text/plain") {
+		t.Errorf("Accept = %q, want text/plain asked for first", got)
+	}
 	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}

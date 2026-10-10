@@ -97,7 +97,7 @@ func verifyOne(w Workaround, load func(service string) (*openapi.Spec, error)) e
 		return fmt.Errorf("loading the %s document: %w", w.Service(), err)
 	}
 	if err := w.Apply(spec); err != nil {
-		return fmt.Errorf("the bug is not in the vendored document: %w", err)
+		return fmt.Errorf("it does not apply to the vendored document, so the bug is not there or the workaround is written wrong: %w", err)
 	}
 	if err := w.Apply(spec); err == nil {
 		return errors.New("applying it again succeeded, so it would not notice the bug being fixed")
@@ -157,7 +157,9 @@ func JSONResponse(op *openapi.Operation, what string) (*openapi.MediaType, error
 }
 
 // Param is a parameter a workaround adds: In is openapi.InQuery, InHeader or
-// InPath, and Type one of the openapi types.
+// InPath, and Type one of the openapi types. A header named Accept is how a
+// caller is given the say over what one call asks for, for a server that
+// chooses its answer by it: the option, when set, is the whole header.
 type Param struct {
 	Name        string
 	In          string
@@ -166,7 +168,7 @@ type Param struct {
 }
 
 func (p Param) parameter() *openapi.Parameter {
-	return &openapi.Parameter{Name: p.Name, In: p.In, Description: p.Description, Schema: &openapi.Schema{Type: p.Type}}
+	return &openapi.Parameter{Name: p.Name, In: p.In, Description: p.Description, Schema: &openapi.Schema{Type: p.Type}, Added: true}
 }
 
 // AddParameters adds undeclared parameters to operations, each target a

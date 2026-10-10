@@ -10,12 +10,18 @@
 //
 // What the sweep holds an answer to: it decodes; it carries something (a
 // file of at least one byte, JSON with at least one value that is not empty,
-// zero or false), because an empty list decodes into any model and so proves
-// nothing about its shape; and no object in it is lost whole, which is how a
-// model whose fields do not match the server shows up (the JSON decoder drops
-// a key it has no field for without a word). It does not check every field
-// unless Strict asks: a server sends many its document does not declare, and
-// a model that holds one of an object's keys holds that object.
+// zero or false, an event stream with at least one event), because an empty
+// list decodes into any model and so proves nothing about its shape; and no
+// object in it is lost whole, which is how a model whose fields do not match
+// the server shows up (the JSON decoder drops a key it has no field for
+// without a word). It does not check every field unless Strict asks: a server
+// sends many its document does not declare, and a model that holds one of an
+// object's keys holds that object.
+//
+// An event stream (text/event-stream) never ends, so the sweep does not read
+// one whole: it reads as far as the first event and hangs up. One that sends
+// no event in the time the sweep waits (EventWait) is an answer with nothing
+// in it, like an empty list.
 //
 // Every operation either answers with something, or has a Case that says why
 // not: the feature needs something the test server lacks, the endpoint is
@@ -31,6 +37,7 @@
 package sweep
 
 import (
+	"bufio"
 	"bytes"
 	"cmp"
 	"context"
@@ -39,6 +46,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"mime"
 	"net/http"
 	"reflect"
 	"slices"
@@ -53,6 +61,9 @@ import (
 const (
 	// DefaultTimeout is how long one operation gets when the sweep sets none.
 	DefaultTimeout = 60 * time.Second
+	// DefaultEventWait is how long an event stream gets to send its first
+	// event when the sweep sets none.
+	DefaultEventWait = 10 * time.Second
 
 	// a JSON answer is buffered by the base client, so this only bounds a
 	// read of what is already in memory; a file is streamed, and only its
@@ -61,6 +72,8 @@ const (
 	maxFile = 1 << 20
 	// how many places a model dropped are named before the rest are counted
 	maxDropped = 5
+
+	eventStream = "text/event-stream"
 )
 
 // Case is how the sweep treats one operation.
@@ -78,8 +91,9 @@ type Case struct {
 	// fetches from the internet).
 	Sometimes bool
 	// Empty says why the operation answers with nothing on the fixtures (an
-	// empty list, an object of zero values, a file of no bytes), which the
-	// sweep otherwise fails.
+	// empty list, an object of zero values, a file of no bytes, an event
+	// stream that sends no event while the sweep waits), which the sweep
+	// otherwise fails.
 	Empty string
 	// MayBeEmpty says why the answer has something on one server image and
 	// nothing on the next, so that neither is a failure.
@@ -159,6 +173,10 @@ type Sweep struct {
 	Strict bool
 	// Timeout is how long one operation gets; zero is DefaultTimeout.
 	Timeout time.Duration
+	// EventWait is how long an event stream gets, once it has answered, to
+	// send its first event before the sweep hangs up and counts it as an
+	// answer with nothing in it; zero is DefaultEventWait.
+	EventWait time.Duration
 }
 
 // Outcome is what the sweep made of one operation.
@@ -244,6 +262,10 @@ func (s Sweep) Operation(ctx context.Context, op *definitions.Operation) Outcome
 		return out
 	}
 
+	// an event stream never ends, so the sweep ends it: cancelling the call's context is how it hangs up
+	ctx, hangUp := context.WithCancel(ctx)
+	defer hangUp()
+
 	args, err := s.arguments(ctx, op, c)
 	if err != nil {
 		out.failf("%s: %v; resolve it in the fixtures or give it a case", op.Key(), err)
@@ -251,7 +273,7 @@ func (s Sweep) Operation(ctx context.Context, op *definitions.Operation) Outcome
 		return out
 	}
 
-	a, err := s.call(op, args)
+	a, err := s.call(ctx, hangUp, op, args)
 	expectsFailure := c.Status != 0 || c.Decode
 	switch {
 	case err == nil && expectsFailure && !c.Sometimes:
@@ -397,9 +419,11 @@ type answer struct {
 	// answered in a documented status, but not the documented shape
 	status    int
 	undecoded bool
-	// empty is an answer with nothing in it: no bytes, or JSON holding no
-	// value but empty ones, zeros and false
-	empty bool
+	// empty is an answer with nothing in it: no bytes, JSON holding no value
+	// but empty ones, zeros and false, or an event stream that sent no event;
+	// stream is set for an event stream, read only as far as its first event
+	empty  bool
+	stream bool
 	// dropped are the places in the answer whose content the model lost
 	// whole, and undeclared the keys it has no field for, as Model.key
 	dropped    []string
@@ -407,8 +431,8 @@ type answer struct {
 }
 
 // call calls the operation, reads what it answered, and classifies a
-// failure.
-func (s Sweep) call(op *definitions.Operation, args []reflect.Value) (answer, error) {
+// failure. hangUp cancels ctx, the context the call was given.
+func (s Sweep) call(ctx context.Context, hangUp context.CancelFunc, op *definitions.Operation, args []reflect.Value) (answer, error) {
 	var a answer
 	results := reflect.ValueOf(s.Client).MethodByName(op.Name).Call(args)
 	if len(results) != 2 || results[0].Kind() != reflect.Struct {
@@ -432,21 +456,79 @@ func (s Sweep) call(op *definitions.Operation, args []reflect.Value) (answer, er
 	}
 
 	defer func() { _ = resp.Body.Close() }()
+	file := op.Response.Type.Type == definitions.RawFile
+	if file && (isEventStream(op.Response.ContentType) || isEventStream(resp.Header.Get("Content-Type"))) {
+		return s.firstEvent(ctx, hangUp, resp)
+	}
+
 	limit := int64(maxJSON)
-	if op.Response.Type.Type == definitions.RawFile {
+	if file {
 		limit = maxFile
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, limit))
 	if err != nil {
 		return a, fmt.Errorf("reading the answer: %w", err)
 	}
-	if op.Response.Type.Type == definitions.RawFile {
+	if file {
 		a.empty = len(body) == 0
 
 		return a, nil
 	}
 
 	return judgeJSON(body, results[0].FieldByName("Model")), nil
+}
+
+func isEventStream(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+
+	return err == nil && mediaType == eventStream
+}
+
+// firstEvent reads an event stream as far as its first event and hangs up:
+// read whole, as a file is, it would only run out of time. One that sends no
+// event while the sweep waits, or ends without one, answered with nothing.
+func (s Sweep) firstEvent(ctx context.Context, hangUp context.CancelFunc, resp *http.Response) (answer, error) {
+	a := answer{stream: true}
+	if sent := resp.Header.Get("Content-Type"); sent != "" && !isEventStream(sent) {
+		return a, fmt.Errorf("answers %s where its document says %s", sent, eventStream)
+	}
+
+	timer := time.AfterFunc(cmp.Or(s.EventWait, DefaultEventWait), hangUp)
+	defer timer.Stop()
+
+	err := readEvent(resp.Body)
+	switch {
+	case err == nil:
+		return a, nil
+	case ctx.Err() != nil || errors.Is(err, io.EOF):
+		a.empty = true
+
+		return a, nil
+	default:
+		return a, fmt.Errorf("reading the event stream: %w", err)
+	}
+}
+
+// readEvent reads an event stream to the end of its first event: the blank
+// line after a block of lines with data among them. A comment (a line that
+// starts with a colon, which a server sends to keep the connection open) is
+// no event, and nor is a block with no data, which a browser would not
+// deliver either.
+func readEvent(r io.Reader) error {
+	lines := bufio.NewReader(io.LimitReader(r, maxFile))
+	data := false
+	for {
+		line, err := lines.ReadString('\n')
+		if err != nil {
+			return err
+		}
+
+		line = strings.TrimRight(line, "\r\n")
+		if line == "" && data {
+			return nil
+		}
+		data = data || line == "data" || strings.HasPrefix(line, "data:")
+	}
 }
 
 // check holds a successful answer to what the sweep claims of it: that it
@@ -456,12 +538,16 @@ func (s Sweep) check(out *Outcome, op *definitions.Operation, c Case, a answer) 
 	switch {
 	case c.MayBeEmpty != "":
 		out.notef("%s: may answer with nothing (it did: %t): %s", op.Key(), a.empty, c.MayBeEmpty)
+	case a.empty && c.Empty == "" && a.stream:
+		out.failf("%s is an event stream that sent no event in %s, which proves only its status: point it at a fixture that sends one, or give it an Empty case", op.Key(), cmp.Or(s.EventWait, DefaultEventWait))
 	case a.empty && c.Empty == "":
 		out.failf("%s answers with nothing, which decodes into any model and so proves only its status: point it at a fixture that has something, or give it an Empty case", op.Key())
 	case !a.empty && c.Empty != "":
 		out.failf("%s now answers with something; drop its Empty case (%s)", op.Key(), c.Empty)
 	case a.empty:
 		out.notef("%s: answers with nothing, as expected: %s", op.Key(), c.Empty)
+	case a.stream:
+		out.notef("%s: an event stream, read as far as its first event and no further", op.Key())
 	}
 
 	for _, d := range a.dropped {

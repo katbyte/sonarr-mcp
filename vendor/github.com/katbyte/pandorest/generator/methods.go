@@ -56,6 +56,9 @@ func (g *gen) writeResponse(b *strings.Builder, o *definitions.Operation, respon
 	if o.Response != nil && o.Response.Type.Type == definitions.RawFile {
 		fmt.Fprintf(b, "//\n// The operation answers %s, left unread in HttpResponse.Body, which\n// the caller must close.\n", o.Response.ContentType)
 	}
+	if o.Response.Text() {
+		fmt.Fprintf(b, "//\n// The operation answers text (%s), which Model holds as it was sent.\n", o.Response.ContentType)
+	}
 	fmt.Fprintf(b, "type %s struct {\n\tHttpResponse *http.Response\n", responseType)
 	if typ, _ := g.responseModel(o); typ != "" {
 		fmt.Fprintf(b, "\tModel %s\n", typ)
@@ -254,6 +257,10 @@ func (g *gen) writeMethod(b *strings.Builder, o *definitions.Operation, response
 		o.Name, strings.Join(append([]string{"ctx context.Context"}, params...), ", "), responseType)
 
 	b.WriteString("\topts := client.RequestOptions{\n")
+	if asksFor := o.Response.AsksFor(); asksFor != "" {
+		// a server may choose its answer by what it is asked for, so a call asks for what its document says it answers
+		fmt.Fprintf(b, "\t\tAccept: %q,\n", asksFor)
+	}
 	if o.Request != nil {
 		fmt.Fprintf(b, "\t\tContentType: %q,\n", o.Request.ContentType)
 	}
@@ -294,10 +301,15 @@ func (g *gen) writeMethod(b *strings.Builder, o *definitions.Operation, response
 			// a 204 is a null result: no model
 			b.WriteString("\tif resp.StatusCode == http.StatusNoContent {\n\t\treturn\n\t}\n\n")
 		}
-		if pointer {
+		switch {
+		case o.Response.Text():
+			// text is held as it was sent, whatever the server calls it
+			b.WriteString("\tvar model string\n\tresult.Model = &model\n")
+			b.WriteString("\tif err = resp.Text(result.Model); err != nil {\n\t\treturn\n\t}\n\n")
+		case pointer:
 			fmt.Fprintf(b, "\tvar model %s\n\tresult.Model = &model\n", strings.TrimPrefix(typ, "*"))
 			b.WriteString("\tif err = resp.Unmarshal(result.Model); err != nil {\n\t\treturn\n\t}\n\n")
-		} else {
+		default:
 			b.WriteString("\tif err = resp.Unmarshal(&result.Model); err != nil {\n\t\treturn\n\t}\n\n")
 		}
 	}

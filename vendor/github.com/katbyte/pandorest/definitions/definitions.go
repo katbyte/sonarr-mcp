@@ -118,8 +118,29 @@ type Body struct {
 	// ContentType is the media type sent or expected. A wildcard such as
 	// image/* means the caller names the concrete type.
 	ContentType string `json:"ContentType"`
-	// Type is RawFile for bodies that are not JSON.
+	// Type is RawFile for bodies that are not JSON, but for an answer that
+	// is text read whole, which is a String of another ContentType than
+	// JSON's.
 	Type TypeRef `json:"Type"`
+}
+
+// JSONContentType is the ContentType of every body that is JSON.
+const JSONContentType = "application/json"
+
+// Text reports whether the body is an answer of text read whole into a
+// string: not JSON, and not a file left for its caller to read.
+func (b *Body) Text() bool {
+	return b != nil && b.Type.Type == String && b.ContentType != JSONContentType
+}
+
+// AsksFor is the media type a call for this answer asks its server for when
+// that is not JSON, and empty when it is: a file's type, or a text's.
+func (b *Body) AsksFor() string {
+	if b == nil || (b.Type.Type != RawFile && !b.Text()) {
+		return ""
+	}
+
+	return b.ContentType
 }
 
 // Pageable says how a list operation pages.

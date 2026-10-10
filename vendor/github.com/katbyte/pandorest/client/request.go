@@ -59,6 +59,12 @@ func (q *QueryParams) Values() url.Values { return q.values }
 
 // RequestOptions describes one request.
 type RequestOptions struct {
+	// Accept is the media type the operation is documented to answer when
+	// that is not JSON: a file's, or an event stream's. The request asks for
+	// it first, since a server may choose its answer by what it is asked
+	// for, and for JSON after it, which is how a refusal reads. Empty asks
+	// for JSON alone.
+	Accept string
 	// ContentType is the media type of the request body, when there is one.
 	ContentType string
 	// ExpectedStatusCodes are the statuses the operation documents; any
@@ -105,7 +111,7 @@ func (c *Client) NewRequest(ctx context.Context, input RequestOptions) (*Request
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: %w", input.HTTPMethod, input.Path, err)
 	}
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", accept(input.Accept))
 	if c.service.UserAgent != "" {
 		req.Header.Set("User-Agent", c.service.UserAgent)
 	}
@@ -119,6 +125,16 @@ func (c *Client) NewRequest(ctx context.Context, input RequestOptions) (*Request
 	return &Request{Request: req, ExpectedStatusCodes: input.ExpectedStatusCodes, StreamResponse: input.StreamResponse, client: c, contentType: input.ContentType, credentialed: credentialed}, nil
 }
 
+// accept is the Accept header of an operation documented to answer
+// mediaType.
+func accept(mediaType string) string {
+	if mediaType == "" || mediaType == jsonMedia {
+		return jsonMedia
+	}
+
+	return mediaType + ", " + jsonMedia + ";q=0.9"
+}
+
 // Marshal sets the request body to payload as JSON.
 func (r *Request) Marshal(payload any) error {
 	b, err := json.Marshal(payload)
@@ -130,7 +146,7 @@ func (r *Request) Marshal(payload any) error {
 	r.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(b)), nil }
 	r.ContentLength = int64(len(b))
 	r.Body = io.NopCloser(bytes.NewReader(b))
-	r.Header.Set("Content-Type", cmp.Or(r.contentType, "application/json"))
+	r.Header.Set("Content-Type", cmp.Or(r.contentType, jsonMedia))
 
 	return nil
 }
@@ -301,6 +317,36 @@ func held(resp *http.Response, body []byte) *Response {
 // Unmarshal decodes the JSON body into model, leaving the body readable
 // again. An empty body leaves model as it is.
 func (r *Response) Unmarshal(model any) error {
+	if err := r.hold(); err != nil {
+		return err
+	}
+
+	if len(bytes.TrimSpace(r.body)) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(r.body, model); err != nil {
+		return fmt.Errorf("%s %s: the answer is not what this client reads there (%w): %s", r.Request.Method, r.Request.URL.Path, err, chttp.Preview(r.body))
+	}
+
+	return nil
+}
+
+// Text sets into to the body as it was sent, for an operation that answers
+// short text and not JSON, leaving the body readable again. What the server
+// calls the answer is not looked at: one that sends bare text may label it
+// JSON.
+func (r *Response) Text(into *string) error {
+	if err := r.hold(); err != nil {
+		return err
+	}
+	*into = string(r.body)
+
+	return nil
+}
+
+// hold reads the body whole, if it has not been, and leaves it readable
+// again.
+func (r *Response) hold() error {
 	if !r.held {
 		body, err := io.ReadAll(io.LimitReader(r.Body, DefaultMaxResponse))
 		_ = r.Body.Close()
@@ -310,13 +356,6 @@ func (r *Response) Unmarshal(model any) error {
 		r.body, r.held = body, true
 	}
 	r.Body = io.NopCloser(bytes.NewReader(r.body))
-
-	if len(bytes.TrimSpace(r.body)) == 0 {
-		return nil
-	}
-	if err := json.Unmarshal(r.body, model); err != nil {
-		return fmt.Errorf("%s %s: the answer is not what this client reads there (%w): %s", r.Request.Method, r.Request.URL.Path, err, chttp.Preview(r.body))
-	}
 
 	return nil
 }

@@ -20,6 +20,19 @@ import (
 // the generated code against the definitions, not the server: the
 // integration suite's read sweep and bespoke tests do that.
 
+// acceptOption reports whether the operation leaves what it asks for to its
+// caller: an Accept option, which a workaround adds and whose value is then
+// the whole header.
+func acceptOption(o *definitions.Operation) bool {
+	return slices.ContainsFunc(o.Options, func(opt definitions.Option) bool {
+		return opt.In == definitions.InHeader && strings.EqualFold(opt.Name, "Accept")
+	})
+}
+
+// sampleText is what the canned server answers an operation that answers
+// text: not JSON, and with space a reader must not trim.
+const sampleText = "some text, as sent\n"
+
 // undocumentedStatus is a status no operation documents.
 const undocumentedStatus = http.StatusTeapot
 
@@ -203,6 +216,9 @@ func (g *gen) testFile(o *definitions.Operation) string {
 	for _, h := range call.headers {
 		fmt.Fprintf(&b, "\tif got := r.Header.Get(%q); got != %q {\n\t\tt.Errorf(\"header %s = %%q, want %%q\", got, %q)\n\t}\n", h.name, h.value, h.name, h.value)
 	}
+	if asksFor := o.Response.AsksFor(); asksFor != "" && !acceptOption(o) {
+		fmt.Fprintf(&b, "\tif got := r.Header.Get(\"Accept\"); !strings.HasPrefix(got, %q) {\n\t\tt.Errorf(\"Accept = %%q, want %s asked for first\", got)\n\t}\n", asksFor, asksFor)
+	}
 	if o.Request != nil {
 		fmt.Fprintf(&b, "\tif got := r.Header.Get(\"Content-Type\"); got != %q {\n\t\tt.Errorf(\"Content-Type = %%q, want %%q\", got, %q)\n\t}\n", call.bodyType, call.bodyType)
 		if o.Request.Type.Type == definitions.RawFile {
@@ -222,8 +238,8 @@ func (g *gen) testFile(o *definitions.Operation) string {
 		b.WriteString("\tif err != nil || result.Model != nil {\n\t\tt.Errorf(\"a 204 = %v, model %v\", err, result.Model)\n\t}\n")
 	}
 
-	// an answer that is not the JSON documented
-	if o.Response != nil && o.Response.Type.Type != definitions.RawFile && status != http.StatusNoContent {
+	// an answer that is not the JSON documented; text is whatever was sent
+	if o.Response != nil && o.Response.Type.Type != definitions.RawFile && !o.Response.Text() && status != http.StatusNoContent {
 		b.WriteString("\n\t// an answer that does not decode is an error, with the response\n")
 		fmt.Fprintf(&b, "\tc, _ = newOperationServer(t, %d, \"application/json\", \"<html>\")\n", status)
 		fmt.Fprintf(&b, "\tresult, err = %s\n", call.expr)
@@ -441,6 +457,9 @@ func (g *gen) sampleResponse(o *definitions.Operation) (contentType, body string
 		return "", ""
 	case o.Response.Type.Type == definitions.RawFile:
 		return concreteType(o.Response.ContentType), "file bytes"
+	case o.Response.Text():
+		// labelled JSON, as a server that sends text may label it: the method reads it as text all the same
+		return definitions.JSONContentType, sampleText
 	default:
 		return "application/json", g.sampleJSON(o.Response.Type)
 	}
@@ -481,6 +500,8 @@ func (g *gen) responseChecks(o *definitions.Operation) string {
 	}
 	typ, pointer := g.responseModel(o)
 	switch {
+	case o.Response.Text():
+		return fmt.Sprintf("\tif result.Model == nil || *result.Model != %q {\n\t\tt.Errorf(\"the text was not held as it was sent: %%v\", result.Model)\n\t}\n", sampleText)
 	case pointer:
 		return "\tif result.Model == nil {\n\t\tt.Error(\"the model was not decoded\")\n\t}\n"
 	case typ == "json.RawMessage" || strings.HasPrefix(typ, "[]") || strings.HasPrefix(typ, "map["):

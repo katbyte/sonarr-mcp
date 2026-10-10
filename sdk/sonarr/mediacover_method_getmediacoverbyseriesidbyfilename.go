@@ -22,6 +22,7 @@ type GetMediaCoverBySeriesIdByFilenameOperationResponse struct {
 // GetMediaCoverBySeriesIdByFilename calls GET /api/v3/mediacover/{seriesId}/{filename}.
 func (c Client) GetMediaCoverBySeriesIdByFilename(ctx context.Context, seriesId int, filename string) (result GetMediaCoverBySeriesIdByFilenameOperationResponse, err error) {
 	opts := client.RequestOptions{
+		Accept: "image/*",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},

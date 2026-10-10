@@ -22,6 +22,7 @@ type GetLogFileUpdateByFilenameOperationResponse struct {
 // GetLogFileUpdateByFilename calls GET /api/v3/log/file/update/{filename}.
 func (c Client) GetLogFileUpdateByFilename(ctx context.Context, filename string) (result GetLogFileUpdateByFilenameOperationResponse, err error) {
 	opts := client.RequestOptions{
+		Accept: "text/plain",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
