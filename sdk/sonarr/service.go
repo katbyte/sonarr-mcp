@@ -24,6 +24,15 @@ var service = client.Service{
 	WebPageAdvice:  "check the server url: it must be Sonarr's own address, with its URL base if it has one, not a proxy's login page",
 	Messages:       errorMessages,
 	Note:           note,
+	// what a trace of the traffic must not show, beside what it hides
+	// unasked (a name ending in password, secret, token or apikey). A
+	// provider's settings travel as a list of name and value pairs, so an
+	// indexer's API key is the "value" of a setting named apiKey, under a
+	// name that says nothing of what it holds: every setting's value is
+	// hidden, the address along with the key, since nothing here can tell
+	// them apart. And the host's settings carry the password a second time
+	// under a name that ends "confirmation"
+	SecretNames: []string{"value", "passwordConfirmation"},
 }
 
 // note says what is known of a failure on a Sonarr.

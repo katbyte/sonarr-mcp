@@ -220,18 +220,35 @@ func invoke(name string, args map[string]any) (map[string]any, error) {
 var (
 	keysMu    sync.Mutex
 	keysShown = map[string]bool{}
+	// keysGiven are the secrets a test handed Sonarr through a tool (secret)
+	keysGiven []string
 )
+
+// secret has every answer and refusal from here on read for a credential a
+// test is about to give Sonarr, and returns it, so it wraps the value where
+// it is given: "apiKey": secret(key).
+func secret(value string) string {
+	keysMu.Lock()
+	defer keysMu.Unlock()
+
+	if !slices.Contains(keysGiven, value) {
+		keysGiven = append(keysGiven, value)
+	}
+
+	return value
+}
 
 func noteKeys(name string, out map[string]any, err error) {
 	said := fmt.Sprint(out)
 	if err != nil {
 		said += err.Error()
 	}
-	for _, key := range []string{testenv.FakeKey, testenv.Token()} {
+	keysMu.Lock()
+	defer keysMu.Unlock()
+
+	for _, key := range append([]string{testenv.FakeKey, testenv.Token()}, keysGiven...) {
 		if key != "" && strings.Contains(said, key) {
-			keysMu.Lock()
 			keysShown[name] = true
-			keysMu.Unlock()
 		}
 	}
 }

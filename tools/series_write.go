@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/katbyte/go-kt/lock"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
@@ -233,14 +234,16 @@ func registerSeriesWriteTools(r *registry) {
 		MonitorNewItems string   `json:"monitor_new_items,omitempty" jsonschema:"all (default): monitor seasons that appear later; none: leave them unmonitored"`
 		Tags            []string `json:"tags,omitempty"              jsonschema:"tag labels, created when Sonarr does not have them"`
 		Search          bool     `json:"search,omitempty"            jsonschema:"search for the missing monitored episodes once added"`
+		Wait            int      `json:"wait_seconds,omitempty"      jsonschema:"how long to wait for Sonarr to read the show's episodes and set what is monitored, default 60; -1 returns at once"`
 	}
 	type addOut struct {
-		Added    seriesSummary `json:"added"`
+		Added    seriesSummary `json:"added"    jsonschema:"the series as it stands once Sonarr has read it, or as it was added when the wait ran out"`
+		Ready    bool          `json:"ready"    jsonschema:"Sonarr has read the show's episodes and set what is monitored. While false, a change to its seasons or episodes is overwritten when Sonarr gets there: wait, and look again with series_get"`
 		Searched bool          `json:"searched"`
 	}
 	add(r, writeTool, &mcp.Tool{
 		Name:        "series_add",
-		Description: "Add a show to Sonarr by tvdb:<id> or exact title, into a root folder and quality profile (the only root folder and the library's most used profile unless named), choosing which episodes to monitor, and optionally search for them at once.",
+		Description: "Add a show to Sonarr by tvdb:<id> or exact title, into a root folder and quality profile (the only root folder and the library's most used profile unless named), choosing which episodes to monitor, and optionally search for them at once. Waits for Sonarr to read the show's episodes, since it sets what is monitored only then: ready says whether it has.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in addIn) (*mcp.CallToolResult, addOut, error) {
 		found, err := r.lookup(ctx, in.Series)
 		if err != nil {
@@ -295,12 +298,36 @@ func registerSeriesWriteTools(r *registry) {
 			return nil, addOut{}, err
 		}
 		r.seriesCache().invalidate()
+
+		// Sonarr answers at once and reads the show's episodes after, and
+		// only then sets what the add asked to be monitored, over whatever
+		// was changed in between: a season monitored a moment after adding is
+		// unmonitored again when it gets there. It keeps the add's choices
+		// on the series until it has, so the series is watched until they
+		// are gone
+		var added *sonarr.SeriesResource
+		for deadline := time.Now().Add(waitFor(in.Wait)); ; {
+			now, readErr := client.GetSeriesById(ctx, res.Model.Id, sonarr.GetSeriesByIdOperationOptions{})
+			if readErr != nil {
+				return nil, addOut{}, fmt.Errorf("%s was added, and reading it back failed: %w", res.Model.Title, readErr)
+			}
+			added = now.Model
+			if added.AddOptions == nil || !time.Now().Before(deadline) {
+				break
+			}
+			select {
+			case <-ctx.Done():
+				return nil, addOut{}, ctx.Err()
+			case <-time.After(commandPoll):
+			}
+		}
+		ready := added.AddOptions == nil
 		profiles, tagNames, err := r.lookupNames(ctx)
 		if err != nil {
 			return nil, addOut{}, err
 		}
 
-		return nil, addOut{Added: summariseSeries(res.Model, profiles, tagNames), Searched: in.Search}, nil
+		return nil, addOut{Added: summariseSeries(added, profiles, tagNames), Ready: ready, Searched: in.Search}, nil
 	})
 
 	type editIn struct {

@@ -129,23 +129,18 @@ func TestJourneySetupAuditFixTeardown(t *testing.T) {
 	}
 
 	// 3. a series on the profile, with the tag, its first episode monitored
-	added := acctest.Object(t, call(t, "series_add", map[string]any{"series": bob, "root_folder": "/tv", "quality_profile": profile, "monitor": "pilot", "tags": []any{tag}})["added"], "added")
-	if acctest.Str(added["title"]) != bandOfBrothers.Title || acctest.Str(added["quality_profile"]) != profile || !slices.Contains(acctest.Strs(t, added["tags"], "tags"), tag) {
-		t.Fatalf("series_add = %v", added)
+	add := call(t, "series_add", map[string]any{"series": bob, "root_folder": "/tv", "quality_profile": profile, "monitor": "pilot", "tags": []any{tag}})
+	added := acctest.Object(t, add["added"], "added")
+	if acctest.Str(added["title"]) != bandOfBrothers.Title || acctest.Str(added["quality_profile"]) != profile || !slices.Contains(acctest.Strs(t, added["tags"], "tags"), tag) || add["ready"] != true || acctest.NumOr0(added["episodes_total"]) == 0 {
+		t.Fatalf("series_add = %v", add)
 	}
 	minutes := acctest.NumOr0(acctest.Object(t, call(t, "series_get", map[string]any{"series": bandOfBrothers.Title}), "series_get")["runtime_minutes"])
 	if minutes == 0 {
 		minutes = 60
 	}
 	none(t, audit(t, "audit_profiles", nil), "subject", tag)
-	// adding a series queues a refresh of it, which writes the series back
-	// as it read it: a change made while it runs is lost, so it is let
-	// finish first
-	eventually(t, "command_list", nil, "the refresh after adding finished", func(out map[string]any) bool {
-		return !slices.ContainsFunc(acctest.RowsOf(out["commands"]), func(c map[string]any) bool {
-			return acctest.Str(c["command"]) == "RefreshSeries" && (acctest.Str(c["status"]) == "started" || acctest.Str(c["status"]) == "queued")
-		})
-	})
+	// (series_add waited for Sonarr to read the show: it sets what the add
+	// asked to be monitored only then, over anything changed before)
 	// only the pilot is wanted for now: the season monitored, so new
 	// episodes would be, and every other episode in it not
 	call(t, "season_monitor", map[string]any{"series": bandOfBrothers.Title, "seasons": []any{1}, "monitored": true})

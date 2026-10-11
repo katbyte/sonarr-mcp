@@ -312,15 +312,22 @@ func healthRank(level string) int {
 // and botToken, appSecret, a tracker's cookie.
 var secretEndings = []string{"key", "token", "secret", "passphrase", "cookie"}
 
+// secretAddresses are the settings that are an address which is itself the
+// credential, lowercased: whoever holds a Discord or Slack webhook's address
+// can post to it, and each of Apprise's addresses carries its service's
+// token in its host or its path (discord://id/token), where taking the
+// sign-in and the parameters out of an address does nothing.
+var secretAddresses = []string{"webhookurl", "statelessurls"}
+
 // secretSetting reports whether a setting holds a credential, by its name:
-// a password wherever the word is in it, or a name that ends as a
-// credential's does. It goes by the name because one left off a list is a
-// credential in an answer with nothing to say so; the price is a setting
-// that is no secret and is not shown, which can still be set.
+// a password wherever the word is in it, a name that ends as a credential's
+// does, or an address that is one. It goes by the name because one left off
+// a list is a credential in an answer with nothing to say so; the price is
+// a setting that is no secret and is not shown, which can still be set.
 func secretSetting(key string) bool {
 	k := strings.ToLower(key)
 
-	return strings.Contains(k, "password") || slices.ContainsFunc(secretEndings, func(ending string) bool { return strings.HasSuffix(k, ending) })
+	return strings.Contains(k, "password") || slices.Contains(secretAddresses, k) || slices.ContainsFunc(secretEndings, func(ending string) bool { return strings.HasSuffix(k, ending) })
 }
 
 // asMap renders a model as a JSON object, for a caller that wants its fields

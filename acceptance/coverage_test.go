@@ -27,7 +27,6 @@ var notReported = map[string]string{
 	"audit_stuck_downloads: waiting to import":  "an import is late only an hour after the download finished; TestStuckProblem covers it",
 	"audit_stuck_downloads: not starting":       "a download is stalled only a day after it was queued; TestStuckProblem covers it",
 	// what the container cannot be made to be
-	"audit_health: root folder low on space":                      "the container's disk is not nearly full; TestAuditHealth covers it",
 	"audit_health: root folder unreachable":                       "Sonarr will not take a root folder it cannot read; TestAuditHealth covers it",
 	"audit_missing_folders: root folder holds none of its series": "it would mean moving the whole library aside; TestAuditFoldersEmptyRoot covers it",
 	// what the fixtures are not
@@ -42,6 +41,13 @@ var notReported = map[string]string{
 	"audit_stuck_downloads: download client unreachable": "Sonarr backs off from a client that fails, for minutes, which would stop the downloads the rest of the suite makes; TestAuditStuckDownloads covers it",
 	"audit_stuck_downloads: error":                       "Sonarr flags a tracked download as errored only for failures it cannot recover from, which the fake client cannot cause; TestStuckProblem covers it",
 	"audit_stuck_downloads: warning":                     "a download still going with a warning on it; the fake client's warnings all arrive as an import that cannot be made; TestStuckProblem covers it",
+}
+
+// eitherWay are the findings that depend on the machine the suite runs on
+// and not on anything it sets up, so a run that reports one and a run that
+// does not are both right.
+var eitherWay = map[string]string{
+	"audit_health: root folder low on space": "the library is a folder of the machine's own disk, so this is reported whenever that disk has under ten gigabytes free; TestAuditHealth covers it",
 }
 
 var (
@@ -95,6 +101,7 @@ func unreportedFindings() (missing, stale []string) {
 		for _, kind := range kinds {
 			key := audit + ": " + kind
 			switch {
+			case eitherWay[key] != "":
 			case reported(audit, kind):
 				if notReported[key] != "" {
 					stale = append(stale, key)

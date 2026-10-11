@@ -34,7 +34,7 @@
 - a call with an argument a tool does not take is told the arguments it does take, where it was only told which one was not expected
 - `file_delete` names every episode each file holds, since a file of two episodes takes both, with its size and whether Sonarr still monitors them, under `files`; and it warns, before deleting and after, when those episodes are still monitored: that Sonarr downloads them again, or, with its Unmonitor Deleted Episodes setting on, that it stops monitoring them
 - `command_list` takes a `command_id`, so a search, refresh or rename still running when its wait ended is followed by the id its tool answered, rather than looked for among the housekeeping Sonarr runs every minute
-- `SONARR_LOG=trace` shows every request and answer, with the API key blanked
+- `SONARR_LOG=trace` shows every request and answer with every credential blanked: Sonarr's own API key, the host's password and its confirmation, and each setting's value of an indexer, download client, notification or import list, since those travel as name and value pairs and a key is the value of a setting named apiKey
 - `sonarr.New` takes the base client's options: a logger with `client.WithLog`, a transport with `client.WithTransport`, a retry rule with `client.WithRetry`
 - the Go client says which Sonarr release its API document was taken from, `sonarr.DocumentVersion`, beside the version the document gives itself
 
@@ -56,6 +56,8 @@
 
 ### Fixed
 
+- `series_add` answered before Sonarr had read the show's episodes, and Sonarr sets what the add asked to be monitored only then, over anything changed in between: a season monitored straight after adding was unmonitored again a moment later. `series_add` now waits for Sonarr to finish (`wait_seconds`, default 60) and answers `ready`
+- a webhook's own headers, where its token goes, were shown by `notification_list` and by what an add or an edit answers, since Sonarr does not mark them private; so were a Discord or Slack webhook's address and Apprise's addresses, each of which is its own credential. All are set and never shown. A live test now reads every setting of every kind of provider Sonarr has (437 over 64 kinds) and fails on one that is shown as text and has not been looked at
 - `indexer_test` handed a caller the API key Sonarr keeps for an indexer: when the indexer answers with an error, Sonarr says where it failed, the address it asked with the key on the end, and that was passed on as a problem. Every address in an answer or a refusal is now shown without who it signs in as and without the value of any parameter
 - a search asked to queue and return at once (`wait_seconds: -1` on `episode_search`, `season_search`, `series_search` and `wanted_search`) waited all the same, for as long as Sonarr was busy and up to thirty seconds: the check of the download clients a search is followed by is a command of its own, and it waited its turn behind the search. Such a search now answers at once, with the queue as it stands
 - `command_list` answered Sonarr's oldest commands first, so on a busy server the first page held none of what was running or had just finished: what is running or waiting comes first, then what finished, newest first

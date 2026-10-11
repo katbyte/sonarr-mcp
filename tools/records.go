@@ -183,13 +183,20 @@ func settable[T any]() []string {
 // Sonarr marks each setting's privacy, and only the ordinary ones are shown;
 // but it does not mark them all - the API key an import list keeps for
 // another Sonarr is ordinary to it - so one named as a credential is
-// (secretSetting) is one too.
+// (secretSetting) is one too. And so is a list of keys and values, which is
+// a webhook's own headers: where its token goes, as Authorization, and
+// ordinary to Sonarr as well. It is hidden whole rather than shown with its
+// values blanked, so that what a caller reads back is never a shape it
+// cannot send.
 func fieldSecret(field map[string]any) bool {
 	privacy := asString(field["privacy"])
 	kind := asString(field["type"])
 
-	return (privacy != "" && privacy != string(sonarr.PrivacyLevelNormal)) || kind == "password" || secretSetting(asString(field["name"]))
+	return (privacy != "" && privacy != string(sonarr.PrivacyLevelNormal)) || kind == "password" || kind == keyValueList || secretSetting(asString(field["name"]))
 }
+
+// keyValueList is the kind of setting that is a list of keys and values.
+const keyValueList = "keyValueList"
 
 // fieldsOf are a provider's settings as Sonarr sends them: a list, each with
 // its name and value.

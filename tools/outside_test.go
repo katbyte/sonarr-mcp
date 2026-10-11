@@ -8,9 +8,11 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/katbyte/go-kt/outside"
+	apiclient "github.com/katbyte/pandorest/client"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -284,7 +286,10 @@ func TestAStoredKeyIsNotQuotedBack(t *testing.T) {
 	f.answerStatus(t, "POST /api/v3/indexer/test", http.StatusBadRequest, failed)
 	f.answerStatus(t, "POST /api/v3/indexer/testall", http.StatusBadRequest, []any{map[string]any{"id": 1, "isValid": false, "validationFailures": failed}})
 	f.answerStatus(t, "PUT /api/v3/indexer/1", http.StatusBadRequest, failed)
-	f.answer(t, "GET /api/v3/notification", []any{map[string]any{"id": 2, "name": "Hook", "implementation": "Webhook", "onGrab": true, "fields": []any{map[string]any{"name": "url", "value": "https://hooks.example/in?token=" + key}}}})
+	// nor this: a webhook's own headers, where its token goes
+	f.answer(t, "GET /api/v3/notification", []any{map[string]any{"id": 2, "name": "Hook", "implementation": "Webhook", "onGrab": true, "fields": []any{map[string]any{"name": "url", "value": "https://hooks.example/in?token=" + key}, map[string]any{"name": "headers", "type": "keyValueList", "value": []any{map[string]any{"key": "Authorization", "value": "Bearer " + key}}}}}})
+	f.answer(t, "GET /api/v3/notification/schema", []any{map[string]any{"implementation": "Webhook", "fields": []any{map[string]any{"name": "url", "type": "url"}, map[string]any{"name": "headers", "type": "keyValueList", "value": []any{}}}}})
+	f.mux.HandleFunc("POST /api/v3/notification", keeper(t, 4))
 	// Sonarr does not mark this one private, and it is a key all the same
 	f.answer(t, "GET /api/v3/importlist", []any{map[string]any{"id": 3, "name": "Other Sonarr", "implementation": "SonarrImport", "fields": []any{map[string]any{"name": "baseUrl", "value": "http://other.example:8989"}, map[string]any{"name": "apiKey", "value": key, "privacy": "normal"}}}})
 	cs := session(t, f, Options{})
@@ -302,7 +307,106 @@ func TestAStoredKeyIsNotQuotedBack(t *testing.T) {
 	if msg := mustFail(t, cs, "indexer_edit", map[string]any{"which": "Broken Indexer", "set": map[string]any{"priority": 40}}); strings.Contains(msg, key) || !strings.Contains(msg, "apikey=REDACTED") {
 		t.Errorf("the save Sonarr refused = %q, want the address without the key", msg)
 	}
-	if listed := mustCall(t, cs, "notification_list", nil); strings.Contains(fmt.Sprint(listed), key) || !strings.Contains(fmt.Sprint(listed), "https://hooks.example/in?token=REDACTED") {
-		t.Errorf("notification_list = %v, want the hook's address without its token", listed)
+	if listed := mustCall(t, cs, "notification_list", nil); strings.Contains(fmt.Sprint(listed), key) || strings.Contains(fmt.Sprint(listed), "Authorization") || !strings.Contains(fmt.Sprint(listed), "https://hooks.example/in?token=REDACTED") {
+		t.Errorf("notification_list = %v, want the hook's address without its token and none of its headers", listed)
+	}
+	added := mustCall(t, cs, "notification_add", map[string]any{"kind": "Webhook", "name": "New Hook", "settings": map[string]any{"url": "https://hooks.example/in", "headers": []any{map[string]any{"key": "Authorization", "value": "Bearer " + key}}}})
+	if strings.Contains(fmt.Sprint(added), key) || strings.Contains(fmt.Sprint(added), "Authorization") {
+		t.Errorf("notification_add = %v, want none of the headers it was given", added)
+	}
+	if sent := f.sent(http.MethodPost, "/api/v3/notification"); len(sent) != 1 || !strings.Contains(sent[0], "Bearer "+key) {
+		t.Errorf("the hook sent = %v, want its headers saved as given", sent)
+	}
+	kinds := rowsOf(mustCall(t, cs, "notification_kinds", nil)["kinds"])
+	if described := fmt.Sprint(kinds); !strings.Contains(described, "headers") || !strings.Contains(described, "credential:true") {
+		t.Errorf("notification_kinds = %v, want the headers listed as a credential to set", kinds)
+	}
+}
+
+// tracer keeps what the Go client says it sent and was sent.
+type tracer struct {
+	mu    sync.Mutex
+	lines []string
+}
+
+func (tr *tracer) Debugf(format string, args ...any) { tr.Tracef(format, args...) }
+
+func (tr *tracer) Tracef(format string, args ...any) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+
+	tr.lines = append(tr.lines, fmt.Sprintf(format, args...))
+}
+
+func (tr *tracer) said() string {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+
+	return strings.Join(tr.lines, "\n")
+}
+
+// With SONARR_LOG=trace the client writes down every request and answer, and
+// none of it may carry a credential: not Sonarr's own key in the header, not
+// a provider's key, which is sent as the value of a setting named apiKey and
+// so sits under "value", not the host's password or the confirmation of it,
+// and not a key Sonarr sends back because it does not count it private.
+func TestATraceShowsNoCredential(t *testing.T) {
+	t.Parallel()
+
+	secrets := map[string]string{
+		"Sonarr's own API key":            "s3cret-server-key",
+		"an indexer's key, sent":          "s3cret-indexer-key",
+		"the host's password":             "s3cret-password-one",
+		"the host's password, confirmed":  "s3cret-password-two",
+		"an import list's key, sent back": "s3cret-list-key",
+	}
+
+	f := newFakeServer(t)
+	f.answer(t, "GET /api/v3/indexer/schema", []any{newznab()})
+	f.answer(t, "GET /api/v3/tag", []any{})
+	f.mux.HandleFunc("POST /api/v3/indexer", keeper(t, 9))
+	f.mux.HandleFunc("PUT /api/v3/indexer/9", keeper(t, 9))
+	f.answer(t, "GET /api/v3/config/host", map[string]any{"id": 1, "port": 8989, "username": "kt", "password": "", "passwordConfirmation": "", "apiKey": secrets["Sonarr's own API key"], "authenticationMethod": "forms"})
+	f.mux.HandleFunc("PUT /api/v3/config/host/1", keeper(t, 1))
+	f.answer(t, "GET /api/v3/importlist", []any{map[string]any{"id": 3, "name": "Other Sonarr", "implementation": "SonarrImport", "fields": []any{map[string]any{"name": "baseUrl", "value": "http://other.example:8989"}, map[string]any{"name": "apiKey", "value": secrets["an import list's key, sent back"], "privacy": "normal"}}}})
+
+	tr := &tracer{}
+	sc, err := sonarr.New(f.srv.URL, secrets["Sonarr's own API key"], apiclient.WithLog(tr))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := mcp.NewServer(&mcp.Implementation{Name: "t", Version: "0"}, nil)
+	if _, err := RegisterAll(srv, sc, Options{Toolsets: []string{"all"}}); err != nil {
+		t.Fatal(err)
+	}
+	cs := connect(t, srv)
+
+	mustCall(t, cs, "indexer_add", map[string]any{"kind": "newznab", "name": "Usenet One", "settings": map[string]any{"baseUrl": "https://indexer.example", "apiKey": secrets["an indexer's key, sent"]}, "force": true})
+	mustCall(t, cs, "config_edit", map[string]any{"section": "host", "confirm": true, "set": map[string]any{"password": secrets["the host's password"], "passwordConfirmation": secrets["the host's password, confirmed"]}})
+	mustCall(t, cs, "importlist_list", nil)
+
+	said := tr.said()
+	if !strings.Contains(said, "/api/v3/indexer") || !strings.Contains(said, "Usenet One") {
+		t.Fatalf("the trace does not hold what was sent, so it proves nothing: %.300s", said)
+	}
+	for what, secret := range secrets {
+		if at := strings.Index(said, secret); at >= 0 {
+			t.Errorf("the trace shows %s: ...%s...", what, strings.ReplaceAll(said[max(0, at-90):at], "\n", " ")+"[the secret]")
+		}
+	}
+}
+
+// A setting is a credential by its name where Sonarr does not mark it one.
+func TestSecretSettingNames(t *testing.T) {
+	t.Parallel()
+
+	for name, want := range map[string]bool{
+		"apiKey": true, "passkey": true, "userKey": true, "accessToken": true, "botToken": true, "appSecret": true, "cookie": true,
+		"password": true, "passwordConfirmation": true, "sslCertPassword": true, "webHookUrl": true, "statelessUrls": true,
+		"url": false, "baseUrl": false, "serverUrl": false, "host": false, "username": false, "tvCategory": false, "sslKeyPath": false, "topics": false,
+	} {
+		if got := secretSetting(name); got != want {
+			t.Errorf("secretSetting(%q) = %v, want %v", name, got, want)
+		}
 	}
 }

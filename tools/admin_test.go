@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -295,5 +296,46 @@ func TestConfigNamingPreview(t *testing.T) {
 	}
 	if msg := mustFail(t, cs, "config_naming_preview", map[string]any{"set": map[string]any{"colour": "red"}}); !strings.Contains(msg, `no setting "colour"`) {
 		t.Errorf("a setting there is not = %q", msg)
+	}
+}
+
+// Sonarr answers an add at once and sets what was asked to be monitored only
+// when it has read the show's episodes, over anything changed before: it
+// keeps the add's choices on the series until then. series_add waits for
+// them to go, and says so when the wait runs out first.
+func TestSeriesAddWaitsForSonarrToReadTheShow(t *testing.T) {
+	t.Parallel()
+
+	show := map[string]any{"title": "Firefly", "year": 2002, "tvdbId": 78874, "seasons": []any{map[string]any{"seasonNumber": 1, "monitored": true}}}
+	f := newFakeServer(t)
+	f.answer(t, "GET /api/v3/series", []any{})
+	f.answer(t, "GET /api/v3/series/lookup", []any{show})
+	f.answer(t, "GET /api/v3/rootfolder", []any{map[string]any{"id": 1, "path": "/tv", "accessible": true}})
+	f.answer(t, "GET /api/v3/qualityprofile", []any{map[string]any{"id": 4, "name": "HD-1080p"}})
+	f.answer(t, "GET /api/v3/tag", []any{})
+	f.mux.HandleFunc("POST /api/v3/series", keeper(t, 7))
+	var reads atomic.Int32
+	f.mux.HandleFunc("GET /api/v3/series/7", func(w http.ResponseWriter, _ *http.Request) {
+		read := map[string]any{"id": 7, "title": "Firefly", "year": 2002, "tvdbId": 78874, "qualityProfileId": 4, "path": "/tv/Firefly"}
+		// read twice before Sonarr is done with it
+		if reads.Add(1) <= 2 {
+			read["addOptions"] = map[string]any{"monitor": "pilot"}
+		} else {
+			read["statistics"] = map[string]any{"totalEpisodeCount": 14}
+		}
+		writeJSON(t, w, read)
+	})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "series_add", map[string]any{"series": "tvdb:78874", "quality_profile": "HD-1080p", "monitor": "pilot"})
+	if added := asObject(out["added"]); !flag(out["ready"]) || number(added["episodes_total"]) != 14 || reads.Load() != 3 {
+		t.Errorf("series_add = %v after %d reads, want the series as it stood once Sonarr had read it", out, reads.Load())
+	}
+
+	// asked not to wait, it reads the series once and says it is not ready
+	reads.Store(0)
+	at := mustCall(t, cs, "series_add", map[string]any{"series": "tvdb:78874", "quality_profile": "HD-1080p", "wait_seconds": -1})
+	if flag(at["ready"]) || reads.Load() != 1 {
+		t.Errorf("series_add told not to wait = %v after %d reads", at, reads.Load())
 	}
 }

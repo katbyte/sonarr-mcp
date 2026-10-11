@@ -162,6 +162,69 @@ func TestDownloadClientAddEditDelete(t *testing.T) {
 	deletes(t, "downloadclient_delete", name, name)
 }
 
+// shownSettings are the settings of Sonarr's providers that the tools show
+// and that are text, each one looked at and found to hold no credential.
+// Sonarr marks some settings private and the tools hide more by name and by
+// kind; what is left is this list, and a setting a later Sonarr adds is on
+// it only once somebody has read what it holds.
+var shownSettings = []string{
+	// where a provider is, and where it puts things
+	"apiPath", "apiUrl", "baseUrl", "clickUrl", "host", "port", "rpcPath", "server", "serverUrl", "urlBase",
+	"category", "completedDirectory", "destination", "destinationDirectory", "directory", "downloadDirectory", "magnetFileExtension", "mapFrom", "mapTo", "nzbFolder", "path", "strmFolder", "torrentFolder", "tvCategory", "tvDirectory", "tvImportedCategory", "watchFolder",
+	// who and what a message goes to, and how it looks
+	"author", "avatar", "bcc", "cc", "channel", "channelTags", "chatId", "deviceIds", "deviceNames", "devices", "displayTime", "event", "expire", "from", "icon", "mention", "notificationName", "receiverId", "recipients", "retry", "senderDomain", "senderId", "sound", "to", "topicId",
+	// what a list reads
+	"genres", "limit", "listId", "listname", "rating", "years",
+	// labels of the provider's own
+	"postImportTags", "tags",
+	// an id an application is known by, beside the token that is hidden
+	"appId",
+	// the account whose list is read, not the one signed in with: a sign-in's name Sonarr marks private, and that is hidden
+	"username",
+	// text a person may have put a credential in, though it is not for one: extra query parameters for an indexer or for Trakt, a script's arguments
+	"additionalParameters", "traktAdditionalParameters", "arguments",
+	// addresses whose path can be private: a generic webhook's, a Plex watchlist's feed. Shown without sign-in or parameter values; whether to hide them whole is the owner's call
+	"url",
+	// a topic on a public ntfy server is as good as a password to it; on one's own it is a name. The owner's call
+	"topics",
+}
+
+// Every setting of every kind of indexer, download client, notification and
+// import list this Sonarr has is a credential the tools hide, or a switch, a
+// number or a choice, or text on the list above. A setting Sonarr adds in a
+// later release fails here until it has been looked at.
+func TestEveryProviderSettingIsHiddenOrLookedAt(t *testing.T) {
+	seen, total := map[string]bool{}, 0
+	for _, tool := range []string{"indexer_kinds", "downloadclient_kinds", "notification_kinds", "importlist_kinds"} {
+		for _, kind := range acctest.Rows(t, call(t, tool, map[string]any{"limit": 1000})["kinds"], "kinds") {
+			for _, setting := range acctest.RowsOf(kind["settings"]) {
+				total++
+				name := acctest.Str(setting["name"])
+				switch acctest.Str(setting["type"]) {
+				case "checkbox", "number", "select", "oAuth":
+					// a switch, a number, a choice, and a button that holds nothing
+					continue
+				}
+				switch {
+				case setting["credential"] == true:
+				case slices.Contains(shownSettings, name):
+					seen[name] = true
+				default:
+					t.Errorf("%s %s shows its setting %s (%s) and nobody has looked at what it holds: hide it as a credential, or add it to shownSettings", tool, acctest.Str(kind["kind"]), name, acctest.Str(setting["type"]))
+				}
+			}
+		}
+	}
+	if total < 400 {
+		t.Errorf("%d settings were read, want the several hundred Sonarr has", total)
+	}
+	for _, name := range shownSettings {
+		if !seen[name] {
+			t.Errorf("shownSettings has %s, which no kind has as text it shows: take it out", name)
+		}
+	}
+}
+
 // A notification sends a real message when it is tested and before it is
 // saved: here to a webhook the suite answers itself, which counts them.
 func TestNotifications(t *testing.T) {
@@ -170,8 +233,10 @@ func TestNotifications(t *testing.T) {
 	var sent atomic.Int32
 	var refuse atomic.Bool
 	const hook = "hooks.sonarr-mcp.test"
-	stop := proxy.Serve(hook, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	var authorised atomic.Pointer[string]
+	stop := proxy.Serve(hook, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sent.Add(1)
+		authorised.Store(new(r.Header.Get("Authorization")))
 		if refuse.Load() {
 			http.Error(w, "the hook is closed", http.StatusForbidden)
 		}
@@ -180,10 +245,17 @@ func TestNotifications(t *testing.T) {
 
 	const name = "Suite Hook"
 	t.Cleanup(func() { _, _ = invoke("notification_delete", map[string]any{"which": name, "confirm": true}) })
-	out := call(t, "notification_add", map[string]any{"kind": "Webhook", "name": name, "set": map[string]any{"onGrab": true, "onDownload": true}, "settings": map[string]any{"url": "http://" + hook + "/in", "method": 1}})
+	// the hook has a header of its own with a token in it, which is where a
+	// webhook's credential goes and which Sonarr does not count private: it
+	// is sent with every message, and shown in no answer
+	headers := []any{map[string]any{"key": "Authorization", "value": "Bearer " + secret("suite-hook-token-7f3a91c2d4e85b60")}}
+	out := call(t, "notification_add", map[string]any{"kind": "Webhook", "name": name, "set": map[string]any{"onGrab": true, "onDownload": true}, "settings": map[string]any{"url": "http://" + hook + "/in", "method": 1, "headers": headers}})
 	rec := record(t, out)
-	if own := acctest.Object(t, rec["settings"], "settings"); rec["onGrab"] != true || rec["onRename"] == true || acctest.Str(own["url"]) != "http://"+hook+"/in" {
+	if own := acctest.Object(t, rec["settings"], "settings"); rec["onGrab"] != true || rec["onRename"] == true || acctest.Str(own["url"]) != "http://"+hook+"/in" || own["headers"] != nil {
 		t.Errorf("the notification added = %v", rec)
+	}
+	if got := authorised.Load(); got == nil || *got != "Bearer suite-hook-token-7f3a91c2d4e85b60" {
+		t.Errorf("the hook was sent Authorization %v, want the header it was given", got)
 	}
 	if sent.Load() == 0 {
 		t.Error("Sonarr saved the notification without sending a test through it")
