@@ -5,6 +5,7 @@ dist/
 /sonarr-mcp
 .tools/bin/
 .tools/venv/
+.tools/npm/
 .env
 .sonarr-mcp
 .testenv*.sh

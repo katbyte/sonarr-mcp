@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/katbyte/go-kt/outside"
-
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 

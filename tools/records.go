@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	apiclient "github.com/katbyte/pandorest/client"
+	"github.com/katbyte/pandorest/client"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -826,7 +826,7 @@ func registerRecords[T any](r *registry, k recordKind[T]) {
 				// answers - leaves Sonarr with no answer for any of them, so
 				// each that is switched on is tried on its own, as its test
 				// of them all tries them
-				if apiclient.StatusCode(err) < http.StatusInternalServerError || k.on == nil {
+				if client.StatusCode(err) < http.StatusInternalServerError || k.on == nil {
 					return nil, recordTestOut{}, err
 				}
 				out := recordTestOut{Results: []testRow{}}

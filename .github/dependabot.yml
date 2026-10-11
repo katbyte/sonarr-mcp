@@ -24,7 +24,7 @@ updates:
         patterns:
           - "*"
 
-  # dev tools (golangci-lint, gofumpt) pinned in .tools/go.mod
+  # dev tools (golangci-lint, gofumpt, actionlint) pinned in .tools/go.mod
   - package-ecosystem: "gomod"
     directory: "/.tools"
     schedule:
@@ -33,18 +33,6 @@ updates:
       default-days: 7
     groups:
       go-tools:
-        patterns:
-          - "*"
-
-  # actionlint has its own module (yaml dependency conflicts with golangci-lint's)
-  - package-ecosystem: "gomod"
-    directory: "/.tools/actionlint"
-    schedule:
-      interval: "monthly"
-    cooldown:
-      default-days: 7
-    groups:
-      go-tools-actionlint:
         patterns:
           - "*"
 

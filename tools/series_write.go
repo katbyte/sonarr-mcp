@@ -371,7 +371,10 @@ func registerSeriesWriteTools(r *registry) {
 		if err != nil {
 			return nil, editOut{}, err
 		}
-		body := *cur.Model
+		body, err := answered(cur.Model, s.Title)
+		if err != nil {
+			return nil, editOut{}, err
+		}
 		profiles, tagNames, err := r.lookupNames(ctx)
 		if err != nil {
 			return nil, editOut{}, err
@@ -724,7 +727,7 @@ func registerSeriesWriteTools(r *registry) {
 						return nil, importOut{}, err
 					}
 				}
-				body := *show
+				body := *show //nolint:azproviderlint // AZG008 cannot see that the first case has dealt with there being no show
 				body.Path = u.Path
 				body.RootFolderPath = folder.Path
 				body.QualityProfileId = profile.Id

@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/katbyte/go-kt/outside"
-	apiclient "github.com/katbyte/pandorest/client"
+	"github.com/katbyte/pandorest/client"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -371,7 +371,7 @@ func TestATraceShowsNoCredential(t *testing.T) {
 	f.answer(t, "GET /api/v3/importlist", []any{map[string]any{"id": 3, "name": "Other Sonarr", "implementation": "SonarrImport", "fields": []any{map[string]any{"name": "baseUrl", "value": "http://other.example:8989"}, map[string]any{"name": "apiKey", "value": secrets["an import list's key, sent back"], "privacy": "normal"}}}})
 
 	tr := &tracer{}
-	sc, err := sonarr.New(f.srv.URL, secrets["Sonarr's own API key"], apiclient.WithLog(tr))
+	sc, err := sonarr.New(f.srv.URL, secrets["Sonarr's own API key"], client.WithLog(tr))
 	if err != nil {
 		t.Fatal(err)
 	}

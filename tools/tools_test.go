@@ -586,3 +586,16 @@ func TestEveryOperationHasAToolOrAReason(t *testing.T) {
 		}
 	}
 }
+
+func TestAnsweredNamesWhatCameBackEmpty(t *testing.T) {
+	t.Parallel()
+
+	if _, err := answered[sonarr.TagResource](nil, "the new tag"); err == nil || !strings.Contains(err.Error(), "the new tag") {
+		t.Errorf("an empty answer = %v, want an error naming the new tag", err)
+	}
+
+	got, err := answered(&sonarr.TagResource{Label: "anime"}, "the new tag")
+	if err != nil || got.Label != "anime" {
+		t.Errorf("an answer = %v, %v, want the record", got, err)
+	}
+}

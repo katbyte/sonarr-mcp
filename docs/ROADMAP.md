@@ -29,7 +29,7 @@ Design rules, in priority order:
 | Area | Tools | Answers |
 |---|---|---|
 | know the library | `server_info`, `series_list`, `series_get`, `episode_list`, `calendar_list`, `file_list`, `profile_list`, `customformat_list`, `tag_list`, `rootfolder_list`, `config_get` | "what do I have, and how is it set up" |
-| curation | `audit_all` + 16 audits, `release_parse`, `file_edit`, `series_edit`, `series_bulk_edit`, `season_monitor`, `episode_monitor`, `series_rename`, `series_rescan`, `series_refresh`, `import_scan` → `import_apply`, `series_import`, `tag_create`, `tag_delete` | "what is wrong, and fix it" |
+| curation | `audit_all` + 17 audits, `release_parse`, `file_edit`, `series_edit`, `series_bulk_edit`, `season_monitor`, `episode_monitor`, `series_rename`, `series_rescan`, `series_refresh`, `import_scan` → `import_apply`, `series_import`, `tag_create`, `tag_delete` | "what is wrong, and fix it" |
 | getting episodes | `episode_search`, `season_search`, `series_search`, `wanted_search`, `release_search` → `release_grab`, `queue_list`, `queue_grab`, `queue_remove`, `history_list`, `history_mark_failed`, `blocklist_list`, `blocklist_remove` | "go and get what is missing, and see it arrive" |
 | growing the library | `series_lookup`, `series_add`, `rootfolder_add`, `rootfolder_remove` | "add this show" |
 | admin | `server_health`, `server_disk_space`, `server_updates`, `server_restart`, `server_shutdown`, `task_list`, `task_run`, `command_list`, `command_cancel`, `log_list`, `logfile_list`, `logfile_read`, `filesystem_list`, `backup_list`, `backup_create`, `backup_restore`, `backup_delete`, `indexer_list`, `indexer_test`, `downloadclient_list`, `downloadclient_test`, `series_delete`, `file_delete` | "keep it healthy" |

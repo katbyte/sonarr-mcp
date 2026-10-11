@@ -1,0 +1,32 @@
+name: Check Links Local
+
+# Offline lychee check of internal links and anchors in the repo's markdown on PRs: fast,
+# deterministic, no network. External link rot is deliberately not a PR problem:
+# main-check-links.yaml checks it on pushes to main.
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    types: ['opened', 'synchronize']
+    paths:
+      - '**.md'
+      - '.github/lychee.toml'
+      - '.github/workflows/pr-check-links-local.yaml'
+      - 'makefile'
+
+concurrency:
+  group: 'pr-check-links-local-${{ github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+jobs:
+  linkcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # make downloads the lychee version pinned in the makefile into .tools
+      - name: Check internal links and anchors
+        run: make linkcheck-local

@@ -7,4 +7,4 @@ destination: ./bin
 plugins:
   - module: "github.com/katbyte/azproviderlint"
     import: "github.com/katbyte/azproviderlint/plugin"
-    version: v0.6.0
+    version: v0.11.0

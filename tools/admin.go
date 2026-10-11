@@ -187,7 +187,9 @@ func registerProfileTools(r *registry) {
 			if err != nil {
 				return nil, profileOut{}, err
 			}
-			body = *blank.Model
+			if body, err = answered(blank.Model, "the blank profile"); err != nil {
+				return nil, profileOut{}, err
+			}
 		}
 		body.Id = 0
 		if err := in.apply(&body); err != nil {

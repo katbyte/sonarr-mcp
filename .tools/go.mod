@@ -4,11 +4,17 @@ go 1.26.6
 
 tool (
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+	github.com/katbyte/actionlint/cmd/actionlint
 	mvdan.cc/gofumpt
 )
 
 require (
 	github.com/golangci/golangci-lint/v2 v2.14.0
+	// Fork of rhysd/actionlint, dormant upstream since April 2026. This is v1.7.12 plus two open
+	// upstream PRs: #732 (`$/` self-repository `uses:` syntax) and #735 (go.yaml.in/yaml/v4 rc.6,
+	// so actionlint and golangci-lint can share it and live in this one module). Switch back to
+	// rhysd/actionlint if it starts releasing again.
+	github.com/katbyte/actionlint v1.7.13
 	mvdan.cc/gofumpt v0.12.0
 )
 
@@ -46,6 +52,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bkielbasa/cyclop v1.2.3 // indirect
 	github.com/blizzy78/varnamelen v0.8.0 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/bombsimon/wsl/v4 v4.7.0 // indirect
 	github.com/bombsimon/wsl/v5 v5.9.0 // indirect
 	github.com/breml/bidichk v0.3.3 // indirect
@@ -141,6 +148,7 @@ require (
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mattn/go-runewidth v0.0.24 // indirect
+	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mgechev/revive v1.17.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -164,6 +172,7 @@ require (
 	github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 // indirect
 	github.com/raeperd/recvcheck v0.3.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rogpeppe/go-internal v1.16.0 // indirect
 	github.com/ryancurrah/gomodguard v1.4.1 // indirect
 	github.com/ryancurrah/gomodguard/v2 v2.1.3 // indirect
@@ -210,6 +219,7 @@ require (
 	go.uber.org/multierr v1.10.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	go.yaml.in/yaml/v4 v4.0.0-rc.6 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20260811152304-ee035b5b010f // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect

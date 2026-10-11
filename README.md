@@ -13,7 +13,7 @@ An [MCP](https://modelcontextprotocol.io) server, CLI and Go SDK that **audit a
 find** - from Claude Code, Claude Desktop, or any other MCP client.
 
 Sonarr's API is large, and an MCP server that wraps it lets a model list your series and
-read the queue. This one does that too, but the reason it exists is the layer above: **16
+read the queue. This one does that too, but the reason it exists is the layer above: **17
 audits**, each a sweep over the whole library for one specific thing that goes wrong with a
 real Sonarr - episodes that aired and never arrived, files stuck below their profile's
 cutoff, a download blocked from importing since Tuesday, a release that keeps failing, files
@@ -380,6 +380,8 @@ test against it.
 Requires docker (or Colima), ffmpeg, jq and openssl; the suites skip when `SONARR_SERVER` and
 `SONARR_TOKEN` are unset, so they never fail for want of a daemon.
 
-Dev tools are pinned in `.tools/go.mod` (actionlint in `.tools/actionlint/go.mod`) and built
-into `.tools/bin` by make. On a noexec checkout point `TOOLS_BIN` somewhere local, e.g.
-`make TOOLS_BIN=~/.cache/sonarr-mcp/bin lint`.
+Dev tools are pinned in `.tools/go.mod` (the Go ones) and at the top of the makefile (the
+rest) and built into `.tools/bin` by make. On a noexec checkout point `TOOLS_BIN` somewhere
+local, e.g. `make TOOLS_BIN=~/.cache/sonarr-mcp/bin lint`. Beside `make lint`, `make typos`
+checks spelling, `make markdownlint` the markdown, and `make actionlint`, `make yamllint` and
+`make zizmor` the workflows.

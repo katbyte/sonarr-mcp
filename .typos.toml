@@ -1,0 +1,35 @@
+# Configuration for typos (https://github.com/crate-ci/typos), run by `make typos` and
+# .github/workflows/typos.yaml. It checks every file type and splits identifiers, so misspelled
+# function and variable names are caught as well as prose.
+#
+# locale is "en" (accept both UK and US spellings): our own text is Canadian English, which takes
+# -ize like the US but -our/-re like the UK, and names mirroring the Sonarr API are American.
+
+[files]
+ignore-hidden = false # the default skips dotfiles, which would leave .github/ workflows unchecked
+extend-exclude = [
+  ".git/",
+  ".idea/",
+  ".tools/bin/", # gitignored tool installs (make tools)
+  ".tools/npm/",
+  ".tools/venv/",
+  "**/vendor/",
+  "**/go.mod", # commit hashes in pinned versions
+  "**/go.sum",
+  "**/testdata/", # recorded provider answers, other people's words
+]
+
+[default]
+locale = "en"
+extend-ignore-re = [
+  '"ofset"',                  # tests that a misspelt argument is refused
+  'Handful[ .]of[ .]Nothin', # an episode's real title, which drops the g
+]
+
+[default.extend-words]
+# language codes
+fre = "fre"
+tha = "tha"
+# linter names
+decorder = "decorder"
+importas = "importas"

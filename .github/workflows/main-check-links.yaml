@@ -1,0 +1,28 @@
+name: Check Links
+
+# Checks internal and external links in the repo's markdown on pushes to main. A link that has
+# rotted elsewhere is a cleanup task, not something a PR author should be blocked on, so PRs get
+# only the offline internal check (pr-check-links-local.yaml).
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ 'main' ]
+
+concurrency:
+  group: 'main-check-links-${{ github.ref }}'
+  cancel-in-progress: true
+
+jobs:
+  linkcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # make downloads the lychee version pinned in the makefile into .tools
+      - name: Check internal and external links
+        run: make linkcheck

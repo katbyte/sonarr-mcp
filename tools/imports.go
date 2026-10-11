@@ -22,7 +22,7 @@ type importCandidate struct {
 	Quality      string   `json:"quality"`
 	Languages    []string `json:"languages"`
 	ReleaseGroup string   `json:"release_group,omitempty"`
-	Rejections   []string `json:"rejections"              jsonschema:"why Sonarr would not import it on its own: unparseable, a sample, not an upgrade, already imported"`
+	Rejections   []string `json:"rejections"              jsonschema:"why Sonarr would not import it on its own: unparsable, a sample, not an upgrade, already imported"`
 	Importable   bool     `json:"importable"              jsonschema:"Sonarr matched a series and episodes and has no permanent objection; anything else needs its series and episodes given to import_apply"`
 }
 

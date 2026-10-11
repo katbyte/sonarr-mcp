@@ -3,6 +3,7 @@
 .idea
 .tools/bin
 .tools/venv
+.tools/npm
 dist
 docs
 acceptance/testdata

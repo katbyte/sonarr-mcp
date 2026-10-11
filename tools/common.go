@@ -21,6 +21,18 @@ import (
 // boolv reads an optional flag, false when unset.
 func boolv(b *bool) bool { return b != nil && *b }
 
+// answered is the record a call answered with, or an error naming what was asked for when it answered with none: a record that is read to be
+// written back must not go back empty.
+func answered[T any](record *T, what string) (T, error) {
+	if record == nil {
+		var none T
+
+		return none, fmt.Errorf("%s: Sonarr answered with nothing", what)
+	}
+
+	return *record, nil
+}
+
 // episodeLabel is how an episode is named for a person: S01E02, or S01E02-E03
 // for a file holding several.
 func episodeLabel(season int, episodes ...int) string {
@@ -232,8 +244,12 @@ func (r *registry) resolveTags(ctx context.Context, refs []string, create bool) 
 			if err != nil {
 				return nil, fmt.Errorf("creating tag %q: %w", ref, err)
 			}
-			id = made.Model.Id
-			res.Model = append(res.Model, *made.Model)
+			tag, err := answered(made.Model, "the new tag")
+			if err != nil {
+				return nil, fmt.Errorf("creating tag %q: %w", ref, err)
+			}
+			id = tag.Id
+			res.Model = append(res.Model, tag)
 		}
 		if !slices.Contains(out, id) {
 			out = append(out, id)

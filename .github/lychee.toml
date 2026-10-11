@@ -1,0 +1,6 @@
+# Configuration for lychee link checking. `make linkcheck-local` (offline, internal links and
+# anchors) runs on pull requests via pr-check-links-local.yaml; `make linkcheck` (internal and
+# external) runs on pushes to main via main-check-links.yaml.
+
+# a site answering "too many requests" is alive; a dead link answers 404
+accept = ["200..=206", "429"]

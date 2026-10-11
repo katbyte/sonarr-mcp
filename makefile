@@ -9,8 +9,7 @@ empty:=
 space:=$(empty) $(empty)
 
 # dev tool binaries are built into .tools/bin (gitignored) from the versions pinned in
-# .tools/go.mod (and .tools/actionlint/go.mod) - the single source of truth for make and CI;
-# dependabot keeps them updated.
+# .tools/go.mod - the single source of truth for make and CI; dependabot keeps them updated.
 # overridable because binaries cannot execute from a noexec mount (e.g. an smb checkout):
 # make TOOLS_BIN=~/.cache/sonarr-mcp/bin lint
 TOOLS_BIN?=.tools/bin
@@ -19,12 +18,19 @@ GOFUMPT=$(TOOLS_BIN)/gofumpt
 GOLANGCI_LINT=$(TOOLS_BIN)/golangci-lint
 
 # non-Go tools also live in .tools/bin at pinned versions, but the pins are here (dependabot
-# cannot bump them): shellcheck is a static haskell binary downloaded from its github release,
-# yamllint is python installed into a repo-local venv. both rebuild when this makefile changes.
+# cannot bump them): shellcheck, lychee, typos and zizmor are static binaries downloaded from their
+# github releases, yamllint is pip installed into a repo-local venv and markdownlint-cli2 is npm
+# installed into a repo-local prefix. all rebuild when this makefile changes.
+LYCHEE_VERSION=v0.24.2
+MARKDOWNLINT_CLI2_VERSION=0.23.2
 SHELLCHECK_VERSION=v0.11.0
+TYPOS_VERSION=v1.50.1
 YAMLLINT_VERSION=1.38.0
 ZIZMOR_VERSION=v1.30.1
+LYCHEE=$(TOOLS_BIN)/lychee
+MARKDOWNLINT=$(TOOLS_BIN)/markdownlint-cli2
 SHELLCHECK=$(TOOLS_BIN)/shellcheck
+TYPOS=$(TOOLS_BIN)/typos
 YAMLLINT=$(TOOLS_BIN)/yamllint
 ZIZMOR=$(TOOLS_BIN)/zizmor
 
@@ -39,14 +45,7 @@ $(TOOLS_BIN)/%: .tools/go.mod .tools/go.sum
 	@mkdir -p $(TOOLS_BIN)
 	@cd .tools && go build -o $(abspath $@) $$(go list tool | grep "/$*$$")
 
-# actionlint lives in its own module (.tools/actionlint/go.mod): it pins an older go.yaml.in/yaml/v4
-# release candidate than golangci-lint's dependencies and does not compile against the newer one
-$(ACTIONLINT): .tools/actionlint/go.mod .tools/actionlint/go.sum
-	@echo "==> building actionlint (version pinned in .tools/actionlint/go.mod)..."
-	@mkdir -p $(TOOLS_BIN)
-	@cd .tools/actionlint && go build -o $(abspath $@) $$(go list tool)
-
-# explicit rules take precedence over the pattern rule above for the non-Go tools and actionlint.
+# explicit rules take precedence over the pattern rule above for the non-Go tools.
 # `golangci-lint custom` always writes to .tools/bin (destination in .custom-gcl.yml), so move
 # the result when TOOLS_BIN points elsewhere (e.g. a local dir because the checkout is noexec)
 $(GOLANGCI_LINT_MODULES): .tools/.custom-gcl.yml $(GOLANGCI_LINT)
@@ -75,6 +74,28 @@ $(ZIZMOR): makefile
 		curl -sSfL "https://github.com/zizmorcore/zizmor/releases/download/$(ZIZMOR_VERSION)/zizmor-$$arch-$$target.tar.gz" \
 		| tar -xz -O zizmor > $@ && chmod +x $@
 
+$(TYPOS): makefile
+	@echo "==> downloading typos $(TYPOS_VERSION)..."
+	@mkdir -p $(TOOLS_BIN)
+	@case "$$(uname)" in Darwin) target=apple-darwin;; *) target=unknown-linux-musl;; esac; \
+		arch=$$(uname -m); [ "$$arch" = "arm64" ] && arch=aarch64; \
+		curl -sSfL "https://github.com/crate-ci/typos/releases/download/$(TYPOS_VERSION)/typos-$(TYPOS_VERSION)-$$arch-$$target.tar.gz" \
+		| tar -xz -O ./typos > $@ && chmod +x $@
+
+$(LYCHEE): makefile
+	@echo "==> downloading lychee $(LYCHEE_VERSION)..."
+	@mkdir -p $(TOOLS_BIN)
+	@case "$$(uname)" in Darwin) target=apple-darwin;; *) target=unknown-linux-gnu;; esac; \
+		arch=$$(uname -m); [ "$$arch" = "arm64" ] && arch=aarch64; \
+		curl -sSfL "https://github.com/lycheeverse/lychee/releases/download/lychee-$(LYCHEE_VERSION)/lychee-$$arch-$$target.tar.gz" \
+		| tar -xz -O --strip-components=1 "lychee-$$arch-$$target/lychee" > $@ && chmod +x $@
+
+$(MARKDOWNLINT): makefile
+	@command -v npm >/dev/null || (echo "npm is required to install markdownlint-cli2 (macOS: brew install node; Debian/Ubuntu: apt install npm)" && exit 1)
+	@echo "==> installing markdownlint-cli2 $(MARKDOWNLINT_CLI2_VERSION) into $(TOOLS_BIN)/../npm..."
+	@mkdir -p $(TOOLS_BIN)
+	@npm install --silent --no-audit --no-fund --prefix $(TOOLS_BIN)/../npm markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) && ln -sf ../npm/node_modules/.bin/markdownlint-cli2 $@
+
 default: fmt build
 
 all: fmt build
@@ -95,7 +116,7 @@ docker: ## Build the sonarr-mcp container image with version info from git
 	@echo "==> building docker image..."
 	docker build --build-arg VERSION=${GIT_VERSION} --build-arg COMMIT=${GIT_COMMIT} -t sonarr-mcp .
 
-tools: $(ACTIONLINT) $(GOFUMPT) $(GOLANGCI_LINT) $(GOLANGCI_LINT_MODULES) $(SHELLCHECK) $(YAMLLINT) $(ZIZMOR) ## Install all pinned dev tools into .tools/bin
+tools: $(ACTIONLINT) $(GOFUMPT) $(GOLANGCI_LINT) $(GOLANGCI_LINT_MODULES) $(LYCHEE) $(MARKDOWNLINT) $(SHELLCHECK) $(TYPOS) $(YAMLLINT) $(ZIZMOR) ## Install all pinned dev tools into .tools/bin
 
 ##@ SDK generation (sdk/pandorest)
 generate: pandorest-import pandorest-generate ## Import the highest-versioned spec into api-defs/sonarr-<version>/, then generate sdk/sonarr
@@ -112,19 +133,22 @@ pandorest-diff: ## Report what the vendored spec changes against its checked-in 
 	@go run ./sdk/pandorest diff -quiet
 
 ##@ Formatting
-fmt: $(GOFUMPT) $(GOLANGCI_LINT) ## Fix Go formatting (gofmt, gofumpt, goimports)
+fmt: $(GOFUMPT) $(GOLANGCI_LINT) ## Fix Go formatting (gofmt, gofumpt, goimports, gci)
 	@echo "==> Fixing source code with gofmt..."
 	find . -name '*.go' | grep -v vendor | xargs gofmt -s -w
 	@echo "==> Fixing source code with gofumpt..."
 	find . -name '*.go' | grep -v vendor | xargs $(GOFUMPT) -w
-	@echo "==> Fixing imports with golangci-lint (goimports)..."
-	$(GOLANGCI_LINT) fmt -E goimports ./...
+	@echo "==> Fixing imports with golangci-lint (goimports, gci)..."
+	$(GOLANGCI_LINT) fmt -E goimports,gci ./...
 
-goimports: $(GOLANGCI_LINT) ## Fix imports with golangci-lint (goimports)
-	@echo "==> Fixing imports with golangci-lint (goimports)..."
-	$(GOLANGCI_LINT) fmt -E goimports ./...
+goimports: $(GOLANGCI_LINT) ## Fix imports with golangci-lint (goimports, gci)
+	@echo "==> Fixing imports with golangci-lint (goimports, gci)..."
+	$(GOLANGCI_LINT) fmt -E goimports,gci ./...
 
 ##@ Linting & Dependencies
+# markdown checked by markdownlint and lychee: every .md the repo owns
+MARKDOWN_INPUTS='*.md' 'docs/**/*.md' 'api-defs/*.md' '.github/**/*.md'
+
 lint: $(GOLANGCI_LINT_MODULES) ## Check source code with the golangci linters (incl. azproviderlint)
 	@echo "==> Checking source code against linters..."
 	$(GOLANGCI_LINT_MODULES) run ./...
@@ -149,6 +173,28 @@ zizmor: $(ZIZMOR) ## Audit GitHub workflows for security issues with zizmor
 	@echo "==> Auditing workflows with zizmor..."
 	@$(ZIZMOR) .
 
+typos: $(TYPOS) ## Check spelling in code and docs with typos (config in .typos.toml)
+	@echo "==> Checking spelling with typos..."
+	@$(TYPOS) || \
+		(echo; echo "Spelling errors found. Fix them with 'make typos-fix', or add false positives (names, API words) to .typos.toml."; exit 1)
+
+typos-fix: $(TYPOS) ## Fix spelling errors found by typos
+	@$(TYPOS) --write-changes
+
+markdownlint: $(MARKDOWNLINT) ## Check the repo's markdown with markdownlint (config in .markdownlint.yml)
+	@echo "==> Checking markdown with markdownlint..."
+	@$(MARKDOWNLINT) $(MARKDOWN_INPUTS)
+
+linkcheck: linkcheck-local linkcheck-external ## Check all doc links, internal and external
+
+linkcheck-local: $(LYCHEE) ## Check internal doc links and anchors with lychee (offline, run on PRs)
+	@echo "==> Checking internal doc links with lychee..."
+	@$(LYCHEE) --config .github/lychee.toml --offline --include-fragments --no-progress --root-dir $(CURDIR) $(MARKDOWN_INPUTS)
+
+linkcheck-external: $(LYCHEE) ## Check external doc links with lychee (network access)
+	@echo "==> Checking external doc links with lychee..."
+	@$(LYCHEE) --config .github/lychee.toml --no-progress --scheme https --scheme http --root-dir $(CURDIR) $(MARKDOWN_INPUTS)
+
 gencheck: generate ## Check that the definitions and generated SDK match the spec (regenerate, then diff)
 	@test -z "$$(git status --porcelain -- api-defs sdk/sonarr)" || \
 		(git status --short -- api-defs sdk/sonarr; echo; \
@@ -171,10 +217,6 @@ depscheck: ## Check that go.mod/go.sum and vendor/ are in sync
 	@cd .tools && go mod tidy
 	@git diff --exit-code -- .tools/go.mod .tools/go.sum || \
 		(echo; echo "Unexpected difference in .tools/go.mod/go.sum. Run 'cd .tools && go mod tidy' and commit."; exit 1)
-	@echo "==> Checking .tools/actionlint/go.mod with go mod tidy..."
-	@cd .tools/actionlint && go mod tidy
-	@git diff --exit-code -- .tools/actionlint/go.mod .tools/actionlint/go.sum || \
-		(echo; echo "Unexpected difference in .tools/actionlint/go.mod/go.sum. Run 'cd .tools/actionlint && go mod tidy' and commit."; exit 1)
 	@echo "==> Checking .tools/.custom-gcl.yml golangci-lint version matches .tools/go.mod..."
 	@modv=$$(cd .tools && go list -m -f '{{.Version}}' github.com/golangci/golangci-lint/v2); \
 		gclv=$$(grep '^version:' .tools/.custom-gcl.yml | awk '{print $$2}'); \
@@ -279,6 +321,6 @@ testenv-up: ## Create a throwaway Sonarr and its library (eval "$$(make -s teste
 testenv-down: ## Remove the throwaway Sonarr and its library
 	@scripts/testenv.sh down
 
-check-all: build test testacc lint actionlint yamllint shellcheck depscheck gencheck apicheck ## Run build + tests (incl. live) + all linters + depscheck
+check-all: build test testacc lint actionlint yamllint shellcheck typos markdownlint linkcheck-local depscheck gencheck apicheck ## Run build + tests (incl. live) + all linters + depscheck
 
-.PHONY: default all help fmt goimports build docker generate pandorest-import pandorest-generate pandorest-diff lint lint-fix actionlint yamllint shellcheck zizmor gencheck apicheck depscheck check-all install tools test test-integration test-acceptance testacc testacc-integration testacc-acceptance cover cover-html cover-integration cover-acceptance record record-check testenv-up testenv-down
+.PHONY: default all help fmt goimports build docker generate pandorest-import pandorest-generate pandorest-diff lint lint-fix actionlint yamllint shellcheck zizmor typos typos-fix markdownlint linkcheck linkcheck-local linkcheck-external gencheck apicheck depscheck check-all install tools test test-integration test-acceptance testacc testacc-integration testacc-acceptance cover cover-html cover-integration cover-acceptance record record-check testenv-up testenv-down

@@ -234,7 +234,10 @@ func registerEpisodeTools(r *registry) {
 		if err != nil {
 			return nil, seasonMonitorOut{}, err
 		}
-		body := *cur.Model
+		body, err := answered(cur.Model, s.Title)
+		if err != nil {
+			return nil, seasonMonitorOut{}, err
+		}
 		out := seasonMonitorOut{Series: body.Title}
 		var settled []int
 		write := false

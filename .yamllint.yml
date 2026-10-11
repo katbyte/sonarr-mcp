@@ -3,6 +3,7 @@ extends: default
 
 ignore:
   - vendor/
+  - .tools/ # tool installs (npm prefix, venv) pull in third-party yaml
 
 rules:
   comments:
