@@ -13,10 +13,8 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -79,14 +77,10 @@ func runSuite(m *testing.M) int {
 		}
 	}
 
-	// no answer and no refusal may hand a caller a credential, whichever
-	// test asked for it
-	if len(keysShown) > 0 {
-		fmt.Fprintf(os.Stderr, "\n%d tool(s) answered or refused with a credential in what they said:\n", len(keysShown))
-		for _, name := range slices.Sorted(maps.Keys(keysShown)) {
-			fmt.Fprintln(os.Stderr, "  "+name)
-		}
-		fmt.Fprintln(os.Stderr, "Sonarr's API key, or the key it keeps for the fake indexer and download client, reached a caller")
+	// no answer and no refusal may hand a caller a credential, whichever test asked for it: Sonarr's API key, the key it keeps for the fake indexer
+	// and download client, or one a test gave it
+	if leaks := suite.LeakReport(); leaks != "" {
+		fmt.Fprint(os.Stderr, leaks)
 		code = 1
 	}
 
@@ -177,6 +171,9 @@ func start() error {
 	}
 	connected.NotReady = testenv.NotConfigured
 	suite = connected
+	// everything a tool says from here on is read for these, and for whatever a test gives Sonarr through suite.Secret (LeakReport, in runSuite)
+	suite.Secret(testenv.FakeKey)
+	suite.Secret(testenv.Token())
 
 	return seed()
 }
@@ -203,54 +200,12 @@ func waitForSonarr() error {
 // an audit's answer is read for the kinds of finding it reported.
 func invoke(name string, args map[string]any) (map[string]any, error) {
 	out, err := suite.Invoke(name, args)
-	noteKeys(name, out, err)
 	if err != nil {
 		return nil, err
 	}
 	recordFindings(name, out)
 
 	return out, nil
-}
-
-// keysShown are the tools that answered, or refused, with a credential in
-// what they said: the key the fakes demand, which Sonarr keeps for its
-// indexers and its download client, or Sonarr's own. No test has to look for
-// one: every call the suite makes is read for them, and one shown fails the
-// run.
-var (
-	keysMu    sync.Mutex
-	keysShown = map[string]bool{}
-	// keysGiven are the secrets a test handed Sonarr through a tool (secret)
-	keysGiven []string
-)
-
-// secret has every answer and refusal from here on read for a credential a
-// test is about to give Sonarr, and returns it, so it wraps the value where
-// it is given: "apiKey": secret(key).
-func secret(value string) string {
-	keysMu.Lock()
-	defer keysMu.Unlock()
-
-	if !slices.Contains(keysGiven, value) {
-		keysGiven = append(keysGiven, value)
-	}
-
-	return value
-}
-
-func noteKeys(name string, out map[string]any, err error) {
-	said := fmt.Sprint(out)
-	if err != nil {
-		said += err.Error()
-	}
-	keysMu.Lock()
-	defer keysMu.Unlock()
-
-	for _, key := range append([]string{testenv.FakeKey, testenv.Token()}, keysGiven...) {
-		if key != "" && strings.Contains(said, key) {
-			keysShown[name] = true
-		}
-	}
 }
 
 // skipUnlessReady skips a test when there is no container to run against.

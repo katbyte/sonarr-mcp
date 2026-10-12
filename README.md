@@ -199,7 +199,7 @@ The tools that delete are only registered when `--enable-delete` / `SONARR_ENABL
 
 Most of what a tool answers was written by someone else: a release's name as a public indexer gave it, a title and plot from TheTVDB, a download client's message. Every piece of text in an answer or a refusal has what does not show taken out of it (control and zero-width characters, the ones that change the direction text runs in) and is cut at 2000 characters, so nothing is hidden in a name and nothing is buried in a page of text. A path, a folder, a release's `guid` and a download's id are left as Sonarr holds them, since a later call hands them back. It is still someone else's text: a client that connects is told to treat it as data, along with the rules above for the tools it was given.
 
-With `SONARR_LOG=info`, every call of a write or delete tool is written to the log as one line: the tool, its arguments, and whether it was refused, failed or answered. What a record is saved with (`settings`, `set`) is written by name only, each value blanked, since some of it is a credential.
+With `SONARR_LOG=info`, every call of a write or delete tool is written to the log as one line: the tool, its arguments, and whether it was refused, failed or answered. What a record is saved with (`settings`, `set`) is written by name only, each value blanked, since some of it is a credential. An argument named as a credential is blanked too, and an address anywhere in the line is written without who it signs in as or the value of any parameter.
 
 ### Choosing which tools load
 

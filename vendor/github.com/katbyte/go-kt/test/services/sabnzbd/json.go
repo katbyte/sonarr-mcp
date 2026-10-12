@@ -1,26 +1,20 @@
 package sabnzbd
 
-// The answers, in the shapes SABnzbd 4 sends and Sonarr's SabnzbdProxy
-// deserializes. Where SABnzbd sends a number as a string (mb, mbleft,
-// percentage) or a flag as 0 or 1 (pre_check), so does this: Sonarr reads
-// those leniently, and a mirror of it that expects the lenient shape is what
-// the tests hold these to.
+// The answers, in the shapes SABnzbd 4 sends and Sonarr reads. Where SABnzbd sends a number as a string or a flag as 0 or 1, so does this.
 
-// statusAnswer is an action's answer, and with Error set a failure: Sonarr's
-// CheckForError throws on status false with the error's words.
+// statusAnswer is an action's answer, and with Error set a failure: Sonarr's CheckForError throws on status false with the error's words.
 type statusAnswer struct {
 	Status bool   `json:"status"`
 	Error  string `json:"error,omitempty"`
 }
 
-func failure(message string) statusAnswer { return statusAnswer{Status: false, Error: message} }
+func failure(message string) statusAnswer { return statusAnswer{Error: message} }
 
 type versionAnswer struct {
 	Version string `json:"version"`
 }
 
-// addAnswer is addfile's, addurl's and a queue action's: the jobs it made or
-// touched (SabnzbdAddResponse).
+// addAnswer is addfile's, addurl's and a queue action's: the jobs it made or touched (SabnzbdAddResponse).
 type addAnswer struct {
 	Status bool     `json:"status"`
 	NzoIDs []string `json:"nzo_ids"`
@@ -57,8 +51,7 @@ type config struct {
 	Sorters    []configSorter   `json:"sorters"`
 }
 
-// configMisc is the part of [misc] Sonarr reads. The old per-kind sorting
-// switches (enable_tv_sorting and the rest) went in SABnzbd 4.1, when sorting
+// configMisc is the part of [misc] Sonarr reads. The old per-kind sorting switches (enable_tv_sorting and the rest) went in SABnzbd 4.1, when sorting
 // became the sorters list, so they are absent, as they are from a real 4.x.
 type configMisc struct {
 	CompleteDir            string `json:"complete_dir"`
@@ -84,8 +77,7 @@ type configServer struct {
 	Name string `json:"name"`
 }
 
-// configSorter is a SABnzbd 4.1+ sorter; the fake lists none, so none is
-// active on Sonarr's category.
+// configSorter is a SABnzbd 4.1+ sorter; the fake lists none, so none is active on Sonarr's category.
 type configSorter struct {
 	Name     string   `json:"name"`
 	IsActive bool     `json:"is_active"`

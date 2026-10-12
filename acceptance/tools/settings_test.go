@@ -249,7 +249,7 @@ func TestNotifications(t *testing.T) {
 	// the hook has a header of its own with a token in it, which is where a
 	// webhook's credential goes and which Sonarr does not count private: it
 	// is sent with every message, and shown in no answer
-	headers := []any{map[string]any{"key": "Authorization", "value": "Bearer " + secret("suite-hook-token-7f3a91c2d4e85b60")}}
+	headers := []any{map[string]any{"key": "Authorization", "value": "Bearer " + suite.Secret("suite-hook-token-7f3a91c2d4e85b60")}}
 	out := call(t, "notification_add", map[string]any{"kind": "Webhook", "name": name, "set": map[string]any{"onGrab": true, "onDownload": true}, "settings": map[string]any{"url": "http://" + hook + "/in", "method": 1, "headers": headers}})
 	rec := record(t, out)
 	if own := acctest.Object(t, rec["settings"], "settings"); !acctest.BoolOf(rec["onGrab"]) || acctest.BoolOf(rec["onRename"]) || acctest.Str(own["url"]) != "http://"+hook+"/in" || own["headers"] != nil {

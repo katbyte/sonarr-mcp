@@ -1,21 +1,9 @@
-// Package sabnzbd is a SABnzbd for a live suite to run beside the server
-// under test: a download client that downloads nothing, and whose jobs the
-// test moves along itself. It was written for sonarr-mcp's suites against
-// Sonarr, which is whose reading of each answer the comments name.
+// Package sabnzbd is a SABnzbd for a live suite to run beside the server under test: a download client that downloads nothing, whose jobs the test
+// moves along itself, written for Sonarr, whose reading of each answer the comments name.
 //
-// Sonarr adds it as its usenet download client, hands it the NZB of every
-// release it grabs, and polls its queue and history every minute
-// (RefreshMonitoredDownloads) to track each download and import the finished
-// ones. Every answer is served in the shape Sonarr's SabnzbdProxy
-// deserializes (SabnzbdQueue, SabnzbdHistory, SabnzbdConfig in Sonarr's
-// source), and the configuration it reports passes Sonarr's own checks of a
-// new client: a recent version, the category present with job folders, no
-// sorting on the category, history kept.
-//
-// Nothing downloads. A test decides what becomes of each job - progress,
-// paused, completed with the files it names, failed with a message - and the
-// files of a completed job are written under HostCompleteDir, the folder the
-// container sees as CompleteDir, where Sonarr goes to import them.
+// Sonarr hands it the NZB of every grab and polls its queue and history to track and import. Every answer is in the shape Sonarr reads, and the
+// configuration it reports passes Sonarr's checks of a new client. A test decides what becomes of each job: progress, paused, completed with the
+// files it names (written under HostCompleteDir, which the container sees as CompleteDir), or failed.
 package sabnzbd
 
 import (
@@ -36,13 +24,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/katbyte/go-kt/pointer"
 )
 
 // Status is a job's state, as SABnzbd names it in the queue and history.
 type Status string
 
-// The states a job moves through. Queued, Downloading and Paused are in the
-// queue; Completed and Failed in the history.
+// The states a job moves through. Queued, Downloading and Paused are in the queue; Completed and Failed in the history.
 const (
 	StatusQueued      Status = "Queued"
 	StatusDownloading Status = "Downloading"
@@ -51,8 +40,7 @@ const (
 	StatusFailed      Status = "Failed"
 )
 
-// SABnzbd's priorities, as addfile takes them. Default is the category's,
-// which Sonarr sends unless its client is set otherwise; a job added Paused
+// SABnzbd's priorities, as addfile takes them. Default is the category's, which Sonarr sends unless its client is set otherwise; a job added Paused
 // starts paused.
 const (
 	PriorityDefault = -100
@@ -63,12 +51,10 @@ const (
 	PriorityForce   = 2
 )
 
-// DefaultVersion is the SABnzbd version reported: a 4.x, which passes
-// Sonarr's version check and has the sorters it looks at.
+// DefaultVersion is the SABnzbd version reported: a 4.x, which passes Sonarr's version check and has the sorters it looks at.
 const DefaultVersion = "4.5.1"
 
-// DefaultSize is the size of a job added with AddJob, which has no NZB to
-// size it from.
+// DefaultSize is the size of a job added with AddJob, which has no NZB to size it from.
 const DefaultSize = 1 << 30
 
 // defaultFailMessage is what SABnzbd says of a download it gave up on.
@@ -78,8 +64,7 @@ const defaultFailMessage = "Aborted, cannot be completed - https://sabnzbd.org/n
 type Job struct {
 	// ID is SABnzbd's nzo_id, the download id Sonarr tracks the grab by.
 	ID string
-	// Name is the job's name: the nzbname given, or the NZB's file name
-	// without .nzb, which for a grab is Sonarr's cleaned release title.
+	// Name is the job's name: the nzbname given, or the NZB's file name without .nzb, which for a grab is Sonarr's cleaned release title.
 	Name     string
 	Category string
 	Priority int
@@ -88,37 +73,30 @@ type Job struct {
 	// Progress is how much has downloaded, 0 to 1.
 	Progress float64
 	Status   Status
-	// Storage is the finished job's folder as the container sees it,
-	// CompleteDir/Name; HostPath is the same folder here.
+	// Storage is the finished job's folder as the container sees it, CompleteDir/Name; HostPath is the same folder here.
 	Storage  string
 	HostPath string
 	// FailMessage is why a failed job failed.
 	FailMessage string
-	// NZB is the NZB as uploaded, and NZBName its file name; for addurl,
-	// URL is where it was to come from.
+	// NZB is the NZB as uploaded, and NZBName its file name; for addurl, URL is where it was to come from.
 	NZB     []byte
 	NZBName string
 	URL     string
-	// Added and Finished are when the job arrived and when it completed or
-	// failed.
+	// Added and Finished are when the job arrived and when it completed or failed.
 	Added    time.Time
 	Finished time.Time
-	// Archived is a history entry deleted with archive=1, which SABnzbd 4
-	// keeps out of the history it lists rather than deleting.
+	// Archived is a history entry deleted with archive=1, which SABnzbd 4 keeps out of the history it lists rather than deleting.
 	Archived bool
 }
 
 // Call is one API call the client received.
 type Call struct {
 	Method string
-	// Mode is the mode= parameter: version, get_config, queue, history,
-	// addfile, addurl, retry.
+	// Mode is the mode= parameter: version, get_config, queue, history, addfile, addurl, retry.
 	Mode string
-	// Name is the name= parameter, the action within a mode (delete,
-	// pause) or the URL of an addurl.
+	// Name is the name= parameter, the action within a mode (delete, pause) or the URL of an addurl.
 	Name string
-	// Params is every parameter as sent, query and form, the API key
-	// included.
+	// Params is every parameter as sent, query and form, the API key included.
 	Params url.Values
 	// File is the uploaded file's name, for addfile.
 	File string
@@ -127,31 +105,22 @@ type Call struct {
 
 // Options configure a Server.
 type Options struct {
-	// Addr is where to listen, e.g. ":18082"; ":0" picks a free port. The
-	// container reaches the host through host.docker.internal, so a live run
-	// listens on every interface.
+	// Addr is where to listen, ":18082"; ":0" picks a free port. A live run listens on every interface for the container.
 	Addr string
-	// APIKey is the key every call but version must carry; empty accepts
-	// any.
+	// APIKey is the key every call but version must carry; empty accepts any.
 	APIKey string
-	// Category is the category Sonarr files its downloads under; default
-	// "tv", Sonarr's own default.
+	// Category is the category Sonarr files its downloads under; default "tv", Sonarr's own default.
 	Category string
-	// CompleteDir is SABnzbd's completed-download folder as the container
-	// sees it, e.g. /downloads/complete: what get_config reports, and where
-	// each finished job's storage is. It must exist in the container, or
-	// Sonarr raises a remote path mapping health check.
+	// CompleteDir is the completed-download folder as the container sees it, /downloads/complete; it must exist there or Sonarr raises a path mapping
+	// health check.
 	CompleteDir string
-	// HostCompleteDir is the same folder on this machine, where Complete
-	// writes a finished job's files.
+	// HostCompleteDir is the same folder on this machine, where Complete writes a finished job's files.
 	HostCompleteDir string
 	// Version is the SABnzbd version reported; default DefaultVersion.
 	Version string
-	// PublicHost is the host the container reaches this process by, for
-	// URL and Host; default 127.0.0.1.
+	// PublicHost is the host the container reaches this process by, for URL and Host; default 127.0.0.1.
 	PublicHost string
-	// Speed is the download speed the queue reports, in bytes a second, from
-	// which each job's time left is worked out; default 10 MiB/s.
+	// Speed is the download speed the queue reports, in bytes a second, from which each job's time left is worked out; default 10 MiB/s.
 	Speed int64
 }
 
@@ -201,8 +170,7 @@ func New(opts Options) (*Server, error) {
 	return s, nil
 }
 
-// Host is the host the container reaches the client by, for Sonarr's host
-// setting.
+// Host is the host the container reaches the client by, for Sonarr's host setting.
 func (s *Server) Host() string { return s.publicHost }
 
 // Port is the port listened on, for Sonarr's port setting.
@@ -236,22 +204,20 @@ func (s *Server) Close() error { return s.srv.Close() }
 // ErrNoJob is a hook called with an id the client does not hold.
 var ErrNoJob = errors.New("sabnzbd: no such job")
 
-// ErrWrongState is a hook that does not apply to the job as it stands, such
-// as completing one already in the history.
+// ErrWrongState is a hook that does not apply to the job as it stands, such as completing one already in the history.
 var ErrWrongState = errors.New("sabnzbd: the job is not in a state for that")
 
-// Jobs returns every job, the queue in order and then the history, archived
-// entries included.
+// Jobs returns every job, the queue in order and then the history, archived entries included.
 func (s *Server) Jobs() []Job {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	out := make([]Job, 0, len(s.jobs))
 	for _, j := range s.queue() {
-		out = append(out, *j)
+		out = append(out, pointer.From(j))
 	}
 	for _, j := range s.history() {
-		out = append(out, *j)
+		out = append(out, pointer.From(j))
 	}
 
 	return out
@@ -269,8 +235,7 @@ func (s *Server) Job(id string) (Job, bool) {
 	return Job{}, false
 }
 
-// FindJob returns the first job whose name holds text, ignoring case; a test
-// knows the release title it grabbed, not the id SABnzbd gave it.
+// FindJob returns the first job whose name holds text, ignoring case; a test knows the release title it grabbed, not the id SABnzbd gave it.
 func (s *Server) FindJob(text string) (Job, bool) {
 	for _, j := range s.Jobs() {
 		if strings.Contains(strings.ToLower(j.Name), strings.ToLower(text)) {
@@ -281,8 +246,7 @@ func (s *Server) FindJob(text string) (Job, bool) {
 	return Job{}, false
 }
 
-// AddJob queues a download Sonarr never grabbed, the way one added in
-// SABnzbd by hand appears to it.
+// AddJob queues a download Sonarr never grabbed, the way one added in SABnzbd by hand appears to it.
 func (s *Server) AddJob(name, category string) Job {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -337,8 +301,7 @@ func (s *Server) Resume(id string) error {
 	})
 }
 
-// PauseAll pauses or resumes the whole queue, which Sonarr shows as every
-// download paused but a forced one.
+// PauseAll pauses or resumes the whole queue, which Sonarr shows as every download paused but a forced one.
 func (s *Server) PauseAll(paused bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -346,8 +309,7 @@ func (s *Server) PauseAll(paused bool) {
 	s.paused = paused
 }
 
-// Complete finishes a queued job with the files given, relative paths to
-// their content, written under HostCompleteDir/<name>, and moves it to the
+// Complete finishes a queued job with the files given, relative paths to their content, written under HostCompleteDir/<name>, and moves it to the
 // history, where Sonarr finds it completed at CompleteDir/<name>.
 func (s *Server) Complete(id string, files map[string][]byte) error {
 	return s.CompleteWith(id, func(dir string) error {
@@ -368,8 +330,7 @@ func (s *Server) Complete(id string, files map[string][]byte) error {
 	})
 }
 
-// CompleteWith finishes a queued job with whatever fill writes into dir, the
-// job's folder here, for a test that generates its media rather than
+// CompleteWith finishes a queued job with whatever fill writes into dir, the job's folder here, for a test that generates its media rather than
 // holding it in memory.
 func (s *Server) CompleteWith(id string, fill func(dir string) error) error {
 	if s.hostCompleteDir == "" {
@@ -408,8 +369,7 @@ func (s *Server) CompleteWith(id string, fill func(dir string) error) error {
 	})
 }
 
-// Fail fails a queued job with a message, the way SABnzbd reports a download
-// it could not complete; empty is SABnzbd's own "cannot be completed".
+// Fail fails a queued job with a message, the way SABnzbd reports a download it could not complete; empty is SABnzbd's own "cannot be completed".
 func (s *Server) Fail(id, message string) error {
 	return s.update(id, func(j *Job) error {
 		if !queued(j.Status) {
@@ -423,8 +383,7 @@ func (s *Server) Fail(id, message string) error {
 	})
 }
 
-// Remove drops a job from the queue or the history without touching its
-// files, the way a download deleted in SABnzbd by hand vanishes from under
+// Remove drops a job from the queue or the history without touching its files, the way a download deleted in SABnzbd by hand vanishes from under
 // Sonarr.
 func (s *Server) Remove(id string) error {
 	s.mu.Lock()
@@ -439,8 +398,7 @@ func (s *Server) Remove(id string) error {
 	return nil
 }
 
-// Calls returns every API call received since the last ResetCalls, oldest
-// first.
+// Calls returns every API call received since the last ResetCalls, oldest first.
 func (s *Server) Calls() []Call {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -487,8 +445,7 @@ func (s *Server) add(name, category string, priority int, size int64) *Job {
 	return j
 }
 
-// resolveCategory is the category a job is filed under: one SABnzbd knows,
-// or its catch-all "*".
+// resolveCategory is the category a job is filed under: one SABnzbd knows, or its catch-all "*".
 func (s *Server) resolveCategory(category string) string {
 	if strings.EqualFold(category, s.category) {
 		return s.category
@@ -521,8 +478,7 @@ func (s *Server) find(id string) *Job {
 	return nil
 }
 
-// queue is the jobs in the queue, in the order they were added. The caller
-// holds the lock.
+// queue is the jobs in the queue, in the order they were added. The caller holds the lock.
 func (s *Server) queue() []*Job {
 	var out []*Job
 	for _, j := range s.jobs {
@@ -534,8 +490,7 @@ func (s *Server) queue() []*Job {
 	return out
 }
 
-// history is the finished jobs, the most recently finished first, archived
-// ones among them. The caller holds the lock.
+// history is the finished jobs, the most recently finished first, archived ones among them. The caller holds the lock.
 func (s *Server) history() []*Job {
 	var out []*Job
 	for _, j := range s.jobs {
@@ -562,9 +517,7 @@ func resumed(j *Job) Status {
 	return StatusQueued
 }
 
-// newID is an nzo_id. Random rather than counted, so a fake restarted
-// against a Sonarr that still remembers the last run's downloads cannot hand
-// a new job an old job's id.
+// newID is an nzo_id, random rather than counted so a restart cannot hand a new job an id Sonarr remembers from the last run.
 func newID() string {
 	const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, 8)
@@ -576,8 +529,7 @@ func newID() string {
 	return "SABnzbd_nzo_" + string(b)
 }
 
-// folderName is the folder a job finishes in: its name, with anything that
-// would leave the complete folder replaced, as SABnzbd sanitises it.
+// folderName is the folder a job finishes in: its name, with anything that would leave the complete folder replaced, as SABnzbd sanitises it.
 func folderName(name string) string {
 	name = strings.NewReplacer("/", "_", `\`, "_").Replace(strings.TrimSpace(name))
 	if name == "" || name == "." || name == ".." {
@@ -597,10 +549,8 @@ func within(dir, rel string) (string, error) {
 	return target, nil
 }
 
-// mkdirAll and writeFile lay files out for another user: the container
-// imports them as its own uid and moves or deletes them afterwards, and the
-// modes asked of MkdirAll and WriteFile are filtered by the umask, so the
-// mode is applied again with chmod, which is not.
+// mkdirAll and writeFile lay files out for another user: the container imports them as its own uid and moves or deletes them afterwards, and the
+// modes asked of MkdirAll and WriteFile are filtered by the umask, so the mode is applied again with chmod, which is not.
 func mkdirAll(dir string) error {
 	if err := os.MkdirAll(dir, 0o777); err != nil { //nolint:gosec // the container writes here as another user
 		return err

@@ -1,5 +1,4 @@
-// Package parallel runs a batch of jobs a few at a time: the reads a sweep
-// makes of a server that answers one request at a time no faster than eight.
+// Package parallel runs a batch of jobs a few at a time, as many as a server answers at once.
 package parallel
 
 import (
@@ -7,14 +6,8 @@ import (
 	"sync"
 )
 
-// Each runs fn for each of n jobs, at most workers at a time - one when
-// workers is below one - and returns the first error. That error ends the
-// run: a job not yet started is not started, and the ones running are told
-// through their context, whose cause it is.
-//
-// When no job failed and the caller's context ended the run, Each returns
-// that context's cause, so a run cut short is never read as one that
-// finished.
+// Each runs fn for each of n jobs, at most workers at a time, and returns the first error, which ends the run: jobs not started stay so, and running
+// ones see it as their context's cause. A run the caller's context cut short returns that cause, never nil.
 func Each(ctx context.Context, n, workers int, fn func(ctx context.Context, i int) error) error {
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)

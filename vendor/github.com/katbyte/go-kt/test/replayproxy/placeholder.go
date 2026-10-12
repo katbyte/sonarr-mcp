@@ -2,14 +2,8 @@ package replayproxy
 
 import "encoding/base64"
 
-// Media bodies are never committed: a poster or a cover is hundreds of
-// kilobytes and a trailer or an episode is tens of megabytes, and neither is
-// what these tests are about. They are elided at record time and replaced on
-// replay by the smallest valid file of the same kind, so the server still
-// gets something it can decode and save - which is the behaviour under test -
-// without the repository carrying a service's artwork.
-//
-// Both are 2x2 grey, produced with:
+// Media bodies are never committed: they are elided when recorded and replaced on replay by the smallest valid file of the kind, so the server still
+// gets something to decode and save. Both are 2x2 grey, from:
 //
 //	ffmpeg -f lavfi -i color=c=gray:s=2x2 -frames:v 1 tiny.jpg
 var (

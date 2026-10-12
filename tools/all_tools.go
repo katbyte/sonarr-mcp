@@ -14,11 +14,8 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
-	"slices"
 	"sync"
 
-	"github.com/katbyte/go-kt/clog"
 	"github.com/katbyte/go-kt/lock"
 	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
@@ -308,83 +305,31 @@ func (r *registry) queued() *mcpregistry.Registry {
 			Essential: EssentialTools,
 			Hints:     toolHints,
 			LogError:  r.errorLog,
-			LogWrite:  r.logWrite,
+			LogWrite:  r.writeLog,
+			// what an answer says is mostly someone else's words: see outside.go
+			CleanAnswers:   answerLength,
+			LeaveAsIs:      handles,
+			BlankAddresses: sonarrSaid,
 		})
 	}
 
 	return r.tools
 }
 
-// logWrite is where go-kt's registry writes its line for every call of a
-// write or delete tool. The registry blanks an argument named as a
-// credential is (apiKey, password); what an indexer, a download client or a
-// notification is saved with sits under names of Sonarr's own choosing - a
-// webhook's address, a passkey, a cookie - inside settings and set, so every
-// value in those is blanked here and its name kept.
-func (r *registry) logWrite(format string, args ...any) {
-	const sent = 3 // kind, tool, outcome, then what the call sent
-	if len(args) > sent {
-		if arguments, ok := args[sent].(string); ok {
-			args = slices.Clone(args)
-			args[sent] = blankFreeForm(arguments)
-		}
-	}
-	if r.writeLog != nil {
-		r.writeLog(format, args...)
-
-		return
-	}
-	clog.Log.Infof(format, args...)
-}
-
-// blankFreeForm is a call's arguments, as the write line carries them, with
-// every value under settings and set blanked.
-func blankFreeForm(arguments string) string {
-	var sent map[string]any
-	if err := json.Unmarshal([]byte(arguments), &sent); err != nil {
-		// cut short for the line, and so not to be read: nothing of it is
-		// written rather than something unblanked
-		return "(arguments too long to show)"
-	}
-	for _, key := range []string{"settings", "set"} {
-		values := asObject(sent[key])
-		for name := range values {
-			values[name] = "***"
-		}
-	}
-	raw, err := json.Marshal(sent)
-	if err != nil {
-		return "(arguments not shown)"
-	}
-
-	return string(raw)
-}
-
-// add queues a typed tool for registration. go-kt's registry sets the MCP
-// annotations from kind and the tool's hints so clients can tell read-only
-// from destructive tools without parsing descriptions, turns a panic in the
-// handler into an ordinary tool error, and sends empty collections as []
-// rather than null: an AI client reading "episodes": null cannot tell "none"
-// from "not fetched", and Go leaves un-appended slices nil. What is this
-// application's own is done around the handler here: the series index is
-// dropped after a write, and the text of every answer is cleaned of what
-// does not show.
+// add queues a typed tool for registration. go-kt's registry sets the MCP annotations from kind and the tool's hints so clients can tell read-only
+// from destructive tools without parsing descriptions, turns a panic in the handler into an ordinary tool error, sends empty collections as []
+// rather than null (an AI client reading "episodes": null cannot tell "none" from "not fetched", and Go leaves un-appended slices nil), cleans the
+// text of every answer of what does not show, and writes a line for every write with what it was sent blanked. What is this application's own is
+// done around the handler here: the series index is dropped after a write.
 func add[In, Out any](r *registry, kind mcpregistry.Kind, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
 	mcpregistry.Add(r.queued(), kind, t, func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, Out, error) {
-		// anything that changes Sonarr may have added, edited or removed a
-		// series, so the index is read again rather than trusted. Done on a
-		// failure too, and on a panic: a write that failed part way may still
-		// have landed.
+		// anything that changes Sonarr may have added, edited or removed a series, so the index is read again rather than trusted. Done on a
+		// failure too, and on a panic: a write that failed part way may still have landed.
 		if kind != readTool {
 			defer r.seriesCache().invalidate()
 		}
 
-		// what an answer says, and what a refusal says, is mostly someone
-		// else's words: see outside.go
-		res, out, err := h(ctx, req, in)
-		cleanAnswer(&out)
-
-		return res, out, cleanFailure(err)
+		return h(ctx, req, in)
 	})
 }
 

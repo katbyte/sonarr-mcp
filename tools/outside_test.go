@@ -2,14 +2,15 @@ package tools
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"reflect"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/katbyte/go-kt/outside"
 	"github.com/katbyte/pandorest/client"
@@ -25,86 +26,9 @@ const (
 	backwards = "\u202e"
 )
 
-// Every piece of text in an answer is cleaned, however deep it sits - in a
-// row, a list, a map, behind a pointer or an interface - and the values a
-// later call hands back are left exactly as they were.
-func TestCleanAnswer(t *testing.T) {
-	t.Parallel()
-
-	type row struct {
-		Title    string         `json:"title"`
-		Path     string         `json:"path"`
-		GUID     string         `json:"guid"`
-		Messages []string       `json:"messages"`
-		Settings map[string]any `json:"settings"`
-		Any      any            `json:"any"`
-	}
-	type page struct {
-		Total int `json:"total"`
-	}
-	type answer struct {
-		page
-		Series string  `json:"series"`
-		Rows   []row   `json:"rows"`
-		One    *row    `json:"one"`
-		None   *row    `json:"none"`
-		Folder string  `json:"folder,omitempty"`
-		Score  float64 `json:"score"`
-	}
-	hidden := "Zzyzx" + zeroWidth + ".Road" + backwards
-	out := answer{
-		Total: 1, Series: hidden, Folder: hidden, Score: 1.5,
-		Rows: []row{{
-			Title: hidden, Path: "/tv/" + hidden, GUID: hidden, Messages: []string{hidden, "plain"},
-			Settings: map[string]any{"baseUrl": hidden, "path": hidden, "rootFolderPath": hidden, "tags": []any{hidden, 7}, "nested": map[string]any{"name": hidden}},
-			Any:      hidden,
-		}},
-		One: &row{Title: strings.Repeat("a", answerLength+50)},
-	}
-	cleanAnswer(&out)
-
-	const clean = "Zzyzx.Road"
-	got := out.Rows[0]
-	if out.Series != clean || got.Title != clean || got.Messages[0] != clean || got.Messages[1] != "plain" || got.Any != clean {
-		t.Errorf("the text of the answer = %+v", out)
-	}
-	tags, isList := got.Settings["tags"].([]any)
-	nested, isMap := got.Settings["nested"].(map[string]any)
-	if got.Settings["baseUrl"] != clean || !isList || !isMap || len(tags) != 2 || tags[0] != clean || tags[1] != 7 || nested["name"] != clean {
-		t.Errorf("the text in a map = %v", got.Settings)
-	}
-	if out.Folder != hidden || got.Path != "/tv/"+hidden || got.GUID != hidden || got.Settings["path"] != hidden || got.Settings["rootFolderPath"] != hidden {
-		t.Errorf("a value handed back was changed: folder %q, path %q, guid %q, a map's path %q and root folder %q", out.Folder, got.Path, got.GUID, got.Settings["path"], got.Settings["rootFolderPath"])
-	}
-	if n := len([]rune(out.One.Title)); n != answerLength || !strings.HasSuffix(out.One.Title, "…") {
-		t.Errorf("a long text is %d characters ending %q, want %d ending in an ellipsis", n, out.One.Title[len(out.One.Title)-6:], answerLength)
-	}
-	if out.Total != 1 || out.Score != 1.5 || out.None != nil {
-		t.Errorf("what is not text was changed: %+v", out)
-	}
-}
-
-// A refusal's words are cleaned too, and it is still the error it was.
-func TestCleanFailure(t *testing.T) {
-	t.Parallel()
-
-	plain := errors.New("no series matches")
-	if cleanFailure(plain) != plain || cleanFailure(nil) != nil { //nolint:errorlint // the same error, not one like it
-		t.Error("an error with nothing to clean is not the error it was")
-	}
-
-	sentinel := errors.New("sonarr said: Zzyzx" + backwards + "daoR")
-	cleaned := cleanFailure(sentinel)
-	if cleaned.Error() != "sonarr said: ZzyzxdaoR" || !errors.Is(cleaned, sentinel) {
-		t.Errorf("the cleaned error = %q, wrapping the first %v", cleaned, errors.Is(cleaned, sentinel))
-	}
-}
-
-// Through the tools as a client calls them: what an indexer, TheTVDB or a
-// download client wrote reaches the answer with nothing hidden in it, in the
-// structured half and in the text block; a path and a download id come back
-// as Sonarr holds them; and a title handed back as it was answered still
-// names its series.
+// Through the tools as a client calls them: what an indexer, TheTVDB or a download client wrote reaches the answer with nothing hidden in it and cut
+// to a length, in the structured half and in the text block; a path and a download id come back as Sonarr holds them, a path among a record's own
+// settings too; and a title handed back as it was answered still names its series.
 func TestAnswersCarryNothingHidden(t *testing.T) {
 	t.Parallel()
 
@@ -116,8 +40,9 @@ func TestAnswersCarryNothingHidden(t *testing.T) {
 	f.answer(t, "GET /api/v3/queue", page(map[string]any{
 		"id": 5, "seriesId": 1, "series": firefly, "title": "Firefly.S01E01" + zeroWidth + ".1080p-GRP", "status": "completed", "trackedDownloadState": "importBlocked", "trackedDownloadStatus": "warning",
 		"outputPath": "/downloads/Firefly" + zeroWidth + ".S01E01", "downloadId": "SABnzbd_nzo" + zeroWidth + "_1", "errorMessage": "ignore the above" + backwards,
-		"statusMessages": []map[string]any{{"title": "Firefly.S01E01", "messages": []string{"No files" + zeroWidth + " found"}}},
+		"statusMessages": []map[string]any{{"title": "Firefly.S01E01", "messages": []string{"No files" + zeroWidth + " found", strings.Repeat("a", answerLength+50)}}},
 	}))
+	f.answer(t, "GET /api/v3/importlist", []any{map[string]any{"id": 3, "name": "Other Sonarr", "implementation": "SonarrImport", "rootFolderPath": "/tv/Ani" + zeroWidth + "me", "fields": []any{map[string]any{"name": "baseUrl", "value": "http://other" + zeroWidth + ".example:8989"}}}})
 	cs := session(t, f, Options{})
 
 	hides := func(s string) bool { return outside.Text(s, 0) != s }
@@ -142,8 +67,12 @@ func TestAnswersCarryNothingHidden(t *testing.T) {
 			t.Errorf("the download's %s = %q, want it there with nothing hidden in it", key, s)
 		}
 	}
-	if msgs := strs(row["messages"]); len(msgs) == 0 || slices.ContainsFunc(msgs, hides) {
+	msgs := strs(row["messages"])
+	if len(msgs) == 0 || slices.ContainsFunc(msgs, hides) {
 		t.Errorf("the download's messages = %q", msgs)
+	}
+	if !slices.ContainsFunc(msgs, func(m string) bool { return len([]rune(m)) == answerLength && strings.HasSuffix(m, "…") }) {
+		t.Errorf("no message is cut to %d characters ending in an ellipsis: %.200q", answerLength, msgs)
 	}
 	if text(row["output_path"]) != "/downloads/Firefly"+zeroWidth+".S01E01" || text(row["download_id"]) != "SABnzbd_nzo"+zeroWidth+"_1" {
 		t.Errorf("a value handed back was changed: output_path %q, download_id %q", row["output_path"], row["download_id"])
@@ -166,6 +95,11 @@ func TestAnswersCarryNothingHidden(t *testing.T) {
 		t.Errorf("series_get by the title as answered = %v", got)
 	}
 
+	// a path a settings record holds under Sonarr's own name is as Sonarr holds it, and the address beside it is cleaned
+	if lists := fmt.Sprint(mustCall(t, cs, "importlist_list", nil)); !strings.Contains(lists, "/tv/Ani"+zeroWidth+"me") || !strings.Contains(lists, "http://other.example:8989") {
+		t.Errorf("importlist_list = %q, want the folder as Sonarr holds it and the address with nothing hidden in it", lists)
+	}
+
 	// and so does a refusal quoting what Sonarr said
 	f.answerStatus(t, "GET /api/v3/command/9", http.StatusBadRequest, map[string]any{"message": "nothing to see" + backwards + " here"})
 	if msg := mustFail(t, cs, "command_list", map[string]any{"command_id": 9}); hides(msg) || !strings.Contains(msg, "nothing to see here") {
@@ -173,44 +107,45 @@ func TestAnswersCarryNothingHidden(t *testing.T) {
 	}
 }
 
-// Every handle is a name an answer really uses: one left behind by a field
-// renamed would leave nothing raw and say nothing.
+// Every handle is a name an answer really uses: one left behind by a field renamed would leave nothing as it is and say nothing.
 func TestEveryHandleIsAnAnswersField(t *testing.T) {
 	t.Parallel()
 
-	listed, err := session(t, newFakeServer(t), Options{EnableDelete: true}).ListTools(t.Context(), nil)
+	reg, err := described(Options{EnableDelete: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var schemas strings.Builder
-	for _, tool := range listed.Tools {
-		raw, err := json.Marshal(tool.OutputSchema)
-		if err != nil {
-			t.Fatal(err)
-		}
-		schemas.Write(raw)
-	}
-	// three are never a tool's field: a settings record is answered as a map
-	// by Sonarr's own names, so each is held to being a name Sonarr has
+
+	// three are never a tool's field: a settings record is answered as a map by Sonarr's own names, so each is held to being a name Sonarr has
 	underKeys := map[string][]string{
 		"rootFolderPath": propertyNames(reflect.TypeFor[sonarr.ImportListResource]()),
 		"remotePath":     propertyNames(reflect.TypeFor[sonarr.RemotePathMappingResource]()),
 		"localPath":      propertyNames(reflect.TypeFor[sonarr.RemotePathMappingResource]()),
 	}
-	for name := range handles {
-		if names, underKey := underKeys[name]; underKey {
-			if !slices.Contains(names, name) {
-				t.Errorf("handles has %q, which is no property of the record it is kept for", name)
-			}
-			if strings.Contains(schemas.String(), `"`+name+`":{`) {
-				t.Errorf("handles has %q as a name only a record's map has, and a tool now answers it as a field", name)
-			}
+	for name, names := range underKeys {
+		if !slices.Contains(names, name) {
+			t.Errorf("handles has %q, which is no property of the record it is kept for", name)
+		}
+	}
 
-			continue
-		}
-		if !strings.Contains(schemas.String(), `"`+name+`":{`) {
-			t.Errorf("handles has %q, which no tool answers", name)
-		}
+	unused := reg.LeaveAsIsUnused()
+	slices.Sort(unused)
+	if want := slices.Sorted(maps.Keys(underKeys)); !slices.Equal(unused, want) {
+		t.Errorf("the handles no tool answers as a field = %v, want only the three a record's map has, %v", unused, want)
+	}
+}
+
+// Every name Sonarr's own words are answered under is a name an answer really uses, for the same reason.
+func TestEveryPlaceSonarrIsQuotedIsAnAnswersField(t *testing.T) {
+	t.Parallel()
+
+	reg, err := described(Options{EnableDelete: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if unused := reg.BlankAddressesUnused(); len(unused) != 0 {
+		t.Errorf("sonarrSaid has %v, which no tool answers", unused)
 	}
 }
 
@@ -245,28 +180,6 @@ func TestInstructionsFollowTheToolsRegistered(t *testing.T) {
 	}
 	if strings.Contains(strings.Join(withoutDelete, "\n"), "confirm") {
 		t.Error("deleting is spoken of with no delete tool registered")
-	}
-}
-
-// An address in an answer's text is shown without who it signs in as and
-// without the value of any parameter; what is around it, and a place on a
-// page, is as it was.
-func TestAddressesCarryNoCredential(t *testing.T) {
-	t.Parallel()
-
-	for text, want := range map[string]string{ //nolint:gosec // made-up credentials, here to be taken out
-		"Unable to connect to indexer. HTTP request failed: [500:InternalServerError] [GET] at [http://indexer.example:8080/api?t=tvsearch&cat=5030,5040&apikey=s3cret-key&limit=100].": "Unable to connect to indexer. HTTP request failed: [500:InternalServerError] [GET] at [http://indexer.example:8080/api?t=REDACTED&cat=REDACTED&apikey=REDACTED&limit=REDACTED].",
-		"https://admin:hunter2@indexer.example/api":                                                       "https://REDACTED@indexer.example/api",
-		"signed in at https://sonarr.example/callback#access_token=s3cret-key":                            "signed in at https://sonarr.example/callback#REDACTED",
-		"see https://wiki.servarr.com/sonarr/system#indexers-are-unavailable-due-to-failures, then retry": "see https://wiki.servarr.com/sonarr/system#indexers-are-unavailable-due-to-failures, then retry",
-		"https://hooks.example/in?s3cret-key":                                                             "https://hooks.example/in?REDACTED",
-		"https://indexer.example/api?apikey=&t=caps":                                                      "https://indexer.example/api?apikey=&t=REDACTED",
-		"/tv/Firefly/Season 01/Firefly - S01E01.mkv":                                                      "/tv/Firefly/Season 01/Firefly - S01E01.mkv",
-		"no address here: 12:30":                                                                          "no address here: 12:30",
-	} {
-		if got := hideAddresses(text); got != want {
-			t.Errorf("hideAddresses(%q)\n got %q\nwant %q", text, got, want)
-		}
 	}
 }
 
@@ -320,6 +233,72 @@ func TestAStoredKeyIsNotQuotedBack(t *testing.T) {
 	kinds := rowsOf(mustCall(t, cs, "notification_kinds", nil)["kinds"])
 	if described := fmt.Sprint(kinds); !strings.Contains(described, "headers") || !strings.Contains(described, "credential:true") {
 		t.Errorf("notification_kinds = %v, want the headers listed as a credential to set", kinds)
+	}
+}
+
+// What Sonarr says went wrong quotes the address it asked, key and all, wherever it says it: a health check's message, a line of its log and the
+// exception under it, a line of a log file, why a download is stuck, why a file would not be imported, and an audit's detail of any of them. None
+// hands a caller the key; and a link that is there to be followed, a health check's wiki page, keeps the place on the page it points at.
+func TestSonarrsOwnWordsCarryNoStoredKey(t *testing.T) {
+	t.Parallel()
+
+	const key = "s3cret-key"
+	const wiki = "https://wiki.servarr.com/sonarr/system#indexers-are-unavailable-due-to-failures"
+	asked := "[GET] at [http://indexer.example/api?t=tvsearch&apikey=" + key + "&limit=100]"
+
+	f := newFakeServer(t)
+	firefly := map[string]any{"id": 1, "title": "Firefly", "year": 2002, "tvdbId": 78874, "path": "/tv/Firefly"}
+	library(t, f, firefly)
+	f.answer(t, "GET /api/v3/qualityprofile", []any{})
+	f.answer(t, "GET /api/v3/tag", []any{})
+	f.answer(t, "GET /api/v3/health", []map[string]any{{"source": "IndexerStatusCheck", "type": "error", "message": "Indexers unavailable due to failures: Fake. " + asked, "wikiUrl": wiki}})
+	f.answer(t, "GET /api/v3/rootfolder", []map[string]any{{"id": 1, "path": "/tv", "accessible": true, "freeSpace": int64(500) << 30}})
+	f.answer(t, "GET /api/v3/diskspace", []map[string]any{{"path": "/", "totalSpace": int64(1000) << 30}})
+	f.answer(t, "GET /api/v3/log", page(map[string]any{"id": 3, "time": ago(time.Hour), "level": "error", "logger": "Newznab", "message": "An error occurred while processing feed " + asked, "exception": "HttpException: 500 " + asked}))
+	f.mux.HandleFunc("GET /api/v3/log/file/sonarr.txt", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("1|Error|the feed failed " + asked + "\n"))
+	})
+	f.answer(t, "GET /api/v3/queue", page(map[string]any{
+		"id": 5, "seriesId": 1, "series": firefly, "title": "Firefly.S01E01.1080p-GRP", "status": "warning", "trackedDownloadState": "downloading", "trackedDownloadStatus": "warning",
+		"errorMessage": "the download failed " + asked, "statusMessages": []map[string]any{{"title": "Firefly.S01E01", "messages": []string{"nothing came " + asked}}},
+	}))
+	f.answer(t, "GET /api/v3/manualimport", []any{map[string]any{"id": 1, "path": "/downloads/Firefly.S01E01.mkv", "size": 1, "rejections": []any{map[string]any{"reason": "Unable to look it up " + asked, "type": "permanent"}}}})
+	cs := session(t, f, Options{Toolsets: []string{"all"}})
+
+	for tool, args := range map[string]map[string]any{"server_health": nil, "log_list": nil, "logfile_read": nil, "queue_list": nil, "audit_health": nil, "import_scan": {"folder": "/downloads"}} {
+		said := fmt.Sprint(mustCall(t, cs, tool, args))
+		if strings.Contains(said, key) || !strings.Contains(said, "apikey=REDACTED") || !strings.Contains(said, "http://indexer.example/api") {
+			t.Errorf("%s = %v, want the address Sonarr asked without the key", tool, said)
+		}
+	}
+
+	if said := fmt.Sprint(mustCall(t, cs, "server_health", nil)); !strings.Contains(said, wiki) {
+		t.Errorf("server_health = %v, want the wiki page as Sonarr gave it, %s", said, wiki)
+	}
+}
+
+// What an edit says it changed is a setting before and after, and a setting can be an address with a credential in it: the address Sonarr is reached
+// at, written with who signs in. It is said without the credential, whether the change was made, would be made, or did not hold.
+func TestWhatAnEditSaysChangedCarriesNoCredential(t *testing.T) {
+	t.Parallel()
+
+	const key = "s3cret-key"
+	f := newFakeServer(t)
+	// the fake answers the section as it was, so what is set does not hold
+	f.answer(t, "GET /api/v3/config/host", map[string]any{"id": 1, "port": 8989, "applicationUrl": "", "instanceName": "Sonarr", "authenticationMethod": "none"})
+	f.mux.HandleFunc("PUT /api/v3/config/host/1", keeper(t, 1))
+	cs := session(t, f, Options{})
+
+	set := map[string]any{"applicationUrl": "https://kt:" + key + "@tv.example/sonarr"}
+	would := mustCall(t, cs, "config_edit", map[string]any{"section": "host", "set": set})
+	done := mustCall(t, cs, "config_edit", map[string]any{"section": "host", "set": set, "confirm": true})
+	for name, said := range map[string][]string{"would_change": strs(would["would_change"]), "changed": strs(done["changed"]), "not_kept": strs(done["not_kept"])} {
+		if joined := strings.Join(said, "\n"); strings.Contains(joined, key) || !strings.Contains(joined, "https://REDACTED@tv.example/sonarr") {
+			t.Errorf("%s = %q, want the address without who signs in", name, said)
+		}
+	}
+	if sent := f.sent(http.MethodPut, "/api/v3/config/host/1"); len(sent) != 1 || !strings.Contains(sent[0], key) {
+		t.Errorf("the section sent = %v, want the address saved as given", sent)
 	}
 }
 

@@ -245,16 +245,13 @@ func TestTheWriteLogShowsNoSetting(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if len(lines) != 1 || !strings.Contains(lines[0], "indexer_add") || !strings.Contains(lines[0], "answered") || !strings.Contains(lines[0], `"baseUrl":"***"`) || !strings.Contains(lines[0], `"priority":"***"`) || !strings.Contains(lines[0], "Usenet One") {
+	if len(lines) != 1 || !strings.Contains(lines[0], "indexer_add") || !strings.Contains(lines[0], "answered") || !strings.Contains(lines[0], `"baseUrl":"REDACTED"`) || !strings.Contains(lines[0], `"priority":"REDACTED"`) || !strings.Contains(lines[0], "Usenet One") {
 		t.Fatalf("the line written = %q, want the tool, how it ended and each setting's name", lines)
 	}
 	for _, secret := range []string{"s3cret-key", "passkey-in-the-path", "indexer.example"} {
 		if strings.Contains(lines[0], secret) {
 			t.Errorf("the line written carries %q: %s", secret, lines[0])
 		}
-	}
-	if blankFreeForm(`{"settings":{"apiKey":"abc`) != "(arguments too long to show)" {
-		t.Error("arguments cut short are shown, and could hold a value unblanked")
 	}
 }
 

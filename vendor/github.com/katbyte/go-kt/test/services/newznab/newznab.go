@@ -1,26 +1,10 @@
-// Package newznab is a Newznab and Torznab indexer for a live suite to run
-// beside the server under test: one listener serving any number of indexers,
-// each at /<name>/api, each usenet or torrent, and each healthy or broken in
-// its own way. A test decides which releases exist, sees every request made,
-// and can make an indexer fail, fail now and then, answer slowly or refuse
-// its key.
+// Package newznab is a Newznab and Torznab indexer for a live suite to run beside the server under test: one listener, any number of indexers at
+// /<name>/api, each usenet or torrent, each healthy or broken as the test says. The test decides which releases exist and sees every request.
 //
-// The test's data is the test's to decide. A release says its title and its
-// category, and one that does not is refused. What a release need not say
-// but a feed has to carry - when it was posted, and how big a torrent is -
-// is not one fixed value a test could come to lean on without knowing it:
-// it is picked from a spread by a seed (Options.Seed), differently each run
-// unless the seed is given, and Indexer.Releases says what was picked.
-//
-// It is the indexers sonarr-mcp, radarr-mcp and prowlarr-mcp each wrote for
-// their suites, made one. Every answer is in the shape the *arr parsers read
-// (NewznabCapabilitiesProvider, NewznabRssParser, TorznabRssParser and
-// NzbValidationService in their source), and where a comment says what one
-// of them does with an answer, that is why the answer is as it is.
-//
-// It runs on the host, and the container reaches the host by another name
-// than the test does, so the links in its feeds are built from the address
-// the container uses (Options.PublicHost), not the one the test dialled.
+// The test's data is the test's to decide: a release must say its title and category. What it need not say but a feed must carry, the date and a
+// torrent's size, is picked from a spread by a seed (Options.Seed), so no test leans on a fixed made-up value; Indexer.Releases says what was picked.
+// Every answer is in the shape the *arr parsers read, and a comment that names one says why the answer is as it is. Links in the feeds use the
+// address the container reaches the host by (Options.PublicHost).
 package newznab
 
 import (
@@ -57,8 +41,7 @@ const (
 	SearchBook  = "book-search"
 )
 
-// The standard categories. A release is filed under one subcategory, and a
-// search for its parent (2000, 5000) finds it too.
+// The standard categories. A release is filed under one subcategory, and a search for its parent (2000, 5000) finds it too.
 const (
 	CategoryMovies        = 2000
 	CategoryMoviesSD      = 2030
@@ -77,8 +60,7 @@ const (
 	CategoryBooks         = 7000
 )
 
-// The Newznab error codes an indexer answers with. The *arrs read 100-199 as
-// a key that was refused, and 500 as a request limit to back off from.
+// The Newznab error codes an indexer answers with. The *arrs read 100-199 as a key that was refused, and 500 as a request limit to back off from.
 const (
 	ErrIncorrectCredentials = 100
 	ErrMissingParameter     = 200
@@ -89,20 +71,17 @@ const (
 	ErrUnknown              = 900
 )
 
-// DefaultPageSize is the page size an indexer advertises and serves unless
-// its Site says otherwise.
+// DefaultPageSize is the page size an indexer advertises and serves unless its Site says otherwise.
 const DefaultPageSize = 100
 
-// Category is a category an indexer's capabilities list, with its
-// subcategories.
+// Category is a category an indexer's capabilities list, with its subcategories.
 type Category struct {
 	ID   int
 	Name string
 	Subs []Category
 }
 
-// DefaultCategories are movies and TV with their subcategories, which is what
-// Sonarr's and Radarr's own default categories are found in.
+// DefaultCategories are movies and TV with their subcategories, which is what Sonarr's and Radarr's own default categories are found in.
 var DefaultCategories = []Category{
 	{ID: CategoryMovies, Name: "Movies", Subs: []Category{{ID: CategoryMoviesSD, Name: "SD"}, {ID: CategoryMoviesHD, Name: "HD"}, {ID: CategoryMoviesUHD, Name: "UHD"}}},
 	{ID: CategoryTV, Name: "TV", Subs: []Category{{ID: CategoryTVForeign, Name: "Foreign"}, {ID: CategoryTVSD, Name: "SD"}, {ID: CategoryTVHD, Name: "HD"}, {ID: CategoryTVUHD, Name: "UHD"}, {ID: CategoryTVOther, Name: "Other"}, {ID: CategoryTVSport, Name: "Sport"}, {ID: CategoryTVAnime, Name: "Anime"}, {ID: CategoryTVDocumentary, Name: "Documentary"}}},
@@ -110,40 +89,27 @@ var DefaultCategories = []Category{
 
 // Release is one entry in an indexer's catalogue.
 type Release struct {
-	// GUID identifies the release in its links; empty derives a stable one
-	// from the title.
+	// GUID identifies the release in its links; empty derives a stable one from the title.
 	GUID string
-	// Title is the scene name an *arr parses the series or film, the
-	// quality and the group from.
+	// Title is the scene name an *arr parses the series or film, the quality and the group from.
 	Title string
-	// Size is the release's size in bytes, which an *arr checks against the
-	// quality's size limits; 0 is unknown, and not checked. A torrent has
-	// to hold something - Prowlarr refuses one of nothing and counts it
-	// against the indexer - so a torrent that does not say its size is
-	// given one (Options.Seed).
+	// Size is the release's size in bytes; 0 is unknown. A torrent must hold something, Prowlarr refuses one of nothing, so a torrent that does not
+	// say is given a size (Options.Seed).
 	Size int64
-	// PubDate is when it was posted. There is no leaving it unknown, as a
-	// size can be: Sonarr refuses a whole feed for one item with no date
-	// (RssParser.GetPublishDate). So a release that does not say is given
-	// one (Options.Seed), which it keeps however often it is offered: an
-	// *arr knows a blocklisted usenet release by its date.
+	// PubDate is when it was posted. Sonarr refuses a whole feed for one item without a date, so one that does not say is given a date
+	// (Options.Seed), kept however often it is offered.
 	PubDate time.Time
-	// Category is the subcategory it is filed under, which decides the
-	// searches that find it. It is the test's to say: a release with none
-	// is refused.
+	// Category is the subcategory it is filed under, which decides the searches that find it; a release without one is refused.
 	Category int
-	// IMDBID, TMDBID, TVDBID and TvMazeID are what a search by id matches.
-	// IMDBID is written with or without its tt.
+	// IMDBID, TMDBID, TVDBID and TvMazeID are what a search by id matches. IMDBID is written with or without its tt.
 	IMDBID   string
 	TMDBID   int
 	TVDBID   int
 	TvMazeID int
-	// Season and Episode are what a TV search by season and episode
-	// matches. Episode 0 is a season pack.
+	// Season and Episode are what a TV search by season and episode matches. Episode 0 is a season pack.
 	Season  int
 	Episode int
-	// Seeders and Peers are what a torrent indexer reports, and Freeleech a
-	// torrent that costs no download ratio.
+	// Seeders and Peers are what a torrent indexer reports, and Freeleech a torrent that costs no download ratio.
 	Seeders   int
 	Peers     int
 	Freeleech bool
@@ -151,34 +117,26 @@ type Release struct {
 	Grabs int
 	// Files is the number of files its NZB lists; 0 is one.
 	Files int
-	// Group and Poster are the usenet group and poster the feed and the NZB
-	// name; empty is a made-up one of each.
+	// Group and Poster are the usenet group and poster the feed and the NZB name; empty is a made-up one of each.
 	Group  string
 	Poster string
-	// Languages are language names (English, German) an *arr reads from the
-	// feed rather than the title.
+	// Languages are language names (English, German) an *arr reads from the feed rather than the title.
 	Languages []string
-	// Scene and Nuked set the prematch and nuked attributes an *arr turns
-	// into indexer flags.
+	// Scene and Nuked set the prematch and nuked attributes an *arr turns into indexer flags.
 	Scene bool
 	Nuked bool
 }
 
 // Failure is how an indexer misbehaves; the zero value is healthy.
 type Failure struct {
-	// Status, when set, is the HTTP status every call answers, the way an
-	// indexer that is down answers a 503.
+	// Status, when set, is the HTTP status every call answers, the way an indexer that is down answers a 503.
 	Status int
-	// Code, when set and Status is not, answers every call with a Newznab
-	// error document under HTTP 200: a key the indexer has revoked
+	// Code, when set and Status is not, answers every call with a Newznab error document under HTTP 200: a key the indexer has revoked
 	// (ErrIncorrectCredentials) or a request limit (ErrRequestLimitReached).
 	Code        int
 	Description string
-	// Every, when above 1, fails only every Every-th search, the way a flaky
-	// indexer does, and answers the rest; capabilities and downloads are
-	// always answered, so the indexer can still be added and tested. A
-	// failure lasts failureSpell, long enough to outlast the retries an
-	// *arr makes of a server error, which would otherwise hide it.
+	// Every, when above 1, fails every Every-th search and answers the rest; capabilities and downloads always answer. A failure lasts failureSpell,
+	// longer than an *arr's retries, which would otherwise hide it.
 	Every int
 }
 
@@ -191,19 +149,15 @@ type Site struct {
 	Name string
 	// Protocol is Usenet or Torrent; empty is Usenet.
 	Protocol string
-	// APIKey is the key every call but capabilities must carry as apikey=;
-	// empty accepts any.
+	// APIKey is the key every call but capabilities must carry as apikey=; empty accepts any.
 	APIKey string
 	// Categories are what its capabilities list; nil is DefaultCategories.
 	Categories []Category
-	// Searches are the kinds of search it offers; nil is SearchText,
-	// SearchTV and SearchMovie.
+	// Searches are the kinds of search it offers; nil is SearchText, SearchTV and SearchMovie.
 	Searches []string
-	// TVSearchParams are the tv-search parameters its capabilities list;
-	// nil is q, season, ep and tvdbid. An *arr sends only the ids listed.
+	// TVSearchParams are the tv-search parameters its capabilities list; nil is q, season, ep and tvdbid. An *arr sends only the ids listed.
 	TVSearchParams []string
-	// PageSize is the default and largest page it serves; 0 is
-	// DefaultPageSize.
+	// PageSize is the default and largest page it serves; 0 is DefaultPageSize.
 	PageSize int
 	// Releases is its catalogue to start with.
 	Releases []Release
@@ -219,8 +173,7 @@ type Request struct {
 	Site   string
 	Method string
 	Path   string
-	// Function is the t= parameter (caps, search, tvsearch, movie), or
-	// "download" for a fetch of a release.
+	// Function is the t= parameter (caps, search, tvsearch, movie), or "download" for a fetch of a release.
 	Function string
 	// Query is every parameter as sent, the API key included.
 	Query url.Values
@@ -229,22 +182,14 @@ type Request struct {
 
 // Options configure a Server.
 type Options struct {
-	// Addr is where to listen, e.g. ":18081"; empty picks a free port on
-	// 127.0.0.1. A container reaches the host from outside it, so a live
-	// run listens on every interface.
+	// Addr is where to listen, ":18081"; empty picks a free port on 127.0.0.1. A live run listens on every interface for the container.
 	Addr string
-	// PublicHost is the name the container reaches this machine by, which
-	// the feeds' links are built from; empty is 127.0.0.1.
+	// PublicHost is the name the container reaches this machine by, which the feeds' links use; empty is 127.0.0.1.
 	PublicHost string
 	// Sites are the indexers to serve from the start.
 	Sites []Site
-	// Seed decides what a release is given for what it does not say and
-	// has to have: when it was posted, and for a torrent how big it is.
-	// Each is picked from a spread, so that no test comes to lean on one
-	// made-up value without knowing it, and Releases says what was picked.
-	// The same seed gives the same release the same again; 0 picks a seed
-	// and says which on stderr, where a failing run's output has it, and
-	// Server.Seed reports it.
+	// Seed decides the date and torrent size a release is given when it says neither, each from a spread. The same seed gives the same again; 0 picks
+	// one and prints it on stderr, where a failing run's output is.
 	Seed uint64
 }
 
@@ -290,8 +235,7 @@ func New(opts Options) (*Server, error) {
 	s := &Server{publicHost: opts.PublicHost, listener: ln, started: time.Now().UTC().Truncate(time.Second), seed: opts.Seed, indexers: map[string]*Indexer{}}
 	if s.seed == 0 {
 		s.seed = rand.Uint64() | 1 //nolint:gosec // test data to vary from run to run, not a secret
-		// said where a failing run's output has it, so a suite that printed
-		// nothing can still be run again on the same data
+		// said where a failing run's output has it, so a suite that printed nothing can still be run again on the same data
 		_, _ = fmt.Fprintf(os.Stderr, "newznab: seed %d (give it as Options.Seed to run on the same data again)\n", s.seed)
 	}
 	for _, site := range opts.Sites {
@@ -308,15 +252,13 @@ func New(opts Options) (*Server, error) {
 	return s, nil
 }
 
-// Close stops the server at once. There is nothing to drain, and a graceful
-// shutdown waits on any connection a client opened and never used.
+// Close stops the server at once; a graceful stop would wait on idle connections.
 func (s *Server) Close() error { return s.srv.Close() }
 
 // Addr is the address listened on.
 func (s *Server) Addr() string { return s.listener.Addr().String() }
 
-// Seed is the seed this run's releases were given what they did not say from
-// (Options.Seed).
+// Seed is the seed this run picked unsaid values by (Options.Seed).
 func (s *Server) Seed() uint64 { return s.seed }
 
 // Port is the port listened on.
@@ -384,19 +326,15 @@ func (s *Server) Requests() []Request {
 	return slices.Clone(s.requests)
 }
 
-// The spreads a release is given what it did not say from. A date is so long
-// before the server started, in seconds: about an hour, some hours, about a
-// day, or about a week. A torrent's size is an episode's, an episode's or a
-// small film's in HD, a film's, or a film's as it came off the disc.
+// The spreads unsaid values are picked from. A date is this long before the server started, in seconds: about an hour, some hours, a day, a week. A
+// torrent's size is an episode's, an HD episode's, a film's, or a disc's.
 var (
 	postedAges   = [][2]int64{{30 * 60, 90 * 60}, {2 * 3600, 20 * 3600}, {22 * 3600, 26 * 3600}, {6 * 86400, 8 * 86400}}
 	torrentSizes = [][2]int64{{200 << 20, 1 << 30}, {1 << 30, 4 << 30}, {4 << 30, 15 << 30}, {20 << 30, 60 << 30}}
 )
 
-// pick is a number from one of the spreads, each as likely as the next,
-// decided by the seed, the release and what is being picked: a release is
-// given the same every time it is offered, and a run with the same seed gives
-// every release the same again.
+// pick is a number from one of the spreads, decided by the seed, the release and what is picked, so the same release gets the same each time and the
+// same seed gives every release the same again.
 func (s *Server) pick(guid, what string, spreads [][2]int64) int64 {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(guid + "\x00" + what))
@@ -406,9 +344,7 @@ func (s *Server) pick(guid, what string, spreads [][2]int64) int64 {
 	return spread[0] + dice.Int64N(spread[1]-spread[0]+1)
 }
 
-// filled is releases with what each left unsaid decided, for an indexer of a
-// protocol. A title and a category are the test's to say, and a release
-// without one is refused.
+// filled is releases with what each left unsaid decided; one without a title or a category is refused.
 func (s *Server) filled(releases []Release, protocol string) ([]Release, error) {
 	out := make([]Release, 0, len(releases))
 	for _, r := range releases {
@@ -448,8 +384,7 @@ func (s *Server) filled(releases []Release, protocol string) ([]Release, error) 
 // Name is the name the indexer is served under.
 func (ix *Indexer) Name() string { return ix.site.Name }
 
-// URL is the indexer's address as the container reaches it: the base URL an
-// *arr is given for it, with /api as its API path.
+// URL is the indexer's address as the container reaches it, the base URL an *arr is given with /api as its path.
 func (ix *Indexer) URL() string {
 	return "http://" + net.JoinHostPort(ix.server.publicHost, strconv.Itoa(ix.server.Port())) + "/" + ix.site.Name
 }
@@ -459,8 +394,7 @@ func (ix *Indexer) LocalURL() string {
 	return "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(ix.server.Port())) + "/" + ix.site.Name
 }
 
-// SetReleases replaces the catalogue, or leaves it as it was when a release
-// is refused (Release).
+// SetReleases replaces the catalogue, or leaves it as it was when a release is refused (Release).
 func (ix *Indexer) SetReleases(releases ...Release) error {
 	filled, err := ix.server.filled(releases, ix.site.Protocol)
 	if err != nil {
@@ -475,8 +409,7 @@ func (ix *Indexer) SetReleases(releases ...Release) error {
 	return nil
 }
 
-// Offer adds releases to the catalogue, each in place of any with its GUID,
-// or adds none when one is refused (Release).
+// Offer adds releases to the catalogue, each in place of any with its GUID, or adds none when one is refused (Release).
 func (ix *Indexer) Offer(releases ...Release) error {
 	filled, err := ix.server.filled(releases, ix.site.Protocol)
 	if err != nil {
@@ -506,8 +439,7 @@ func (ix *Indexer) Withdraw(titles ...string) {
 	ix.site.Releases = slices.DeleteFunc(ix.site.Releases, func(r Release) bool { return slices.Contains(titles, r.Title) })
 }
 
-// Releases is the catalogue, with what each release left unsaid decided and
-// its grabs counted.
+// Releases is the catalogue, unsaid values decided and grabs counted.
 func (ix *Indexer) Releases() []Release {
 	ix.server.mu.Lock()
 	defer ix.server.mu.Unlock()
@@ -533,8 +465,7 @@ func (ix *Indexer) Requests() []Request {
 	return out
 }
 
-// Grabbed is the titles of the releases fetched from the indexer, in the
-// order they were: what the server under test grabbed.
+// Grabbed is the titles fetched from the indexer, in order.
 func (ix *Indexer) Grabbed() []string {
 	ix.server.mu.Lock()
 	defer ix.server.mu.Unlock()

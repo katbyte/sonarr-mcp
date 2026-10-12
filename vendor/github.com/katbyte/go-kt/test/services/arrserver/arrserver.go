@@ -1,23 +1,9 @@
-// Package arrserver is the servers a Prowlarr, Sonarr or Radarr calls home
-// to, for a live suite to answer itself: the update server, the clock the
-// application checks its own against, and the notices its makers post.
+// Package arrserver is the servers a Prowlarr, Sonarr or Radarr calls home to, for a live suite to answer itself: the update server, the clock, and
+// the notices.
 //
-// The applications ask these whether or not anyone asked them to. The update
-// server is asked whenever the health checks run once a build is two weeks
-// old (UpdateCheck in the applications' source), and an answer that cannot be
-// had ends the whole run of checks rather than the one, so a suite that cuts
-// the application off from the internet has to answer it or lose every health
-// check a fortnight after the release it pins. The clock is asked the same way
-// (SystemTimeCheck), and an answer more than a day from the application's own
-// is a health error, so a recording of it is wrong the day after it was made:
-// this one answers with the time it is.
-//
-// It is an http.Handler for whatever serves the hosts: the applications reach
-// them over HTTPS, so a suite puts it behind the proxy the container is
-// pointed at (test/replayproxy, Proxy.Serve), for the whole host or, where
-// the host's other paths are replayed from a recording, for the one path.
-//
-// It was written for prowlarr-mcp's suite.
+// The applications ask these unasked. An update check that cannot be answered ends every health check once a build is two weeks old, so a suite that
+// cuts the application off must answer it; the clock is checked the same way, and a recording of it is wrong by the next day, so this answers the
+// time it is. It is a handler for a suite to put behind its proxy (replayproxy.Proxy.Serve), for the whole host or for one path.
 package arrserver
 
 import (
@@ -43,8 +29,7 @@ type Update struct {
 	Fixed []string
 }
 
-// Server is the servers, as one handler. The zero value is not usable; make
-// one with New.
+// Server is the servers, as one handler. The zero value is not usable; make one with New.
 type Server struct {
 	started time.Time
 
@@ -66,8 +51,7 @@ func (s *Server) Offer(updates ...Update) {
 	s.updates = slices.Clone(updates)
 }
 
-// SetDown makes every answer a 503, the way the services answer when they
-// are not there, or puts them back.
+// SetDown makes every answer a 503, the way the services answer when they are not there, or puts them back.
 func (s *Server) SetDown(down bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -83,8 +67,7 @@ func (s *Server) Requests() []string {
 	return slices.Clone(s.requests)
 }
 
-// Unknown is the requests it had no answer for, which it answered 404: what
-// an application asked that this does not know it asks.
+// Unknown is the requests answered 404: what an application asks that this does not know of.
 func (s *Server) Unknown() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -92,10 +75,7 @@ func (s *Server) Unknown() []string {
 	return slices.Clone(s.unknown)
 }
 
-// Report says what a run should fail on at its end, "" for nothing: the
-// requests there was no answer for, which are what an application has started
-// asking that this does not know it asks. It reads as the replay proxy's
-// report of its misses does.
+// Report says what a run should fail on, "" for nothing: the requests with no answer, worded like the replay proxy's report of its misses.
 func (s *Server) Report() string {
 	unknown := s.Unknown()
 	if len(unknown) == 0 {
@@ -111,8 +91,7 @@ func (s *Server) Report() string {
 	return b.String()
 }
 
-// updatePackage is a release as the update server describes it
-// (UpdatePackage in the applications' source).
+// updatePackage is a release as the update server describes it (UpdatePackage in the applications' source).
 type updatePackage struct {
 	Version     string        `json:"version"`
 	ReleaseDate time.Time     `json:"releaseDate"`
@@ -128,10 +107,8 @@ type updateChanges struct {
 	Fixed []string `json:"fixed"`
 }
 
-// ServeHTTP answers the three things the applications ask, under /v1: the
-// newest release above the one asking (update/<branch>), the recent releases
-// (update/<branch>/changes), the time (time) and the notices (notification),
-// of which there are none.
+// ServeHTTP answers, under /v1: the newest release above the one asking (update/<branch>), the recent releases (update/<branch>/changes), the time,
+// and the notices, of which there are none.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.requests = append(s.requests, r.Method+" "+r.URL.Path)

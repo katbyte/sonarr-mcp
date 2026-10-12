@@ -15,16 +15,18 @@ github.com/gookit/color
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/katbyte/go-kt v0.6.1
+# github.com/katbyte/go-kt v0.6.4
 ## explicit; go 1.26
 github.com/katbyte/go-kt/chttp
 github.com/katbyte/go-kt/clog
+github.com/katbyte/go-kt/internal/addresses
 github.com/katbyte/go-kt/lock
 github.com/katbyte/go-kt/mcp/acctest
 github.com/katbyte/go-kt/mcp/registry
 github.com/katbyte/go-kt/mcp/server
 github.com/katbyte/go-kt/outside
 github.com/katbyte/go-kt/parallel
+github.com/katbyte/go-kt/pointer
 github.com/katbyte/go-kt/test/env
 github.com/katbyte/go-kt/test/replayproxy
 github.com/katbyte/go-kt/test/services/arrserver
@@ -128,7 +130,7 @@ go.yaml.in/yaml/v3
 ## explicit; go 1.24.0
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.23.0
+# golang.org/x/sync v0.24.0
 ## explicit; go 1.26.0
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.41.0
@@ -136,7 +138,7 @@ golang.org/x/sync/errgroup
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.42.0
+# golang.org/x/text v0.43.0
 ## explicit; go 1.26.0
 golang.org/x/text/encoding
 golang.org/x/text/encoding/internal

@@ -7,13 +7,8 @@ import (
 	"strings"
 )
 
-// Drift is one recorded interaction whose live response no longer has the
-// shape the cassette captured.
-//
-// Only the shape is compared, never the values: which result a service ranks
-// first this week is none of our business, but a field appearing, vanishing or
-// changing type is exactly what breaks decoding, in the server or in a client
-// of ours, and with it everything that depends on the lookup.
+// Drift is a recording whose live answer no longer has the same shape. Only the shape is compared, never the values: a field appearing, going or
+// changing type is what breaks decoding.
 type Drift struct {
 	Key           string
 	StatusWas     int
@@ -38,8 +33,7 @@ func (d Drift) String() string {
 	return b.String()
 }
 
-// Drifts returns the shape changes seen so far, in a stable order. Empty in
-// any mode but Verify.
+// Drifts returns the shape changes seen so far, in a stable order. Empty in any mode but Verify.
 func (p *Proxy) Drifts() []Drift {
 	p.driftMu.Lock()
 	defer p.driftMu.Unlock()
@@ -83,9 +77,7 @@ func (p *Proxy) compare(recorded, live *interaction) {
 	p.driftMu.Unlock()
 }
 
-// fieldPaths returns the sorted, deduplicated set of "a.b[].c" paths in a JSON
-// document, each with the type of its leaf. Array elements collapse to one
-// entry, so a list of ten books and a list of one compare equal.
+// fieldPaths is the sorted set of "a.b[].c" paths in a JSON document with each leaf's type; a list's elements collapse to one.
 func fieldPaths(body string) []string {
 	if strings.TrimSpace(body) == "" {
 		return nil
@@ -126,8 +118,7 @@ func walk(prefix string, v any, seen map[string]struct{}, depth int) {
 			walk(path, child, seen, depth+1)
 		}
 	case []any:
-		// every element folds into one path, so list length never counts as
-		// a change; an empty list still records the path itself
+		// elements fold into one path; an empty list still records the path
 		if len(t) == 0 {
 			seen[prefix+"[]"] = struct{}{}
 			return

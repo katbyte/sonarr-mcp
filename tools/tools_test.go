@@ -554,6 +554,25 @@ var notWrapped = map[string]string{
 	"RefreshSeriesAndWait": waitsItself, "RenameFilesAndWait": waitsItself, "RescanSeriesAndWait": waitsItself, "SeasonSearchAndWait": waitsItself, "SeriesSearchAndWait": waitsItself,
 }
 
+// A tool that takes no arguments refuses one and says it takes none: an argument quietly dropped reads as one that was heeded.
+func TestAToolThatTakesNoArgumentsRefusesOne(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	f.answer(t, "GET /api/v3/health", []any{})
+	cs := session(t, f, Options{})
+
+	if msg := mustFail(t, cs, "server_health", map[string]any{"level": "error"}); !strings.Contains(msg, "server_health takes no arguments") {
+		t.Errorf("server_health with an argument = %q, want it refused as taking none", msg)
+	}
+	if out := mustCall(t, cs, "server_health", nil); out["checks"] == nil {
+		t.Errorf("server_health with no arguments = %v, want its checks", out)
+	}
+	if len(f.requests("/api/v3/health")) != 1 {
+		t.Error("the refused call reached Sonarr")
+	}
+}
+
 // waitsItself is why no tool calls a command's AndWait form: a command still running when the wait ends is an answer for a tool, and an error from AndWait.
 const waitsItself = "the tool queues the command with its own method and waits itself, so one still running when the wait ends is answered as it stands"
 

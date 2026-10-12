@@ -14,8 +14,7 @@ import (
 	"unicode/utf8"
 )
 
-// DefaultTraceBody is how much of a body a trace prints: enough to see what
-// was asked and what came back, and not a library's whole listing.
+// DefaultTraceBody is how much of a body a trace prints: enough to see what came back, not a whole listing.
 const DefaultTraceBody = 8 << 10
 
 // redacted stands in a trace for a value that is not shown.
@@ -24,23 +23,35 @@ const redacted = "REDACTED"
 // secretHeaders are the headers a credential travels in whatever the API.
 var secretHeaders = []string{"Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"}
 
-// secretEndings are how the name of a credential ends, lowercased, whatever
-// an API puts in front: primaryNodePassword, sharedSecret, refresh_token,
-// TmdbApiKey.
-// A name is matched by its ending because a name left off a list is a
-// credential in a log, with nothing to say so; the price is a page token
-// that a trace hides too.
-var secretEndings = []string{"password", "secret", "token", "apikey", "api_key"}
+// secretWords make a name a credential's wherever they sit in it: primaryNodePassword, passwordConfirmation, clientSecretValue. The price is a
+// harmless name with one of them in it, passwordPolicy, hidden too.
+var secretWords = []string{"password", "passphrase", "secret"}
+
+// secretEndings are how a credential's name ends, whatever is in front: refresh_token, TmdbApiKey. Only the ending is matched, since maxTokens and
+// cookiePolicy hold no credential; the price is a page token hidden too.
+var secretEndings = []string{"passkey", "token", "cookie", "apikey", "api_key", "privatekey", "private_key"}
+
+// SecretName reports whether a name holds a credential, by the rule a trace hides one by: a common credential parameter, one of also, a name with
+// password, passphrase or secret anywhere in it, or one ending passkey, token, cookie, apikey, api_key, privatekey or private_key, in any case.
+func SecretName(name string, also ...string) bool {
+	name = strings.ToLower(name)
+	if slices.Contains(credentialParams, name) || slices.ContainsFunc(also, func(a string) bool { return strings.EqualFold(a, name) }) {
+		return true
+	}
+
+	return reads(name)
+}
+
+// reads reports whether a lower-case name reads as a credential's, by a word in it or by how it ends.
+func reads(name string) bool {
+	return slices.ContainsFunc(secretWords, func(word string) bool { return strings.Contains(name, word) }) || slices.ContainsFunc(secretEndings, func(ending string) bool { return strings.HasSuffix(name, ending) })
+}
 
 // defaultSecrets is what is hidden when nothing more is named.
 var defaultSecrets = newSecrets(Options{})
 
-// RedactJSON is JSON text, whole or cut short, with the value of every string
-// field that holds a credential blanked: a field of one of the names an API
-// passes a credential under, one of also, or one whose name ends as a
-// credential's does (password, secret, token, apikey, api_key). It is the
-// rule a trace hides a body's credentials by, for whatever else writes down
-// what it was sent.
+// RedactJSON blanks every string field in JSON text, whole or cut short, whose name is a credential's (SecretName, plus also). It is the rule a trace
+// hides a body's secrets by, for whatever else writes one down.
 func RedactJSON(text string, also ...string) string {
 	s := defaultSecrets
 	if len(also) > 0 {
@@ -50,8 +61,7 @@ func RedactJSON(text string, also ...string) string {
 	return s.fields.ReplaceAllString(text, `${1}"`+redacted+`"`)
 }
 
-// lazy is text put together only when something formats it, which is how a
-// trace costs nothing while tracing is off (see Logger).
+// lazy is text built only when formatted, so a trace that is off costs nothing.
 type lazy func() string
 
 func (l lazy) String() string { return l() }
@@ -60,8 +70,7 @@ func (l lazy) String() string { return l() }
 type secrets struct {
 	headers []string
 	names   []string
-	// fields finds a JSON string field with one of the names, in a body
-	// that may have been cut off part way
+	// fields finds a JSON string field by one of the names, even in a body cut off part way
 	fields *regexp.Regexp
 }
 
@@ -71,13 +80,12 @@ func newSecrets(o Options) secrets {
 		s.names = append(s.names, strings.ToLower(n))
 	}
 
-	// a field with one of the names, or with a name that ends as a
-	// credential's does
-	named := make([]string, 0, len(s.names)+1)
+	// a field with one of the names, or one that reads as a credential's by a word in it or by how it ends
+	named := make([]string, 0, len(s.names)+2)
 	for _, n := range s.names {
 		named = append(named, regexp.QuoteMeta(n))
 	}
-	named = append(named, `[^"\\]*(?:`+strings.Join(secretEndings, "|")+`)`)
+	named = append(named, `[^"\\]*(?:`+strings.Join(secretWords, "|")+`)[^"\\]*`, `[^"\\]*(?:`+strings.Join(secretEndings, "|")+`)`)
 	s.fields = regexp.MustCompile(`(?i)("(?:` + strings.Join(named, "|") + `)"\s*:\s*)"(?:[^"\\]|\\.)*"?`)
 
 	return s
@@ -87,17 +95,14 @@ func (s secrets) header(name string) bool {
 	return slices.ContainsFunc(s.headers, func(h string) bool { return strings.EqualFold(h, name) })
 }
 
-// name reports whether a query parameter or a form field of this name holds
-// a credential: one of the names, or a name that ends as a credential's
-// does.
+// name reports whether a parameter or form field of this name is a credential.
 func (s secrets) name(name string) bool {
 	name = strings.ToLower(name)
 
-	return slices.Contains(s.names, name) || slices.ContainsFunc(secretEndings, func(ending string) bool { return strings.HasSuffix(name, ending) })
+	return slices.Contains(s.names, name) || reads(name)
 }
 
-// query is a query string, or a form sent as one, with the value of every
-// credential in it blanked and the rest as it was sent.
+// query is a query string or form with its credentials blanked.
 func (s secrets) query(raw string) string {
 	parts := strings.Split(raw, "&")
 	for i, p := range parts {
@@ -114,8 +119,7 @@ func (s secrets) query(raw string) string {
 	return strings.Join(parts, "&")
 }
 
-// requestText is a request as a trace shows it: its line, its headers and
-// what can be shown of its body.
+// requestText is a request as a trace shows it.
 func (t *Transport) requestText(req *http.Request) string {
 	var b strings.Builder
 	path, query, hasQuery := strings.Cut(req.URL.RequestURI(), "?")
@@ -152,10 +156,8 @@ func (t *Transport) requestText(req *http.Request) string {
 	return b.String()
 }
 
-// responseText is an answer as a trace shows it. The start of its body is
-// read to show it and handed back in front of the rest, so whoever reads the
-// answer gets every byte, and what is not shown is never read here: a file
-// being downloaded stays a stream.
+// responseText is an answer as a trace shows it. The start of the body is read and put back in front of the rest, so the reader gets every byte and a
+// download stays a stream.
 func (t *Transport) responseText(resp *http.Response) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s %s\n", resp.Proto, resp.Status)
@@ -165,8 +167,7 @@ func (t *Transport) responseText(resp *http.Response) string {
 	switch {
 	case resp.Body == nil || resp.Body == http.NoBody:
 	case handedOver:
-		// a connection switched to another protocol is the caller's to
-		// read and write, not an answer to show
+		// a connection switched to another protocol is not an answer
 	case t.o.TraceBody < 0:
 		b.WriteString("\n(a body, not shown)")
 	case !textual(resp.Header.Get("Content-Type")):
@@ -204,10 +205,8 @@ func (t *Transport) writeHeaders(b *strings.Builder, h http.Header) {
 	}
 }
 
-// bodyText is the start of a body as a trace shows it: what is secret
-// blanked, JSON pretty-printed when all of it is there, and a note when
-// there was more than is shown. head holds one byte more than is shown when
-// the body went on.
+// bodyText is the start of a body as a trace shows it: secrets blanked, whole JSON laid out, and a note when there was more. head holds one byte past
+// the limit when the body went on.
 func (t *Transport) bodyText(head []byte, contentType string) string {
 	if len(head) == 0 {
 		return ""
@@ -216,8 +215,7 @@ func (t *Transport) bodyText(head []byte, contentType string) string {
 	limit, more := t.traceBody(), false
 	if len(head) > limit {
 		head, more = head[:limit], true
-		// not half a character: back to where the last one starts, and
-		// without it when the cut fell inside it
+		// not half a character
 		last := len(head)
 		for last > 0 && !utf8.RuneStart(head[last-1]) {
 			last--
@@ -249,14 +247,12 @@ func (t *Transport) bodyText(head []byte, contentType string) string {
 	return "\n" + text
 }
 
-// textual reports whether a body of this type is worth showing as text. One
-// that does not say what it is may be, and is shown if it turns out to be.
+// textual reports whether a body of this type is worth showing as text; one that does not say is tried.
 func textual(contentType string) bool {
 	mt := mediaType(contentType)
 	switch {
 	case mt == "", strings.HasPrefix(mt, "text/"):
-		// a stream of events never ends, and waiting for the start of one
-		// to show would hold its reader up
+		// an event stream never ends, and waiting for it would hold its reader up
 		return mt != "text/event-stream"
 	case strings.HasSuffix(mt, "json"), strings.HasSuffix(mt, "xml"), mt == "application/x-www-form-urlencoded", mt == "application/javascript", mt == "application/graphql":
 		return true
@@ -274,8 +270,7 @@ func mediaType(contentType string) string {
 	return mt
 }
 
-// contentOf says what a body that is not shown is: its type, and its length
-// where the server gave one.
+// contentOf says what a body not shown is: its type and, when given, its length.
 func contentOf(resp *http.Response) string {
 	what := mediaType(resp.Header.Get("Content-Type"))
 	if resp.ContentLength >= 0 {
@@ -285,10 +280,8 @@ func contentOf(resp *http.Response) string {
 	return what
 }
 
-// readAhead reads up to n bytes from the start of a body and returns them
-// with a body that gives every byte the first would have, those included,
-// and ends as it would have: the error a read ahead met is met again where
-// it was, not swallowed, so an answer cut short still reads as one.
+// readAhead reads up to n bytes of a body and returns them with a body that still gives every byte, those included, and meets the same error where it
+// was, so an answer cut short still reads as one.
 func readAhead(body io.ReadCloser, n int) ([]byte, io.ReadCloser) {
 	head := make([]byte, 0, n)
 	var err error

@@ -7,14 +7,8 @@ import (
 	"sync"
 )
 
-// Set is a set of locks of its own: what is locked in one set holds nobody
-// up in another, All included. An application that serves one world from
-// one process can use the package's own By, ByString and All, which share
-// one set; one that holds several, or a test that wants to see nothing was
-// left locked, makes a set with NewSet. The zero value is ready to use.
-//
-// A set keeps a lock for a key only while somebody holds or waits for it, so
-// a long-running server does not keep one for every record it ever touched.
+// Set is a set of locks of its own: what is locked in one holds nobody up in another, All included. The zero value is ready to use. A lock is kept
+// only while held or waited for, so a long-running server does not keep one for every record it ever touched.
 type Set struct {
 	all sync.RWMutex
 
@@ -33,8 +27,7 @@ func NewSet() *Set {
 	return &Set{}
 }
 
-// By locks every thing named, in this set, until unlock is called (see the
-// package's By).
+// By locks every thing named in this set until unlock is called (see By).
 func (s *Set) By(things ...Thing) (unlock func()) {
 	keys := make([]Key, 0, len(things))
 	for _, t := range things {
@@ -83,17 +76,14 @@ func (s *Set) ByString(key string) (unlock func()) {
 	return s.By(String(key))
 }
 
-// All locks everything there is or could be in this set: it waits for every
-// lock in it to be unlocked, and none is granted until it is.
+// All locks everything in this set (see All).
 func (s *Set) All() (unlock func()) {
 	s.all.Lock()
 
 	return s.all.Unlock
 }
 
-// Idle reports whether nothing in the set is locked and nobody waits for
-// anything in it: what a test asks once every call it made has returned, to
-// see that none left a lock behind.
+// Idle reports whether nothing is locked or waited for, for a test to see that no call left a lock behind.
 func (s *Set) Idle() bool {
 	if !s.all.TryLock() {
 		return false

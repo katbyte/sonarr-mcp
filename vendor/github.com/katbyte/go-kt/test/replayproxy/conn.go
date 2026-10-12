@@ -10,15 +10,13 @@ import (
 	"sync"
 )
 
-// readers are kept per connection: http.ReadRequest buffers ahead, so a fresh
-// bufio.Reader on every request would lose bytes belonging to the next one.
+// readers are kept per connection: a fresh reader per request would lose the bytes already buffered for the next.
 var (
 	readerMu sync.Mutex
 	readers  = map[net.Conn]*bufio.Reader{}
 )
 
-// dropReader forgets a connection's reader once the tunnel is closed, or
-// the map would hold a reader and its connection for the proxy's life.
+// dropReader forgets a closed tunnel's reader.
 func dropReader(c net.Conn) {
 	readerMu.Lock()
 	defer readerMu.Unlock()
@@ -38,17 +36,13 @@ func newReader(c net.Conn) *bufio.Reader {
 	return r
 }
 
-// connResponse is an http.ResponseWriter that writes an HTTP/1.1 response
-// directly onto a hijacked, TLS-terminated connection. net/http will not do
-// this for us: inside a CONNECT tunnel we are both the server and the
-// transport.
+// connResponse writes an HTTP/1.1 answer straight onto a hijacked connection: inside a tunnel the proxy is both server and transport.
 type connResponse struct {
 	conn   net.Conn
 	header http.Header
 	closed bool
 	wrote  bool
-	// last says the answer went out with no length, so it ends where the
-	// connection does and the tunnel must close behind it
+	// last is an answer with no length, which ends where the connection does, so the tunnel must close behind it
 	last bool
 }
 
@@ -66,10 +60,7 @@ func (c *connResponse) WriteHeader(status int) {
 	}
 	c.wrote = true
 
-	// an answer with no length ends where the connection does (http.Error
-	// writes one), and the tunnel is otherwise held open for the next
-	// request: the client would wait out the tunnel's idle minute for the
-	// end of a one-line body. Say this one closes, and close it (tunnel)
+	// an answer with no length ends where the connection does, so say this one closes, or the client waits out the idle minute for it
 	if c.Header().Get("Content-Length") == "" && bodyAllowed(status) {
 		c.Header().Set("Connection", "close")
 		c.last = true
@@ -78,7 +69,7 @@ func (c *connResponse) WriteHeader(status int) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "HTTP/1.1 %d %s\r\n", status, http.StatusText(status))
 
-	// deterministic header order keeps a tcpdump of a failing run readable
+	// a fixed header order keeps a capture of a failing run readable
 	names := make([]string, 0, len(c.Header()))
 	for name := range c.Header() {
 		names = append(names, name)

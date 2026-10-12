@@ -37,9 +37,9 @@ var sonarr = env.New("SONARR")
 // NotConfigured is what a test says when it skips for want of a container.
 const NotConfigured = "SONARR_SERVER, SONARR_TOKEN and SONARR_TEST_CONTAINER are not set; run: eval \"$(.scripts/testenv.sh up)\""
 
-// FakeKey is the API key both fakes demand, so a Sonarr that sent none would
-// be caught.
-const FakeKey = "sonarr-mcp-fake"
+// FakeKey is the API key both fakes demand, so a Sonarr that sent none would be caught. It is long and nothing's name, so that a suite reading
+// every answer for it finds it only where the key itself was shown.
+const FakeKey = "sonarr-mcp-fake-key-7c1e94a2d05b83f6"
 
 // Configured reports whether the container environment is present: a server,
 // a token and the container to start.

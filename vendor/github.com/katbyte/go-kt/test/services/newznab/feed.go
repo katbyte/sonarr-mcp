@@ -12,15 +12,13 @@ import (
 	"time"
 )
 
-// The namespaces the *arr parsers read a feed's attr elements from. They are
-// names, never fetched, and https would be other names.
+// The namespaces the *arr parsers read a feed's attr elements from. They are names, never fetched, and https would be other names.
 const (
 	newznabNamespace = "http://www.newznab.com/DTD/2010/feeds/attributes/" //nolint:revive // unsecure-url-scheme: a namespace's name, see above
 	torznabNamespace = "http://torznab.com/schemas/2015/feed"              //nolint:revive // unsecure-url-scheme: the same
 )
 
-// searchParams are the parameters each kind of search lists in an indexer's
-// capabilities, tv-search aside, which is the Site's to say.
+// searchParams are the parameters each kind of search lists in an indexer's capabilities, tv-search aside, which is the Site's to say.
 var searchParams = map[string]string{
 	SearchText:  "q",
 	SearchMovie: "q,imdbid,tmdbid",
@@ -29,12 +27,11 @@ var searchParams = map[string]string{
 	SearchBook:  "q,author,title",
 }
 
-// searchAudio is music-search's other name: one *arr reads the capabilities
-// for one, another for the other, so an indexer that offers music lists both.
+// searchAudio is music-search's other name: one *arr reads the capabilities for one, another for the other, so an indexer that offers music lists
+// both.
 const searchAudio = "audio-search"
 
-// capsDocument is the t=caps answer, what NewznabCapabilitiesProvider reads:
-// the page size, the kinds of search the indexer offers with their
+// capsDocument is the t=caps answer, what NewznabCapabilitiesProvider reads: the page size, the kinds of search the indexer offers with their
 // parameters, and its categories.
 func capsDocument(site *Site) string {
 	var b strings.Builder
@@ -66,10 +63,7 @@ func capsDocument(site *Site) string {
 	return b.String()
 }
 
-// feedDocument is a search's or an RSS sync's answer: an RSS 2.0 channel of
-// items with the attributes the *arr parsers read and the ones a real indexer
-// sends besides, in the newznab namespace for usenet and torznab for
-// torrents.
+// feedDocument is a search's answer: an RSS channel of items with the attributes the *arr parsers read, in the newznab or torznab namespace.
 func (ix *Indexer) feedDocument(site *Site, page []Release, offset, total int) string {
 	ns := "newznab"
 	if site.Protocol == Torrent {
@@ -152,8 +146,7 @@ func writeItem(b *strings.Builder, site *Site, base, ns string, r *Release) {
 	number("tvdbid", r.TVDBID)
 	number("tvmazeid", r.TvMazeID)
 	number("tmdbid", r.TMDBID)
-	// the IMDb id travels as its number alone, seven digits or more, which
-	// an *arr turns back into tt and the number
+	// the IMDb id travels as its number alone, seven digits or more, which an *arr turns back into tt and the number
 	if n := imdbNumber(r.IMDBID); n > 0 {
 		attr("imdb", fmt.Sprintf("%07d", n))
 	}
@@ -173,8 +166,7 @@ func writeItem(b *strings.Builder, site *Site, base, ns string, r *Release) {
 	b.WriteString("    </item>\n")
 }
 
-// downloadURL is where the feed says a release is, with the indexer's key,
-// because an *arr fetches the link as it stands.
+// downloadURL is where the feed says a release is, with the indexer's key, because an *arr fetches the link as it stands.
 func downloadURL(site *Site, base, guid string) string {
 	link := base + "/download/" + url.PathEscape(guid)
 	if site.APIKey != "" {
@@ -184,8 +176,7 @@ func downloadURL(site *Site, base, guid string) string {
 	return link
 }
 
-// categoryLabel is an item's category element, "TV > HD", from the
-// categories the indexer lists; a category it does not list is its number.
+// categoryLabel is an item's category element, "TV > HD", from the categories the indexer lists; a category it does not list is its number.
 func categoryLabel(site *Site, category int) string {
 	for _, c := range site.Categories {
 		if c.ID == category {
@@ -201,10 +192,7 @@ func categoryLabel(site *Site, category int) string {
 	return strconv.Itoa(category)
 }
 
-// nzbDocument is the NZB a fetch from a usenet indexer answers. An *arr's
-// NzbValidationService wants an nzb root with at least one file in its
-// namespace; a download client reads the size from the segments, so their
-// bytes add up to the release's size.
+// nzbDocument is the NZB a usenet fetch answers: at least one file, which an *arr checks for, with segments adding up to the release's size.
 func nzbDocument(r *Release) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
@@ -237,9 +225,7 @@ func nzbDocument(r *Release) string {
 // torrentPieceLength is the piece size of the torrents served.
 const torrentPieceLength = 1 << 22
 
-// torrentInfo is a release's torrent info dictionary, bencoded: one file of
-// its size, and a hash for every piece that size takes (zeroes: nothing is
-// ever downloaded), which a torrent parser checks the count of.
+// torrentInfo is a release's bencoded info dictionary: one file of its size, and a zero hash per piece, the count of which a parser checks.
 func torrentInfo(r *Release) string {
 	name := r.Title + ".mkv"
 	pieces := int((r.Size + torrentPieceLength - 1) / torrentPieceLength)
@@ -248,24 +234,21 @@ func torrentInfo(r *Release) string {
 	return fmt.Sprintf("d6:lengthi%de4:name%d:%s12:piece lengthi%de6:pieces%d:%s7:privatei1ee", r.Size, len(name), name, torrentPieceLength, len(hashes), hashes)
 }
 
-// torrentFile is the .torrent a fetch from a torrent indexer answers: a
-// tracker that is never reached, and the info dictionary.
+// torrentFile is the .torrent a fetch from a torrent indexer answers: a tracker that is never reached, and the info dictionary.
 func torrentFile(r *Release) string {
 	announce := "http://tracker.invalid/announce" //nolint:revive // unsecure-url-scheme: a tracker that is never reached, in a file a client must parse
 
 	return fmt.Sprintf("d8:announce%d:%s4:info%se", len(announce), announce, torrentInfo(r))
 }
 
-// infoHash is the SHA-1 of a release's info dictionary, as a torrent client
-// works it out.
+// infoHash is the SHA-1 of a release's info dictionary, as a torrent client works it out.
 func infoHash(r *Release) string {
 	sum := sha1.Sum([]byte(torrentInfo(r))) //nolint:gosec // the info hash is SHA-1 by definition
 
 	return hex.EncodeToString(sum[:])
 }
 
-// escape makes text safe in XML element content and in a double-quoted
-// attribute.
+// escape makes text safe in XML element content and in a double-quoted attribute.
 func escape(text string) string {
 	var b strings.Builder
 	_ = xml.EscapeText(&b, []byte(text))

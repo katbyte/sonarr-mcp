@@ -5,9 +5,7 @@ import "time"
 // waitPoll is how often a wait looks again.
 const waitPoll = 500 * time.Millisecond
 
-// Holds reports whether check stays true for a few seconds: a change the
-// server applies in the background (a refresh) that would undo something
-// shows within that.
+// Holds reports whether check stays true for a few seconds, long enough for a background refresh that would undo something to show.
 func Holds(check func() bool) bool {
 	for range 10 {
 		if !check() {
@@ -24,8 +22,7 @@ func Eventually(check func() bool) bool {
 	return EventuallyWithin(20*time.Second, check)
 }
 
-// EventuallyWithin is Eventually with its own patience, for work a server
-// queues behind whatever else it is doing: a refresh can wait on a scan's.
+// EventuallyWithin is Eventually with its own patience, for work queued behind a server's other work.
 func EventuallyWithin(patience time.Duration, check func() bool) bool {
 	for range int(patience / waitPoll) {
 		if check() {

@@ -10,8 +10,7 @@ import (
 	"time"
 )
 
-// The API's functions, the t= parameter, and the name a fetch of a release
-// is recorded under.
+// The API's functions, the t= parameter, and the name a fetch of a release is recorded under.
 const (
 	functionCaps     = "caps"
 	functionSearch   = "search"
@@ -29,13 +28,8 @@ const (
 	contentTypeTorrent = "application/x-bittorrent"
 )
 
-// ServeHTTP answers each indexer under its name: the Newznab API at
-// /<name>/api (or any path under the name that ends in /api, for an indexer
-// configured with an API path of its own) and a release at
-// /<name>/download/<guid>, which is where its feed says the release is.
-//
-// Nothing a request carries is written back in an answer: an error names the
-// parameter at fault and not what it was sent as.
+// ServeHTTP answers each indexer under its name: the API at /<name>/api, or any path under the name ending in /api, and a release at
+// /<name>/download/<guid>. An error names the parameter at fault, never what it was sent as.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	name, rest, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 	query := r.URL.Query()
@@ -71,8 +65,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// a real indexer answers its capabilities without a key; an *arr sends
-	// one anyway
+	// a real indexer answers its capabilities without a key; an *arr sends one anyway
 	if function == functionCaps {
 		writeXML(w, contentTypeXML, capsDocument(&site))
 
@@ -82,8 +75,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch key := query.Get("apikey"); {
 	case site.APIKey == "":
 	case key == "":
-		// an *arr reads "apikey" in the description of a request it sent
-		// without one as the indexer needing a key
+		// an *arr reads "apikey" in the description of a request it sent without one as the indexer needing a key
 		writeError(w, http.StatusOK, ErrMissingParameter, "Missing parameter (apikey)")
 
 		return
@@ -105,8 +97,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// misbehaves answers for an indexer that is failing, and reports whether it
-// did; false is to answer as a healthy one would.
+// misbehaves answers for an indexer that is failing, and reports whether it did; false is to answer as a healthy one would.
 func (ix *Indexer) misbehaves(w http.ResponseWriter, function string) bool {
 	ix.server.mu.Lock()
 	f := ix.site.Failure
@@ -132,9 +123,7 @@ func (ix *Indexer) misbehaves(w http.ResponseWriter, function string) bool {
 	return true
 }
 
-// flakes reports whether an indexer that fails now and then fails this call:
-// every Every-th search, and each one after it until the spell is over. The
-// caller holds the lock.
+// flakes reports whether a flaky indexer fails this call: every Every-th search, and each after it until the spell ends. The caller holds the lock.
 func (ix *Indexer) flakes(function string) bool {
 	if function == functionCaps || function == functionDownload {
 		return false
@@ -173,8 +162,7 @@ func (ix *Indexer) serveSearch(w http.ResponseWriter, function string, query url
 	writeXML(w, contentTypeRSS, ix.feedDocument(&site, page, q.offset, total))
 }
 
-// serveRelease answers a fetch with the release's NZB or torrent, and counts
-// the grab.
+// serveRelease answers a fetch with the release's NZB or torrent, and counts the grab.
 func (ix *Indexer) serveRelease(w http.ResponseWriter, guid string) {
 	guid = strings.TrimSuffix(strings.TrimSuffix(guid, ".nzb"), ".torrent")
 

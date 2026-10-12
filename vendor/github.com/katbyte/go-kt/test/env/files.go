@@ -10,18 +10,10 @@ import (
 	"testing"
 )
 
-// Files under the tree the server's container reads, bind-mounted from root
-// on this machine (Env.DataDir).
+// Files under the tree the server's container reads, bind-mounted from root on this machine (Env.DataDir).
 
-// Mkdir makes a directory under the bind-mounted tree at root that the
-// server's own user can write in, and WriteFile writes a file there. The mode
-// asked of MkdirAll and WriteFile is filtered by the process umask, which on
-// Linux leaves a directory nobody but the test can write to - so a server
-// running as another user in its container cannot delete a file the test laid
-// out, and a tool that asks it to fails. chmod is not filtered by the umask,
-// so the mode asked for is the mode applied. Docker Desktop hides this by
-// mapping every file to the container's user, which is why it only bites in
-// CI.
+// Mkdir makes a directory under root that the server's own user can write in. The umask narrows what MkdirAll gives, so on Linux the server could not
+// delete what the test laid out; chmod is not filtered. Docker Desktop hides this, so it only bites in CI.
 func Mkdir(t *testing.T, root, dir string) {
 	t.Helper()
 
@@ -35,8 +27,7 @@ func Mkdir(t *testing.T, root, dir string) {
 	}
 }
 
-// WriteFile writes a file the server's own user can write over or remove (see
-// Mkdir).
+// WriteFile writes a file the server's own user can write over or remove (see Mkdir).
 func WriteFile(t *testing.T, path string, data []byte) {
 	t.Helper()
 
@@ -48,8 +39,7 @@ func WriteFile(t *testing.T, path string, data []byte) {
 	}
 }
 
-// CopyTree copies a folder under the tree at root, and everything under it,
-// to a new place.
+// CopyTree copies a folder under the tree at root, and everything under it, to a new place.
 func CopyTree(t *testing.T, root, src, dst string) {
 	t.Helper()
 
@@ -75,9 +65,7 @@ func CopyTree(t *testing.T, root, src, dst string) {
 	}
 }
 
-// TreeOf reads every folder and file under root, a folder ending in "/", so
-// a test can hold the disk to what it was. skip leaves those paths, and
-// whatever is under them, out.
+// TreeOf reads everything under root, folders ending in "/", so a test can hold the disk to what it was; skip leaves those paths out.
 func TreeOf(t *testing.T, root string, skip ...string) map[string][]byte {
 	t.Helper()
 
@@ -107,8 +95,7 @@ func TreeOf(t *testing.T, root string, skip ...string) map[string][]byte {
 	return out
 }
 
-// SameTree fails for every path that changed, went or appeared between two
-// reads of a tree (TreeOf), named without root.
+// SameTree fails for every path that changed, went or appeared between two reads of a tree (TreeOf), named without root.
 func SameTree(t *testing.T, root string, before, after map[string][]byte) {
 	t.Helper()
 
@@ -117,8 +104,7 @@ func SameTree(t *testing.T, root string, before, after map[string][]byte) {
 	}
 }
 
-// treeChanges names every path that differs between two reads of a tree, in
-// order.
+// treeChanges names every path that differs between two reads of a tree, in order.
 func treeChanges(root string, before, after map[string][]byte) []string {
 	var out []string
 	for path, raw := range before {
@@ -136,8 +122,7 @@ func treeChanges(root string, before, after map[string][]byte) []string {
 	return out
 }
 
-// FilesUnder reads every file under the folders, to hold them to later
-// (StillOnDisk); folders with nothing under them fail the test.
+// FilesUnder reads every file under the folders, to hold them to later (StillOnDisk); folders with nothing under them fail the test.
 func FilesUnder(t *testing.T, dirs ...string) map[string][]byte {
 	t.Helper()
 
@@ -162,8 +147,7 @@ func FilesUnder(t *testing.T, dirs ...string) map[string][]byte {
 	return out
 }
 
-// StillOnDisk checks every file read by FilesUnder is where it was, as it
-// was, after what the test did (after), naming a file without root.
+// StillOnDisk checks every file read by FilesUnder is where it was, as it was, after what the test did (after), naming a file without root.
 func StillOnDisk(t *testing.T, root string, files map[string][]byte, after string) {
 	t.Helper()
 
@@ -172,8 +156,7 @@ func StillOnDisk(t *testing.T, root string, files map[string][]byte, after strin
 	}
 }
 
-// filesChanged names every file that is no longer on disk as it was read,
-// in order.
+// filesChanged names every file that is no longer on disk as it was read, in order.
 func filesChanged(root string, files map[string][]byte, after string) []string {
 	var out []string
 	for path, raw := range files {

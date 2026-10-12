@@ -17,25 +17,15 @@ import (
 	"unicode/utf8"
 )
 
-// maxBodyBytes caps what a cassette stores. It is generous because a search
-// page, an episode list or a podcast feed runs to hundreds of kilobytes and
-// has to replay intact or the server will not decode it; what must never be
-// committed is media, which elideTypes catches regardless of size.
+// maxBodyBytes caps what a cassette stores: generous, since a feed runs to hundreds of kilobytes and must replay intact. Media is caught by type.
 const maxBodyBytes = 4 << 20
 
-// elideTypes are the content types stored as a placeholder however small they
-// are: committing a service's artwork, audio or video to the repository is
-// never right, and neither is what these tests assert on. A binary blob under
-// application/octet-stream (a plugin's dll, an installer, a CDN serving an
-// episode that way) is elided the same way, told by the NUL bytes text never
-// holds; the text a server fetches under that type (a list of names, in
-// whatever encoding) is kept.
+// elideTypes are the content types stored as a placeholder however small: a service's artwork or audio never belongs in the repository. A binary blob
+// under application/octet-stream is elided the same way, told by its NUL bytes; text under that type is kept.
 var elideTypes = []string{"audio/", "video/", "image/", "application/x-msdownload"}
 
-// volatileHeaders change on every response and would make a re-record a large
-// meaningless diff. Most are not secret, but a CDN's request ids can carry the
-// edge address and metro area of the machine that recorded, which has no
-// business in a repository either.
+// volatileHeaders change on every answer and would make a re-record a meaningless diff; a CDN's request ids can also say where the recording machine
+// was.
 var volatileHeaders = map[string]bool{
 	"age":                            true,
 	"akamai-cache-status":            true,
@@ -112,9 +102,7 @@ type interaction struct {
 	ElidedSize int    `json:"elided_size,omitempty"`
 }
 
-// bytes returns the response body to serve for this interaction. An elided
-// media body becomes the smallest valid file of that kind, so the server can
-// still decode and store it.
+// bytes is the body to serve; an elided media body becomes the smallest valid file of its kind, so the server can still decode it.
 func (i *interaction) bytes() []byte {
 	switch {
 	case i.Elided:
@@ -137,9 +125,7 @@ func (i *interaction) bytes() []byte {
 	}
 }
 
-// setBody stores b as text when it is valid UTF-8, and base64 otherwise, so a
-// JSON or XML cassette stays readable in a diff. contentType decides whether
-// the body is media that must never be committed.
+// setBody stores b as text when it is UTF-8, base64 otherwise, and elides media by its type.
 func (i *interaction) setBody(b []byte, contentType string) {
 	ct := strings.ToLower(contentType)
 	for _, t := range elideTypes {
@@ -159,8 +145,7 @@ func (i *interaction) setBody(b []byte, contentType string) {
 	i.BodyBase64 = base64.StdEncoding.EncodeToString(b)
 }
 
-// clone copies an interaction, so one copy can be redacted and the other
-// not.
+// clone copies an interaction, so one copy can be redacted and the other not.
 func (i *interaction) clone() *interaction {
 	c := *i
 	c.Headers = maps.Clone(i.Headers)
@@ -168,9 +153,7 @@ func (i *interaction) clone() *interaction {
 	return &c
 }
 
-// redact replaces the value of each named JSON field in the body, and the
-// same value wherever a header carries it: one service answers a new request
-// token in the body and again in a link in a header.
+// redact blanks each named JSON field in the body, and the same value in any header, where one service repeats a token.
 func (i *interaction) redact(fields []string) {
 	var secrets []string
 	i.Body, secrets = redactJSONFields(i.Body, fields)
@@ -212,6 +195,10 @@ func newStore(dir string) (*store, error) {
 		dirty:  map[string]bool{},
 	}
 
+	if dir == "" {
+		return s, nil // a proxy that keeps no recordings
+	}
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -240,9 +227,7 @@ func newStore(dir string) (*store, error) {
 	return s, nil
 }
 
-// key identifies a request by everything that changes the response: method,
-// host, path, and the query with its parameters sorted so ordering does not
-// produce a spurious miss.
+// key identifies a request by all that changes its answer: method, host, path and the query, sorted.
 func key(method, host, path string, query url.Values) string {
 	var b strings.Builder
 	b.WriteString(strings.ToUpper(method))
@@ -291,8 +276,7 @@ func (s *store) put(host string, i *interaction) {
 	s.dirty[host] = true
 }
 
-// flush writes every changed cassette, sorted by key so a re-record produces a
-// minimal diff.
+// flush writes every changed cassette, sorted by key for a small diff.
 func (s *store) flush() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -322,8 +306,7 @@ func (s *store) flush() error {
 	return nil
 }
 
-// hostFile is the cassette filename for a host, with the characters that are
-// awkward in a path replaced.
+// hostFile is a host's cassette file name.
 func hostFile(host string) string {
 	return strings.NewReplacer(":", "_", "/", "_").Replace(host) + ".json"
 }
@@ -341,21 +324,15 @@ func keepHeaders(h http.Header) map[string]string {
 	return out
 }
 
-// redactedValue replaces a credential in a recorded body. It is not valid for
-// anything, which is the point: a cassette that is replayed never needs one.
-// The wording is the one the cassettes recorded before this package was
-// shared already hold, which is how a recording is told to be redacted.
+// redactedValue replaces a credential in a recorded body; the wording is what older cassettes already hold, and is how a recording is known to be
+// redacted.
 const redactedValue = "redacted by the provider proxy"
 
-// elidedBody is what is served for an elided body that is no image, worded
-// as it always was so replay answers what it did.
+// elidedBody is served for an elided body that is no image.
 const elidedBody = "elided by the provider proxy"
 
-// redactJSONFields replaces the string value of each named field in a JSON
-// body, leaving every other byte where it was so a re-record is a small diff
-// and the key order the service sent is kept. A value carrying an escaped
-// quote is matched too. Nothing is parsed: a body that is not JSON has no
-// field to match and comes back unchanged.
+// redactJSONFields blanks each named string field in a JSON body, leaving every other byte in place so a re-record is a small diff; nothing is
+// parsed, so a body that is not JSON comes back as it was.
 func redactJSONFields(body string, fields []string) (redacted string, secrets []string) {
 	if body == "" || len(fields) == 0 {
 		return body, nil

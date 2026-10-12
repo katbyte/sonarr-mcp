@@ -19,8 +19,7 @@ import (
 	"time"
 )
 
-// The API's modes, and the actions within them, that Sonarr's SabnzbdProxy
-// uses, plus the few around them a test might.
+// The API's modes, and the actions within them, that Sonarr's SabnzbdProxy uses, plus the few around them a test might.
 const (
 	modeVersion    = "version"
 	modeGetConfig  = "get_config"
@@ -40,20 +39,17 @@ const (
 // maxUpload caps an NZB upload; a real one runs to a few megabytes.
 const maxUpload = 64 << 20
 
-// SABnzbd's own words for a failed call (its api.py), which Sonarr puts in
-// front of whoever reads its error.
+// SABnzbd's own words for a failed call (its api.py), which Sonarr puts in front of whoever reads its error.
 const (
 	msgNoValue        = "expects one parameter"
 	msgNoItem         = "item does not exist"
 	msgNotImplemented = "not implemented"
 )
 
-// noScript is how SABnzbd names a job's post-processing script when it has
-// none.
+// noScript is how SABnzbd names a job's post-processing script when it has none.
 const noScript = "None"
 
-// ServeHTTP answers the SABnzbd API on /api (any path ending in /api, so a
-// client configured with a URL base such as /sabnzbd works too), always as
+// ServeHTTP answers the SABnzbd API on /api (any path ending in /api, so a client configured with a URL base such as /sabnzbd works too), always as
 // JSON, which is what Sonarr asks for.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/api" && !strings.HasSuffix(r.URL.Path, "/api") {
@@ -80,8 +76,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	s.mu.Unlock()
 
-	// SABnzbd answers version to anyone; everything else needs the key, and a
-	// missing or wrong one is a JSON error under a 200, whose words Sonarr's
+	// SABnzbd answers version to anyone; everything else needs the key, and a missing or wrong one is a JSON error under a 200, whose words Sonarr's
 	// TestAuthentication looks for
 	if mode != modeVersion && s.apiKey != "" {
 		switch params.Get("apikey") {
@@ -104,9 +99,8 @@ type upload struct {
 	data     []byte
 }
 
-// parseRequest reads the query and form, and the uploaded file of a
-// multipart POST, which is how Sonarr's DownloadNzb sends an NZB: the file in
-// a part named "name", cat and priority in the query.
+// parseRequest reads the query and form, and the uploaded file of a multipart POST, which is how Sonarr's DownloadNzb sends an NZB: the file in a
+// part named "name", cat and priority in the query.
 func parseRequest(w http.ResponseWriter, r *http.Request) (upload, error) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
@@ -173,24 +167,18 @@ func (s *Server) answer(mode string, params url.Values, up upload) any {
 	}
 }
 
-// configAnswer is get_config, as Sonarr's checks of a new client want it: a
-// rooted complete folder; the "*" and Sonarr's category, with job folders
-// (a dir not ending in *); no sorter active on the category; no pre-check;
-// and history kept, so Sonarr does not warn that completed downloads vanish
-// before it can import them.
+// configAnswer is get_config as Sonarr's checks of a new client want it: a rooted complete folder, the category with job folders, no sorter on it, no
+// pre-check, history kept.
 func (s *Server) configAnswer() configAnswer {
 	return configAnswer{Config: config{
 		Misc: configMisc{
 			CompleteDir:            s.completeDir,
 			DownloadDir:            s.incompleteDir(),
-			PreCheck:               0,
-			HistoryRetention:       "",
 			HistoryRetentionOption: "all",
-			HistoryRetentionNumber: 0,
 		},
 		Categories: []configCategory{
-			{Name: "*", Order: 0, PP: "3", Script: noScript, Dir: "", Priority: PriorityNormal},
-			{Name: s.category, Order: 1, PP: "", Script: "Default", Dir: "", Priority: PriorityDefault},
+			{Name: "*", PP: "3", Script: noScript, Priority: PriorityNormal},
+			{Name: s.category, Order: 1, Script: "Default", Priority: PriorityDefault},
 		},
 		Servers: []configServer{},
 		Sorters: []configSorter{},
@@ -239,8 +227,7 @@ func (s *Server) historyCall(params url.Values) any {
 		return s.historyListing(params)
 	case actionDelete:
 		ids := splitIDs(params.Get("value"))
-		// SABnzbd 4 archives unless told archive=0, and Sonarr says
-		// archive=0 only for a failed download
+		// SABnzbd 4 archives unless told archive=0, and Sonarr says archive=0 only for a failed download
 		archive := params.Get("archive") != "0"
 		for _, j := range s.history() {
 			if !ids.matchHistory(j) {
@@ -261,8 +248,7 @@ func (s *Server) historyCall(params url.Values) any {
 	}
 }
 
-// queueListing is the queue, filtered and paged the way SabnzbdProxy.GetQueue
-// asks: start and limit (0 is everything) and the category.
+// queueListing is the queue, filtered and paged the way SabnzbdProxy.GetQueue asks: start and limit (0 is everything) and the category.
 func (s *Server) queueListing(params url.Values) queueAnswer {
 	var jobs []*Job
 	for _, j := range s.queue() {
@@ -290,7 +276,6 @@ func (s *Server) queueListing(params url.Values) queueAnswer {
 			Script:     noScript,
 			Filename:   j.Name,
 			Labels:     []string{},
-			Password:   "",
 			Cat:        j.Category,
 			MBLeft:     megabytes(remaining),
 			MB:         megabytes(j.Size),
@@ -334,8 +319,7 @@ func (s *Server) queueListing(params url.Values) queueAnswer {
 	}}
 }
 
-// historyListing is the history, newest first, filtered and paged the way
-// SabnzbdProxy.GetHistory asks: start, limit (Sonarr's history limit, 60 by
+// historyListing is the history, newest first, filtered and paged the way SabnzbdProxy.GetHistory asks: start, limit (Sonarr's history limit, 60 by
 // default) and the category.
 func (s *Server) historyListing(params url.Values) historyAnswer {
 	archived := params.Get("archive") == "1"
@@ -389,7 +373,6 @@ func (s *Server) historyListing(params url.Values) historyAnswer {
 
 	return historyAnswer{History: history{
 		NoOfSlots:         total,
-		PPSlots:           0,
 		DaySize:           humanSize(totalBytes),
 		WeekSize:          humanSize(totalBytes),
 		MonthSize:         humanSize(totalBytes),
@@ -399,17 +382,15 @@ func (s *Server) historyListing(params url.Values) historyAnswer {
 	}}
 }
 
-// addFile is mode=addfile: a job from the uploaded NZB, sized from its
-// segments, named after nzbname or the file, in the category asked for.
+// addFile is mode=addfile: a job from the uploaded NZB, sized from its segments, named after nzbname or the file, in the category asked for.
 func (s *Server) addFile(params url.Values, up upload) any {
 	if up.data == nil {
 		return failure(msgNoValue)
 	}
 	size, err := nzbSize(up.data)
 	if err != nil {
-		// SABnzbd answers what is not an NZB with no job and status false,
-		// which Sonarr's CheckForError turns into a failed grab
-		return addAnswer{Status: false, NzoIDs: []string{}}
+		// SABnzbd answers what is not an NZB with no job and status false, which Sonarr's CheckForError turns into a failed grab
+		return addAnswer{NzoIDs: []string{}}
 	}
 	name := params.Get("nzbname")
 	if name == "" {
@@ -423,8 +404,7 @@ func (s *Server) addFile(params url.Values, up upload) any {
 	return addAnswer{Status: true, NzoIDs: []string{j.ID}}
 }
 
-// addURL is mode=addurl: a job for the NZB at a URL, which SABnzbd would
-// fetch itself. Sonarr downloads the NZB and uses addfile instead, so this
+// addURL is mode=addurl: a job for the NZB at a URL, which SABnzbd would fetch itself. Sonarr downloads the NZB and uses addfile instead, so this
 // only records where it was to come from.
 func (s *Server) addURL(params url.Values) any {
 	link := params.Get("name")
@@ -466,8 +446,7 @@ func (s *Server) drop(j *Job) {
 	}
 }
 
-// deleteFiles removes a finished job's folder, never anything outside the
-// complete folder.
+// deleteFiles removes a finished job's folder, never anything outside the complete folder.
 func (s *Server) deleteFiles(j *Job) {
 	if j.HostPath == "" || s.hostCompleteDir == "" {
 		return
@@ -479,12 +458,10 @@ func (s *Server) deleteFiles(j *Job) {
 	j.HostPath = ""
 }
 
-// incompleteDir is where SABnzbd would download into, beside the complete
-// folder.
+// incompleteDir is where SABnzbd would download into, beside the complete folder.
 func (s *Server) incompleteDir() string { return path.Join(path.Dir(s.completeDir), "incomplete") }
 
-// timeLeft is a queued job's time to finish at the speed configured; nothing
-// while it or the queue is paused.
+// timeLeft is a queued job's time to finish at the speed configured; nothing while it or the queue is paused.
 func (s *Server) timeLeft(j *Job) string {
 	if s.paused || j.Status == StatusPaused {
 		return "0:00:00"
@@ -498,8 +475,7 @@ func (j *Job) remaining() int64 {
 	return j.Size - int64(float64(j.Size)*j.Progress)
 }
 
-// listed reports whether a job passes a listing's filters: category (cat on
-// older clients), nzo_ids and search.
+// listed reports whether a job passes a listing's filters: category (cat on older clients), nzo_ids and search.
 func listed(j *Job, params url.Values) bool {
 	if c := cmp.Or(params.Get("category"), params.Get("cat")); c != "" && !strings.EqualFold(c, j.Category) {
 		return false
@@ -535,8 +511,7 @@ func window(jobs []*Job, start, limit int) []*Job {
 	return jobs
 }
 
-// ids is the value= of an action: nzo_ids, comma-separated, or a word for
-// every job ("all"), or in the history every failed or completed one.
+// ids is the value= of an action: nzo_ids, comma-separated, or a word for every job ("all"), or in the history every failed or completed one.
 type ids []string
 
 func splitIDs(value string) ids {
@@ -571,8 +546,7 @@ func (v ids) matchHistory(j *Job) bool {
 	return v.match(j.ID)
 }
 
-// priority is addfile's priority= parameter; the category's default when
-// absent.
+// priority is addfile's priority= parameter; the category's default when absent.
 func priority(params url.Values) int {
 	p, err := strconv.Atoi(params.Get("priority"))
 	if err != nil {
@@ -582,8 +556,7 @@ func priority(params url.Values) int {
 	return p
 }
 
-// priorityName is how a queue slot shows a priority; Sonarr parses it back
-// to its SabnzbdPriority by name.
+// priorityName is how a queue slot shows a priority; Sonarr parses it back to its SabnzbdPriority by name.
 func priorityName(p int) string {
 	switch p {
 	case PriorityForce:
@@ -608,8 +581,7 @@ func trimNZB(name string) string {
 	return name
 }
 
-// nzbSize checks data is an NZB - an nzb root with at least one file, what
-// SABnzbd accepts - and adds up its segments' bytes.
+// nzbSize checks data is an NZB - an nzb root with at least one file, what SABnzbd accepts - and adds up its segments' bytes.
 func nzbSize(data []byte) (int64, error) {
 	dec := xml.NewDecoder(bytes.NewReader(data))
 	var size int64
@@ -648,8 +620,7 @@ func nzbSize(data []byte) (int64, error) {
 	return size, nil
 }
 
-// megabytes is a size in MiB, as the queue's mb and mbleft carry it: a
-// string, which Sonarr reads as a decimal.
+// megabytes is a size in MiB, as the queue's mb and mbleft carry it: a string, which Sonarr reads as a decimal.
 func megabytes(n int64) string {
 	return fmt.Sprintf("%.2f", float64(n)/(1<<20))
 }
@@ -671,8 +642,7 @@ func humanSize(n int64) string {
 	return fmt.Sprintf("%.1f %s", value, suffix)
 }
 
-// formatDuration is a time left as SABnzbd writes it, h:mm:ss, or d:hh:mm:ss
-// past a day, the two shapes Sonarr's SabnzbdQueueTimeConverter reads.
+// formatDuration is a time left as SABnzbd writes it, h:mm:ss, or d:hh:mm:ss past a day, the two shapes Sonarr's SabnzbdQueueTimeConverter reads.
 func formatDuration(d time.Duration) string {
 	total := int(d.Seconds())
 	days, hours, minutes, seconds := total/86400, total/3600%24, total/60%60, total%60
