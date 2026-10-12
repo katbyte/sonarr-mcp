@@ -10,13 +10,13 @@ type HistoryResource struct {
 	Date                string                  `json:"date,omitempty"`
 	DownloadId          string                  `json:"downloadId,omitempty"`
 	Episode             *EpisodeResource        `json:"episode,omitempty"`
-	EpisodeId           int                     `json:"episodeId,omitempty"`
+	EpisodeId           EpisodeID               `json:"episodeId,omitempty"`
 	EventType           EpisodeHistoryEventType `json:"eventType,omitempty"`
 	Id                  int                     `json:"id,omitempty"`
 	Languages           []Language              `json:"languages,omitzero"`
 	Quality             *QualityModel           `json:"quality,omitempty"`
-	QualityCutoffNotMet *bool                   `json:"qualityCutoffNotMet,omitempty"`
+	QualityCutoffNotMet bool                    `json:"qualityCutoffNotMet"`
 	Series              *SeriesResource         `json:"series,omitempty"`
-	SeriesId            int                     `json:"seriesId,omitempty"`
+	SeriesId            SeriesID                `json:"seriesId,omitempty"`
 	SourceTitle         string                  `json:"sourceTitle,omitempty"`
 }

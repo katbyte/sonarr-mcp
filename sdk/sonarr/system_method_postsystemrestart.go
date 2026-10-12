@@ -9,18 +9,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostSystemRestartOperationResponse is the result of PostSystemRestart.
-type PostSystemRestartOperationResponse struct {
+// PostSystemRestartResponse is the result of PostSystemRestart.
+type PostSystemRestartResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostSystemRestart calls POST /api/v3/system/restart.
-func (c Client) PostSystemRestart(ctx context.Context) (result PostSystemRestartOperationResponse, err error) {
+func (c Client) PostSystemRestart(ctx context.Context) (result PostSystemRestartResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostSystemRestart",
 		Path:       "/api/v3/system/restart",
 	}
 

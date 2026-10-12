@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetHealthOperationResponse is the result of GetHealth.
-type GetHealthOperationResponse struct {
+// GetHealthResponse is the result of GetHealth.
+type GetHealthResponse struct {
 	HttpResponse *http.Response
-	Model        []HealthResource
+	Answer       []HealthResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetHealthResponse) Answered() bool { return r.Answer != nil }
+
 // GetHealth calls GET /api/v3/health.
-func (c Client) GetHealth(ctx context.Context) (result GetHealthOperationResponse, err error) {
+func (c Client) GetHealth(ctx context.Context) (result GetHealthResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetHealth",
 		Path:       "/api/v3/health",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetHealth(ctx context.Context) (result GetHealthOperationRespons
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

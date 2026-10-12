@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetDownloadClientByIdOperationResponse is the result of GetDownloadClientById.
-type GetDownloadClientByIdOperationResponse struct {
+// GetDownloadClientByIdResponse is the result of GetDownloadClientById.
+//
+// Answer is the DownloadClientResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetDownloadClientByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *DownloadClientResource
+	Answer       *DownloadClientResource
+	*DownloadClientResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetDownloadClientByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the DownloadClientResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetDownloadClientByIdResponse) Record() (DownloadClientResource, error) {
+	if r.Answer == nil {
+		return DownloadClientResource{}, errors.New("GetDownloadClientById answered no DownloadClientResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetDownloadClientById calls GET /api/v3/downloadclient/{id}.
-func (c Client) GetDownloadClientById(ctx context.Context, id int) (result GetDownloadClientByIdOperationResponse, err error) {
+func (c Client) GetDownloadClientById(ctx context.Context, id int) (result GetDownloadClientByIdResponse, err error) {
+	result.DownloadClientResource = &DownloadClientResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetDownloadClientById",
 		Path:       fmt.Sprintf("/api/v3/downloadclient/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetDownloadClientById(ctx context.Context, id int) (result GetDo
 		return
 	}
 
-	var model DownloadClientResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer DownloadClientResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.DownloadClientResource = result.Answer
 
 	return
 }

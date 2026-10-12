@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostImportListTestAllOperationResponse is the result of PostImportListTestAll.
-type PostImportListTestAllOperationResponse struct {
+// PostImportListTestAllResponse is the result of PostImportListTestAll.
+type PostImportListTestAllResponse struct {
 	HttpResponse *http.Response
-	Model        []ProviderTestAllResult
+	Answer       []ProviderTestAllResult
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostImportListTestAllResponse) Answered() bool { return r.Answer != nil }
+
 // PostImportListTestAll calls POST /api/v3/importlist/testall.
-func (c Client) PostImportListTestAll(ctx context.Context) (result PostImportListTestAllOperationResponse, err error) {
+func (c Client) PostImportListTestAll(ctx context.Context) (result PostImportListTestAllResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 			http.StatusBadRequest,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostImportListTestAll",
 		Path:       "/api/v3/importlist/testall",
 	}
 
@@ -40,7 +45,7 @@ func (c Client) PostImportListTestAll(ctx context.Context) (result PostImportLis
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

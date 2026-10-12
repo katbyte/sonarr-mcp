@@ -97,7 +97,8 @@
           "Name": "QualityProfileId",
           "JsonName": "qualityProfileId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "QualityProfileID"
           },
           "Nullable": true
         },
@@ -123,7 +124,8 @@
           "Type": {
             "Type": "List",
             "NestedItem": {
-              "Type": "Integer"
+              "Type": "ID",
+              "ReferenceName": "SeriesID"
             }
           },
           "Nullable": true
@@ -142,7 +144,8 @@
           "Type": {
             "Type": "List",
             "NestedItem": {
-              "Type": "Integer"
+              "Type": "ID",
+              "ReferenceName": "TagID"
             }
           },
           "Nullable": true

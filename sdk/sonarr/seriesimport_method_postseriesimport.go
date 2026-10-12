@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostSeriesImportOperationResponse is the result of PostSeriesImport.
-type PostSeriesImportOperationResponse struct {
+// PostSeriesImportResponse is the result of PostSeriesImport.
+type PostSeriesImportResponse struct {
 	HttpResponse *http.Response
-	Model        []SeriesResource
+	Answer       []SeriesResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostSeriesImportResponse) Answered() bool { return r.Answer != nil }
+
 // PostSeriesImport calls POST /api/v3/series/import.
-func (c Client) PostSeriesImport(ctx context.Context, input []SeriesResource) (result PostSeriesImportOperationResponse, err error) {
+func (c Client) PostSeriesImport(ctx context.Context, input []SeriesResource) (result PostSeriesImportResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostSeriesImport",
 		Path:       "/api/v3/series/import",
 	}
 
@@ -44,7 +49,7 @@ func (c Client) PostSeriesImport(ctx context.Context, input []SeriesResource) (r
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

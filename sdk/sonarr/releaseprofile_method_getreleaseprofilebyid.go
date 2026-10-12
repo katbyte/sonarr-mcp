@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetReleaseProfileByIdOperationResponse is the result of GetReleaseProfileById.
-type GetReleaseProfileByIdOperationResponse struct {
+// GetReleaseProfileByIdResponse is the result of GetReleaseProfileById.
+//
+// Answer is the ReleaseProfileResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetReleaseProfileByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *ReleaseProfileResource
+	Answer       *ReleaseProfileResource
+	*ReleaseProfileResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetReleaseProfileByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the ReleaseProfileResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetReleaseProfileByIdResponse) Record() (ReleaseProfileResource, error) {
+	if r.Answer == nil {
+		return ReleaseProfileResource{}, errors.New("GetReleaseProfileById answered no ReleaseProfileResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetReleaseProfileById calls GET /api/v3/releaseprofile/{id}.
-func (c Client) GetReleaseProfileById(ctx context.Context, id int) (result GetReleaseProfileByIdOperationResponse, err error) {
+func (c Client) GetReleaseProfileById(ctx context.Context, id int) (result GetReleaseProfileByIdResponse, err error) {
+	result.ReleaseProfileResource = &ReleaseProfileResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetReleaseProfileById",
 		Path:       fmt.Sprintf("/api/v3/releaseprofile/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetReleaseProfileById(ctx context.Context, id int) (result GetRe
 		return
 	}
 
-	var model ReleaseProfileResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer ReleaseProfileResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.ReleaseProfileResource = result.Answer
 
 	return
 }

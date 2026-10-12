@@ -4,28 +4,51 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutReleaseProfileByIdOperationResponse is the result of PutReleaseProfileById.
-type PutReleaseProfileByIdOperationResponse struct {
+// PutReleaseProfileByIdResponse is the result of PutReleaseProfileById.
+//
+// Answer is the ReleaseProfileResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutReleaseProfileByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *ReleaseProfileResource
+	Answer       *ReleaseProfileResource
+	*ReleaseProfileResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutReleaseProfileByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the ReleaseProfileResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutReleaseProfileByIdResponse) Record() (ReleaseProfileResource, error) {
+	if r.Answer == nil {
+		return ReleaseProfileResource{}, errors.New("PutReleaseProfileById answered no ReleaseProfileResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PutReleaseProfileById calls PUT /api/v3/releaseprofile/{id}.
-func (c Client) PutReleaseProfileById(ctx context.Context, id string, input ReleaseProfileResource) (result PutReleaseProfileByIdOperationResponse, err error) {
+func (c Client) PutReleaseProfileById(ctx context.Context, id int, input ReleaseProfileResource) (result PutReleaseProfileByIdResponse, err error) {
+	result.ReleaseProfileResource = &ReleaseProfileResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
-		Path:       fmt.Sprintf("/api/v3/releaseprofile/%s", url.PathEscape(id)),
+		Operation:  "PutReleaseProfileById",
+		Path:       fmt.Sprintf("/api/v3/releaseprofile/%d", id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -46,11 +69,12 @@ func (c Client) PutReleaseProfileById(ctx context.Context, id string, input Rele
 		return
 	}
 
-	var model ReleaseProfileResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer ReleaseProfileResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.ReleaseProfileResource = result.Answer
 
 	return
 }

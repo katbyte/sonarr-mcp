@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetConfigImportListByIdOperationResponse is the result of GetConfigImportListById.
-type GetConfigImportListByIdOperationResponse struct {
+// GetConfigImportListByIdResponse is the result of GetConfigImportListById.
+//
+// Answer is the ImportListConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetConfigImportListByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *ImportListConfigResource
+	Answer       *ImportListConfigResource
+	*ImportListConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetConfigImportListByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the ImportListConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetConfigImportListByIdResponse) Record() (ImportListConfigResource, error) {
+	if r.Answer == nil {
+		return ImportListConfigResource{}, errors.New("GetConfigImportListById answered no ImportListConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetConfigImportListById calls GET /api/v3/config/importlist/{id}.
-func (c Client) GetConfigImportListById(ctx context.Context, id int) (result GetConfigImportListByIdOperationResponse, err error) {
+func (c Client) GetConfigImportListById(ctx context.Context, id int) (result GetConfigImportListByIdResponse, err error) {
+	result.ImportListConfigResource = &ImportListConfigResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetConfigImportListById",
 		Path:       fmt.Sprintf("/api/v3/config/importlist/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetConfigImportListById(ctx context.Context, id int) (result Get
 		return
 	}
 
-	var model ImportListConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer ImportListConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.ImportListConfigResource = result.Answer
 
 	return
 }

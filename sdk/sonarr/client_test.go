@@ -8,12 +8,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
+
+	"github.com/katbyte/pandorest/client"
 )
 
 // operationServer is a canned server that answers every request with one
-// status, content type and body, and records what it was sent.
+// status, content type and body, and records what it was sent. queued, when
+// set, is the status a POST gets instead, for a command queued and then polled.
 type operationServer struct {
+	queued int
 	*httptest.Server
 	requests []*http.Request
 	bodies   []string
@@ -30,6 +35,17 @@ func newOperationServer(t *testing.T, status int, contentType, body string) (*Cl
 		s.bodies = append(s.bodies, string(b))
 		if contentType != "" {
 			w.Header().Set("Content-Type", contentType)
+		}
+		if body == "file bytes" {
+			// a file is named, as a server names one it serves
+			w.Header().Set("Content-Disposition", "attachment; filename=\"answer.bin\"")
+		}
+		if s.queued != 0 && r.Method == http.MethodPost {
+			// a command queued, answered as the queueing operation does; the polls after it get the status
+			w.WriteHeader(s.queued)
+			_, _ = io.WriteString(w, body)
+
+			return
 		}
 		w.WriteHeader(status)
 		_, _ = io.WriteString(w, body)
@@ -113,5 +129,15 @@ func TestNew(t *testing.T) {
 	c, err := New("http://server/", "test-token")
 	if err != nil || c.Client.BaseURL != "http://server" {
 		t.Errorf("New = %+v, %v", c, err)
+	}
+
+	// a refusal that echoes the credential does not repeat it
+	c, _ = newOperationServer(t, 401, "application/json", `{"message": "the key test-token is not known"}`)
+	req, err := c.Client.NewRequest(t.Context(), client.RequestOptions{HTTPMethod: http.MethodGet, Path: "/x", ExpectedStatusCodes: []int{http.StatusOK}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := req.Execute(t.Context()); err == nil || strings.Contains(err.Error(), "test-token") || !strings.Contains(err.Error(), "***") {
+		t.Errorf("a refusal repeats the credential: %v", err)
 	}
 }

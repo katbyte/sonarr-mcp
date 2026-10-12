@@ -9,19 +9,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostQueueGrabBulkOperationResponse is the result of PostQueueGrabBulk.
-type PostQueueGrabBulkOperationResponse struct {
+// PostQueueGrabBulkResponse is the result of PostQueueGrabBulk.
+type PostQueueGrabBulkResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostQueueGrabBulk calls POST /api/v3/queue/grab/bulk.
-func (c Client) PostQueueGrabBulk(ctx context.Context, input QueueBulkResource) (result PostQueueGrabBulkOperationResponse, err error) {
+func (c Client) PostQueueGrabBulk(ctx context.Context, input QueueBulkResource) (result PostQueueGrabBulkResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostQueueGrabBulk",
 		Path:       "/api/v3/queue/grab/bulk",
 	}
 

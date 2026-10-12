@@ -4,26 +4,52 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetWantedCutoffByIdOperationResponse is the result of GetWantedCutoffById.
-type GetWantedCutoffByIdOperationResponse struct {
+// GetWantedCutoffByIdResponse is the result of GetWantedCutoffById.
+//
+// Answer is the EpisodeResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetWantedCutoffByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *EpisodeResource
+	Answer       *EpisodeResource
+	*EpisodeResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetWantedCutoffByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the EpisodeResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetWantedCutoffByIdResponse) Record() (EpisodeResource, error) {
+	if r.Answer == nil {
+		return EpisodeResource{}, errors.New("GetWantedCutoffById answered no EpisodeResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetWantedCutoffById calls GET /api/v3/wanted/cutoff/{id}.
-func (c Client) GetWantedCutoffById(ctx context.Context, id int) (result GetWantedCutoffByIdOperationResponse, err error) {
+func (c Client) GetWantedCutoffById(ctx context.Context, id EpisodeID) (result GetWantedCutoffByIdResponse, err error) {
+	result.EpisodeResource = &EpisodeResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
-		Path:       fmt.Sprintf("/api/v3/wanted/cutoff/%d", id),
+		Operation:  "GetWantedCutoffById",
+		Path:       fmt.Sprintf("/api/v3/wanted/cutoff/%s", url.PathEscape(strconv.Itoa(int(id)))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -40,11 +66,12 @@ func (c Client) GetWantedCutoffById(ctx context.Context, id int) (result GetWant
 		return
 	}
 
-	var model EpisodeResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer EpisodeResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.EpisodeResource = result.Answer
 
 	return
 }

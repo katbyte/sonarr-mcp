@@ -34,7 +34,8 @@ func New(baseURL, apiKey string, opts ...client.Option) (*Client, error) {
 	if apiKey == "" {
 		return nil, errors.New("API key is required")
 	}
-	c, err := service.New(baseURL, client.APIKey(apiKey), opts...)
+	// the credential is a secret whatever the authorizer makes of it, so no error repeats it
+	c, err := service.New(baseURL, client.APIKey(apiKey), append(opts[:len(opts):len(opts)], client.WithSecrets(apiKey))...)
 	if err != nil {
 		return nil, err
 	}

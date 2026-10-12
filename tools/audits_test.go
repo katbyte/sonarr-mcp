@@ -512,7 +512,7 @@ func TestPickLookup(t *testing.T) {
 		switch {
 		case c.want == 0 && ok:
 			t.Errorf("%q picked %s (%d)", c.term, got.Title, got.Year)
-		case c.want != 0 && (!ok || got.TvdbId != c.want):
+		case c.want != 0 && (!ok || got.TvdbId != sonarr.TvdbID(c.want)):
 			t.Errorf("%q = %v, want tvdb %d", c.term, got, c.want)
 		}
 	}

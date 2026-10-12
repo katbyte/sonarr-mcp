@@ -4,27 +4,51 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostLanguageProfileOperationResponse is the result of PostLanguageProfile.
-type PostLanguageProfileOperationResponse struct {
+// PostLanguageProfileResponse is the result of PostLanguageProfile.
+//
+// Answer is the LanguageProfileResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PostLanguageProfileResponse struct {
 	HttpResponse *http.Response
-	Model        *LanguageProfileResource
+	Answer       *LanguageProfileResource
+	*LanguageProfileResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostLanguageProfileResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the LanguageProfileResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PostLanguageProfileResponse) Record() (LanguageProfileResource, error) {
+	if r.Answer == nil {
+		return LanguageProfileResource{}, errors.New("PostLanguageProfile answered no LanguageProfileResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PostLanguageProfile calls POST /api/v3/languageprofile.
 //
 // Deprecated: the document marks this operation deprecated.
-func (c Client) PostLanguageProfile(ctx context.Context, input LanguageProfileResource) (result PostLanguageProfileOperationResponse, err error) {
+func (c Client) PostLanguageProfile(ctx context.Context, input LanguageProfileResource) (result PostLanguageProfileResponse, err error) {
+	result.LanguageProfileResource = &LanguageProfileResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostLanguageProfile",
 		Path:       "/api/v3/languageprofile",
 	}
 
@@ -46,11 +70,12 @@ func (c Client) PostLanguageProfile(ctx context.Context, input LanguageProfileRe
 		return
 	}
 
-	var model LanguageProfileResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer LanguageProfileResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.LanguageProfileResource = result.Answer
 
 	return
 }

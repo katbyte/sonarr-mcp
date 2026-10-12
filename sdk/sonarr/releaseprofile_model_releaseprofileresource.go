@@ -4,11 +4,17 @@ package sonarr
 
 // ReleaseProfileResource is the "ReleaseProfileResource" schema.
 type ReleaseProfileResource struct {
-	Enabled   *bool  `json:"enabled,omitempty"`
-	Id        int    `json:"id,omitempty"`
-	Ignored   any    `json:"ignored,omitempty"`
-	IndexerId int    `json:"indexerId,omitempty"`
-	Name      string `json:"name,omitempty"`
-	Required  any    `json:"required,omitempty"`
-	Tags      []int  `json:"tags,omitzero"`
+	Enabled   *bool   `json:"enabled,omitempty"`
+	Id        int     `json:"id,omitempty"`
+	Ignored   any     `json:"ignored,omitempty"`
+	IndexerId int     `json:"indexerId,omitempty"`
+	Name      string  `json:"name,omitempty"`
+	Required  any     `json:"required,omitempty"`
+	Tags      []TagID `json:"tags,omitzero"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m ReleaseProfileResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m ReleaseProfileResource) GetId() int { return m.Id }

@@ -74,7 +74,7 @@ func TestRecordAdd(t *testing.T) {
 	if err := json.Unmarshal([]byte(sent[0]), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Name != "Usenet One" || body.Implementation != "Newznab" || body.ConfigContract != "NewznabSettings" || body.Priority != 10 || boolv(body.EnableRss) || !boolv(body.EnableAutomaticSearch) || !boolv(body.EnableInteractiveSearch) || !slices.Equal(body.Tags, []int{3}) {
+	if body.Name != "Usenet One" || body.Implementation != "Newznab" || body.ConfigContract != "NewznabSettings" || body.Priority != 10 || boolv(body.EnableRss) || !boolv(body.EnableAutomaticSearch) || !boolv(body.EnableInteractiveSearch) || !slices.Equal(body.Tags, []sonarr.TagID{3}) {
 		t.Errorf("the indexer sent = %+v", body)
 	}
 	values := map[string]any{}
@@ -279,7 +279,7 @@ func TestConfigEdit(t *testing.T) {
 		t.Errorf("changed = %q", changed)
 	}
 	var sent sonarr.NamingConfigResource
-	if bodies := f.sent(http.MethodPut, "/api/v3/config/naming/1"); len(bodies) != 1 || json.Unmarshal([]byte(bodies[0]), &sent) != nil || !boolv(sent.RenameEpisodes) || sent.Id != 1 || sent.StandardEpisodeFormat == "" || !boolv(sent.ReplaceIllegalCharacters) {
+	if bodies := f.sent(http.MethodPut, "/api/v3/config/naming/1"); len(bodies) != 1 || json.Unmarshal([]byte(bodies[0]), &sent) != nil || !sent.RenameEpisodes || sent.Id != 1 || sent.StandardEpisodeFormat == "" || !sent.ReplaceIllegalCharacters {
 		t.Errorf("the section sent = %v", bodies)
 	}
 	// the fake answers the section as it was, so what was set did not hold

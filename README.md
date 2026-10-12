@@ -285,18 +285,26 @@ A pattern that matches no tool aborts startup and names it, so a typo cannot sil
 import "github.com/katbyte/sonarr-mcp/sdk/sonarr"
 
 c, err := sonarr.New("http://nas:8989", os.Getenv("SONARR_TOKEN"))
-series, err := c.GetSeries(ctx, sonarr.GetSeriesOperationOptions{})
-for _, s := range series.Model { ... }
+series, err := c.GetSeries(ctx) // options may be left out when none is needed
+for _, s := range series.Answer { ... }
 
-specials, err := c.GetEpisode(ctx, sonarr.GetEpisodeOperationOptions{
-    SeriesId: new(series.Model[0].Id), SeasonNumber: new(0),
-}) // a number or a flag is a pointer, so 0 and false can be asked for
+specials, err := c.GetEpisode(ctx, sonarr.GetEpisodeOptions{
+    SeriesId: series.Answer[0].Id, SeasonNumber: new(0),
+}) // a number or a flag is a pointer, so 0 and false can be asked for; an id is given as it is
 
-missing, err := c.GetWantedMissingComplete(ctx, sonarr.GetWantedMissingOperationOptions{
+missing, err := c.GetWantedMissingComplete(ctx, sonarr.GetWantedMissingOptions{
     Monitored: new(true), IncludeSeries: new(true),
 }) // every page
 for _, e := range missing.Items { ... }
+
+for h, err := range c.GetHistoryEach(ctx) { // a page at a time, until the loop stops
+    if err != nil || h.SourceTitle == wanted { break }
+}
+
+rescan, err := c.RescanSeriesAndWait(ctx, sonarr.RescanSeriesCommand{SeriesId: series.Answer[0].Id}, time.Minute) // a command, queued and waited for
 ```
+
+The ids that travel between calls have a type each (`SeriesID`, `EpisodeID`, `EpisodeFileID`, `TagID`, `QualityProfileID`, `CommandID`, `TvdbID`), so an episode's id handed where a series' belongs does not compile; `sonarr.SeriesID(n)` makes one from a plain number.
 
 It is generated from Sonarr's own OpenAPI document (`api-defs/`, see [api-defs/README.md](api-defs/README.md)) by [pandorest](https://github.com/katbyte/pandorest), the generator the katbyte MCP servers share, modelled on [hashicorp/pandora](https://github.com/hashicorp/pandora): an importer normalises the spec into checked-in definitions (`api-defs/sonarr-<version>/`, one file per tag) through named workarounds for the spec's known bugs, a differ reports what a spec refresh changes, and a generator writes one file per operation and model from the definitions. What is this repository's own is in `sdk/pandorest`, the service's settings and the workarounds for its document, and in `sdk/sonarr/service.go`, the one hand-written file beside the generated ones: how Sonarr's refusals read and what is known of them. That is **a method for every one of Sonarr's 228 operations**, each with typed options, a typed body, a `{Model, HttpResponse}` result, the status codes the operation answers with (anything else is an error), and a `Complete` pager on every paged list. `make apicheck` proves the coverage claim against the spec, `make gencheck` (and the unit tests) fail when the generated code is stale, and the SDK suite (`acceptance/sonarr`) proves the shapes **against a running Sonarr** - which is the only thing that catches the server answering differently from what its spec says.
 

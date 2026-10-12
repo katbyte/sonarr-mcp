@@ -11,7 +11,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "QualityProfileID"
           }
         }
       ],
@@ -46,7 +47,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "QualityProfileID"
           }
         }
       ],
@@ -92,7 +94,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "String"
+            "Type": "ID",
+            "ReferenceName": "QualityProfileID"
           }
         }
       ],

@@ -9,19 +9,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteImportListBulkOperationResponse is the result of DeleteImportListBulk.
-type DeleteImportListBulkOperationResponse struct {
+// DeleteImportListBulkResponse is the result of DeleteImportListBulk.
+type DeleteImportListBulkResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteImportListBulk calls DELETE /api/v3/importlist/bulk.
-func (c Client) DeleteImportListBulk(ctx context.Context, input ImportListBulkResource) (result DeleteImportListBulkOperationResponse, err error) {
+func (c Client) DeleteImportListBulk(ctx context.Context, input ImportListBulkResource) (result DeleteImportListBulkResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteImportListBulk",
 		Path:       "/api/v3/importlist/bulk",
 	}
 

@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutCustomFormatBulkOperationResponse is the result of PutCustomFormatBulk.
-type PutCustomFormatBulkOperationResponse struct {
+// PutCustomFormatBulkResponse is the result of PutCustomFormatBulk.
+type PutCustomFormatBulkResponse struct {
 	HttpResponse *http.Response
-	Model        []CustomFormatResource
+	Answer       []CustomFormatResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutCustomFormatBulkResponse) Answered() bool { return r.Answer != nil }
+
 // PutCustomFormatBulk calls PUT /api/v3/customformat/bulk.
-func (c Client) PutCustomFormatBulk(ctx context.Context, input CustomFormatBulkResource) (result PutCustomFormatBulkOperationResponse, err error) {
+func (c Client) PutCustomFormatBulk(ctx context.Context, input CustomFormatBulkResource) (result PutCustomFormatBulkResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
+		Operation:  "PutCustomFormatBulk",
 		Path:       "/api/v3/customformat/bulk",
 	}
 
@@ -44,7 +49,7 @@ func (c Client) PutCustomFormatBulk(ctx context.Context, input CustomFormatBulkR
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

@@ -14,3 +14,9 @@ type CustomFormatSpecificationSchema struct {
 	Presets            []CustomFormatSpecificationSchema `json:"presets,omitzero"`
 	Required           *bool                             `json:"required,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m CustomFormatSpecificationSchema) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m CustomFormatSpecificationSchema) GetId() int { return m.Id }

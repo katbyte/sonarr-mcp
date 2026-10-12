@@ -116,7 +116,7 @@ func roundAge(d time.Duration) string {
 // repeat, and for grabs Sonarr never heard of again.
 func (r *registry) auditFailedDownloads(ctx context.Context, s *snapshot, limit int) (auditOut, error) {
 	since := time.Now().AddDate(0, 0, -failedDays)
-	res, err := r.client.GetHistorySince(ctx, sonarr.GetHistorySinceOperationOptions{
+	res, err := r.client.GetHistorySince(ctx, sonarr.GetHistorySinceOptions{
 		Date: since.UTC().Format(time.RFC3339), IncludeSeries: new(true), IncludeEpisode: new(true),
 	})
 	if err != nil {
@@ -135,16 +135,16 @@ func (r *registry) auditFailedDownloads(ctx context.Context, s *snapshot, limit 
 
 	type failures struct {
 		series, episode string
-		seriesID        int
+		seriesID        sonarr.SeriesID
 		count           int
 		titles          []string
 		last            string
 	}
-	byEpisode := map[int]*failures{}
-	var order []int
+	byEpisode := map[sonarr.EpisodeID]*failures{}
+	var order []sonarr.EpisodeID
 	heard := map[string]bool{} // download ids Sonarr imported, failed or ignored
 	var grabs []sonarr.HistoryResource
-	for _, h := range res.Model {
+	for _, h := range res.Answer {
 		if !s.covers(h.SeriesId) {
 			continue
 		}
@@ -179,8 +179,8 @@ func (r *registry) auditFailedDownloads(ctx context.Context, s *snapshot, limit 
 		}
 	}
 
-	out := auditOut{Scanned: len(res.Model)}
-	slices.SortStableFunc(order, func(a, b int) int {
+	out := auditOut{Scanned: len(res.Answer)}
+	slices.SortStableFunc(order, func(a, b sonarr.EpisodeID) int {
 		if c := byEpisode[b].count - byEpisode[a].count; c != 0 {
 			return c
 		}

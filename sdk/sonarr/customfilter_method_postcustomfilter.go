@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostCustomFilterOperationResponse is the result of PostCustomFilter.
-type PostCustomFilterOperationResponse struct {
+// PostCustomFilterResponse is the result of PostCustomFilter.
+//
+// Answer is the CustomFilterResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PostCustomFilterResponse struct {
 	HttpResponse *http.Response
-	Model        *CustomFilterResource
+	Answer       *CustomFilterResource
+	*CustomFilterResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostCustomFilterResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the CustomFilterResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PostCustomFilterResponse) Record() (CustomFilterResource, error) {
+	if r.Answer == nil {
+		return CustomFilterResource{}, errors.New("PostCustomFilter answered no CustomFilterResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PostCustomFilter calls POST /api/v3/customfilter.
-func (c Client) PostCustomFilter(ctx context.Context, input CustomFilterResource) (result PostCustomFilterOperationResponse, err error) {
+func (c Client) PostCustomFilter(ctx context.Context, input CustomFilterResource) (result PostCustomFilterResponse, err error) {
+	result.CustomFilterResource = &CustomFilterResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusCreated,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostCustomFilter",
 		Path:       "/api/v3/customfilter",
 	}
 
@@ -44,11 +68,12 @@ func (c Client) PostCustomFilter(ctx context.Context, input CustomFilterResource
 		return
 	}
 
-	var model CustomFilterResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer CustomFilterResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.CustomFilterResource = result.Answer
 
 	return
 }

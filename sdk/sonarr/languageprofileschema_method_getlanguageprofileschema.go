@@ -4,26 +4,50 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetLanguageProfileSchemaOperationResponse is the result of GetLanguageProfileSchema.
-type GetLanguageProfileSchemaOperationResponse struct {
+// GetLanguageProfileSchemaResponse is the result of GetLanguageProfileSchema.
+//
+// Answer is the LanguageProfileResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetLanguageProfileSchemaResponse struct {
 	HttpResponse *http.Response
-	Model        *LanguageProfileResource
+	Answer       *LanguageProfileResource
+	*LanguageProfileResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetLanguageProfileSchemaResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the LanguageProfileResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetLanguageProfileSchemaResponse) Record() (LanguageProfileResource, error) {
+	if r.Answer == nil {
+		return LanguageProfileResource{}, errors.New("GetLanguageProfileSchema answered no LanguageProfileResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetLanguageProfileSchema calls GET /api/v3/languageprofile/schema.
 //
 // Deprecated: the document marks this operation deprecated.
-func (c Client) GetLanguageProfileSchema(ctx context.Context) (result GetLanguageProfileSchemaOperationResponse, err error) {
+func (c Client) GetLanguageProfileSchema(ctx context.Context) (result GetLanguageProfileSchemaResponse, err error) {
+	result.LanguageProfileResource = &LanguageProfileResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetLanguageProfileSchema",
 		Path:       "/api/v3/languageprofile/schema",
 	}
 
@@ -41,11 +65,12 @@ func (c Client) GetLanguageProfileSchema(ctx context.Context) (result GetLanguag
 		return
 	}
 
-	var model LanguageProfileResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer LanguageProfileResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.LanguageProfileResource = result.Answer
 
 	return
 }

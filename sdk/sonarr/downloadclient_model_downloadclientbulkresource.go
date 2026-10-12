@@ -10,5 +10,5 @@ type DownloadClientBulkResource struct {
 	Priority                 int       `json:"priority,omitempty"`
 	RemoveCompletedDownloads *bool     `json:"removeCompletedDownloads,omitempty"`
 	RemoveFailedDownloads    *bool     `json:"removeFailedDownloads,omitempty"`
-	Tags                     []int     `json:"tags,omitzero"`
+	Tags                     []TagID   `json:"tags,omitzero"`
 }

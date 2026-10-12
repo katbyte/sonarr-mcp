@@ -7,6 +7,6 @@ package sonarr
 // The outcome of testing one provider.
 type ProviderTestAllResult struct {
 	Id                 int                 `json:"id,omitempty"`
-	IsValid            *bool               `json:"isValid,omitempty"`
+	IsValid            bool                `json:"isValid"`
 	ValidationFailures []ValidationFailure `json:"validationFailures,omitzero"`
 }

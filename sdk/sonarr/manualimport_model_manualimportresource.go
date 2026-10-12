@@ -7,7 +7,7 @@ type ManualImportResource struct {
 	CustomFormatScore int                       `json:"customFormatScore,omitempty"`
 	CustomFormats     []CustomFormatResource    `json:"customFormats,omitzero"`
 	DownloadId        string                    `json:"downloadId,omitempty"`
-	EpisodeFileId     int                       `json:"episodeFileId,omitempty"`
+	EpisodeFileId     EpisodeFileID             `json:"episodeFileId,omitempty"`
 	Episodes          []EpisodeResource         `json:"episodes,omitzero"`
 	FolderName        string                    `json:"folderName,omitempty"`
 	Id                int                       `json:"id,omitempty"`
@@ -25,3 +25,9 @@ type ManualImportResource struct {
 	Series            *SeriesResource           `json:"series,omitempty"`
 	Size              int64                     `json:"size,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m ManualImportResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m ManualImportResource) GetId() int { return m.Id }

@@ -7,7 +7,7 @@ type ManualImportReprocessResource struct {
 	CustomFormatScore int                       `json:"customFormatScore,omitempty"`
 	CustomFormats     []CustomFormatResource    `json:"customFormats,omitzero"`
 	DownloadId        string                    `json:"downloadId,omitempty"`
-	EpisodeIds        []int                     `json:"episodeIds,omitzero"`
+	EpisodeIds        []EpisodeID               `json:"episodeIds,omitzero"`
 	Episodes          []EpisodeResource         `json:"episodes,omitzero"`
 	Id                int                       `json:"id,omitempty"`
 	IndexerFlags      int                       `json:"indexerFlags,omitempty"`
@@ -18,5 +18,5 @@ type ManualImportReprocessResource struct {
 	ReleaseGroup      string                    `json:"releaseGroup,omitempty"`
 	ReleaseType       ReleaseType               `json:"releaseType,omitempty"`
 	SeasonNumber      int                       `json:"seasonNumber,omitempty"`
-	SeriesId          int                       `json:"seriesId,omitempty"`
+	SeriesId          SeriesID                  `json:"seriesId,omitempty"`
 }

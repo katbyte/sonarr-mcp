@@ -26,7 +26,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeFileID"
           }
         }
       ],
@@ -44,7 +45,8 @@
           "Field": "SeriesId",
           "In": "Query",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         },
         {
@@ -54,7 +56,8 @@
           "Type": {
             "Type": "List",
             "NestedItem": {
-              "Type": "Integer"
+              "Type": "ID",
+              "ReferenceName": "EpisodeFileID"
             }
           }
         }
@@ -82,7 +85,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeFileID"
           }
         }
       ],
@@ -134,7 +138,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "String"
+            "Type": "ID",
+            "ReferenceName": "EpisodeFileID"
           }
         }
       ],
@@ -193,7 +198,8 @@
           "Type": {
             "Type": "List",
             "NestedItem": {
-              "Type": "Integer"
+              "Type": "ID",
+              "ReferenceName": "EpisodeFileID"
             }
           },
           "Nullable": true

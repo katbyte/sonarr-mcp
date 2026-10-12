@@ -4,31 +4,54 @@ package sonarr
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetParseOperationResponse is the result of GetParse.
-type GetParseOperationResponse struct {
+// GetParseResponse is the result of GetParse.
+//
+// Answer is the ParseResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetParseResponse struct {
 	HttpResponse *http.Response
-	Model        *ParseResource
+	Answer       *ParseResource
+	*ParseResource
 }
 
-// GetParseOperationOptions holds the query and header parameters of GetParse.
-type GetParseOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetParseResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the ParseResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetParseResponse) Record() (ParseResource, error) {
+	if r.Answer == nil {
+		return ParseResource{}, errors.New("GetParse answered no ParseResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// GetParseOptions holds the query and header parameters of GetParse.
+type GetParseOptions struct {
 	Title string
 	Path  string
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetParseOperationOptions) ToHeaders() *client.Headers {
+func (o GetParseOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetParseOperationOptions) ToQuery() *client.QueryParams {
+func (o GetParseOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.Title != "" {
 		out.Append("title", o.Title)
@@ -40,13 +63,24 @@ func (o GetParseOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetParse calls GET /api/v3/parse.
-func (c Client) GetParse(ctx context.Context, options GetParseOperationOptions) (result GetParseOperationResponse, err error) {
+func (c Client) GetParse(ctx context.Context, options ...GetParseOptions) (result GetParseResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetParse takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetParseOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.ParseResource = &ParseResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetParse",
+		OptionsObject: option,
 		Path:          "/api/v3/parse",
 	}
 
@@ -64,11 +98,12 @@ func (c Client) GetParse(ctx context.Context, options GetParseOperationOptions) 
 		return
 	}
 
-	var model ParseResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer ParseResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.ParseResource = result.Answer
 
 	return
 }

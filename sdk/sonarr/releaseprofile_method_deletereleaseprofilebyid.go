@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteReleaseProfileByIdOperationResponse is the result of DeleteReleaseProfileById.
-type DeleteReleaseProfileByIdOperationResponse struct {
+// DeleteReleaseProfileByIdResponse is the result of DeleteReleaseProfileById.
+type DeleteReleaseProfileByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteReleaseProfileById calls DELETE /api/v3/releaseprofile/{id}.
-func (c Client) DeleteReleaseProfileById(ctx context.Context, id int) (result DeleteReleaseProfileByIdOperationResponse, err error) {
+func (c Client) DeleteReleaseProfileById(ctx context.Context, id int) (result DeleteReleaseProfileByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteReleaseProfileById",
 		Path:       fmt.Sprintf("/api/v3/releaseprofile/%d", id),
 	}
 

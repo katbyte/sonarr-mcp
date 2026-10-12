@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetConfigHostByIdOperationResponse is the result of GetConfigHostById.
-type GetConfigHostByIdOperationResponse struct {
+// GetConfigHostByIdResponse is the result of GetConfigHostById.
+//
+// Answer is the HostConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetConfigHostByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *HostConfigResource
+	Answer       *HostConfigResource
+	*HostConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetConfigHostByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the HostConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetConfigHostByIdResponse) Record() (HostConfigResource, error) {
+	if r.Answer == nil {
+		return HostConfigResource{}, errors.New("GetConfigHostById answered no HostConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetConfigHostById calls GET /api/v3/config/host/{id}.
-func (c Client) GetConfigHostById(ctx context.Context, id int) (result GetConfigHostByIdOperationResponse, err error) {
+func (c Client) GetConfigHostById(ctx context.Context, id int) (result GetConfigHostByIdResponse, err error) {
+	result.HostConfigResource = &HostConfigResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetConfigHostById",
 		Path:       fmt.Sprintf("/api/v3/config/host/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetConfigHostById(ctx context.Context, id int) (result GetConfig
 		return
 	}
 
-	var model HostConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer HostConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.HostConfigResource = result.Answer
 
 	return
 }

@@ -81,7 +81,8 @@
           "Name": "Id",
           "JsonName": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         },
         {

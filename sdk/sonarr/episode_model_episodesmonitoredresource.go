@@ -4,6 +4,6 @@ package sonarr
 
 // EpisodesMonitoredResource is the "EpisodesMonitoredResource" schema.
 type EpisodesMonitoredResource struct {
-	EpisodeIds []int `json:"episodeIds,omitzero"`
-	Monitored  *bool `json:"monitored,omitempty"`
+	EpisodeIds []EpisodeID `json:"episodeIds,omitzero"`
+	Monitored  *bool       `json:"monitored,omitempty"`
 }

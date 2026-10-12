@@ -15,27 +15,27 @@ import (
 
 // queueRow is one download Sonarr is tracking.
 type queueRow struct {
-	ID             int      `json:"id"                        jsonschema:"the queue id, for taking it out of the queue or grabbing it early"`
-	Series         string   `json:"series,omitempty"`
-	SeriesID       int      `json:"series_id,omitempty"`
-	Season         int      `json:"season"`
-	Episode        string   `json:"episode,omitempty"`
-	Title          string   `json:"title"                     jsonschema:"the release name"`
-	Status         string   `json:"status"                    jsonschema:"what the download client says: queued, paused, downloading, completed, failed, warning, delay (held by a delay profile), downloadClientUnavailable"`
-	State          string   `json:"state"                     jsonschema:"where Sonarr is with it: downloading, importPending, importBlocked, importing, imported, failedPending, failed, ignored"`
-	Health         string   `json:"health"                    jsonschema:"ok, warning or error: whether Sonarr thinks it needs attention"`
-	Messages       []string `json:"messages"                  jsonschema:"why it needs attention, as Sonarr words it"`
-	Error          string   `json:"error,omitempty"`
-	Progress       float64  `json:"progress_percent"`
-	Size           string   `json:"size"`
-	TimeLeft       string   `json:"time_left,omitempty"`
-	Quality        string   `json:"quality"`
-	Protocol       string   `json:"protocol"`
-	DownloadClient string   `json:"download_client,omitempty"`
-	Indexer        string   `json:"indexer,omitempty"`
-	Added          string   `json:"added,omitempty"`
-	OutputPath     string   `json:"output_path,omitempty"`
-	DownloadID     string   `json:"download_id,omitempty"`
+	ID             int             `json:"id"                        jsonschema:"the queue id, for taking it out of the queue or grabbing it early"`
+	Series         string          `json:"series,omitempty"`
+	SeriesID       sonarr.SeriesID `json:"series_id,omitempty"`
+	Season         int             `json:"season"`
+	Episode        string          `json:"episode,omitempty"`
+	Title          string          `json:"title"                     jsonschema:"the release name"`
+	Status         string          `json:"status"                    jsonschema:"what the download client says: queued, paused, downloading, completed, failed, warning, delay (held by a delay profile), downloadClientUnavailable"`
+	State          string          `json:"state"                     jsonschema:"where Sonarr is with it: downloading, importPending, importBlocked, importing, imported, failedPending, failed, ignored"`
+	Health         string          `json:"health"                    jsonschema:"ok, warning or error: whether Sonarr thinks it needs attention"`
+	Messages       []string        `json:"messages"                  jsonschema:"why it needs attention, as Sonarr words it"`
+	Error          string          `json:"error,omitempty"`
+	Progress       float64         `json:"progress_percent"`
+	Size           string          `json:"size"`
+	TimeLeft       string          `json:"time_left,omitempty"`
+	Quality        string          `json:"quality"`
+	Protocol       string          `json:"protocol"`
+	DownloadClient string          `json:"download_client,omitempty"`
+	Indexer        string          `json:"indexer,omitempty"`
+	Added          string          `json:"added,omitempty"`
+	OutputPath     string          `json:"output_path,omitempty"`
+	DownloadID     string          `json:"download_id,omitempty"`
 }
 
 func projectQueue(q *sonarr.QueueResource) queueRow {
@@ -72,7 +72,7 @@ func projectQueue(q *sonarr.QueueResource) queueRow {
 
 // queueAll reads the whole queue, with each item's series and episode.
 func (r *registry) queueAll(ctx context.Context) ([]sonarr.QueueResource, error) {
-	res, err := r.client.GetQueueComplete(ctx, sonarr.GetQueueOperationOptions{
+	res, err := r.client.GetQueueComplete(ctx, sonarr.GetQueueOptions{
 		IncludeSeries: new(true), IncludeEpisode: new(true), IncludeUnknownSeriesItems: new(true),
 	})
 	if err != nil {
@@ -91,7 +91,8 @@ const queueWait = 30 * time.Second
 // grab, or a minute on its own schedule - so a tool that has just grabbed
 // and is about to report the queue asks for the check first.
 func (r *registry) refreshQueue(ctx context.Context) error {
-	_, err := r.runCommand(ctx, "RefreshMonitoredDownloads", nil, queueWait)
+	sent, err := r.client.RefreshMonitoredDownloads(ctx, sonarr.RefreshMonitoredDownloadsCommand{})
+	_, err = r.settleCommand(ctx, "RefreshMonitoredDownloads", queueWait, sent, err)
 
 	return err
 }
@@ -101,22 +102,22 @@ func (r *registry) refreshQueue(ctx context.Context) error {
 // just grabbed. A search that was only queued has grabbed nothing yet, and
 // the check is a command of its own that would wait its turn behind it, so
 // such a search reads the queue as it stands.
-func (r *registry) queueFor(ctx context.Context, seriesID int, episodeIDs []int, fresh bool) ([]queueRow, error) {
+func (r *registry) queueFor(ctx context.Context, seriesID sonarr.SeriesID, episodeIDs []sonarr.EpisodeID, fresh bool) ([]queueRow, error) {
 	if fresh {
 		if err := r.refreshQueue(ctx); err != nil {
 			return nil, err
 		}
 	}
 
-	res, err := r.client.GetQueueDetails(ctx, sonarr.GetQueueDetailsOperationOptions{
-		SeriesId: new(seriesID), IncludeSeries: new(true), IncludeEpisode: new(true),
+	res, err := r.client.GetQueueDetails(ctx, sonarr.GetQueueDetailsOptions{
+		SeriesId: seriesID, IncludeSeries: new(true), IncludeEpisode: new(true),
 	})
 	if err != nil {
 		return nil, err
 	}
 	var out []queueRow
-	for i := range res.Model {
-		q := &res.Model[i]
+	for i := range res.Answer {
+		q := &res.Answer[i]
 		if len(episodeIDs) > 0 && !slices.Contains(episodeIDs, q.EpisodeId) {
 			continue
 		}
@@ -227,7 +228,7 @@ func registerQueueTools(r *registry) {
 		Name:        "queue_list",
 		Description: "The download queue: every download Sonarr is tracking, its progress and time left, what the download client says, and where Sonarr is with it - downloading, waiting to import, blocked from importing, failed - with Sonarr's own words on any that need attention.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in listIn) (*mcp.CallToolResult, listOut, error) {
-		seriesID := 0
+		var seriesID sonarr.SeriesID
 		if in.Series != "" {
 			s, err := r.resolveSeries(ctx, in.Series)
 			if err != nil {
@@ -290,7 +291,7 @@ func registerQueueTools(r *registry) {
 			if !ok {
 				return nil, out, fmt.Errorf("no download %d in the queue", id)
 			}
-			if _, err := client.DeleteQueueById(ctx, id, sonarr.DeleteQueueByIdOperationOptions{
+			if _, err := client.DeleteQueueById(ctx, id, sonarr.DeleteQueueByIdOptions{
 				RemoveFromClient: new(fromClient), Blocklist: new(in.Blocklist), SkipRedownload: new(in.SkipRedownload),
 			}); err != nil {
 				return nil, out, err
@@ -361,7 +362,7 @@ func registerHistoryTools(r *registry) {
 		if err != nil {
 			return nil, listOut{}, err
 		}
-		opts := sonarr.GetHistoryOperationOptions{
+		opts := sonarr.GetHistoryOptions{
 			SortKey: "date", SortDirection: sonarr.SortDirectionDescending, IncludeSeries: new(true), IncludeEpisode: new(true),
 			EventType: events,
 		}
@@ -370,7 +371,7 @@ func registerHistoryTools(r *registry) {
 			if err != nil {
 				return nil, listOut{}, err
 			}
-			opts.SeriesIds = []int{s.Id}
+			opts.SeriesIds = []sonarr.SeriesID{s.Id}
 			if in.Episode != "" {
 				eps, err := r.episodesOf(ctx, s.Id, nil, false)
 				if err != nil {
@@ -380,7 +381,7 @@ func registerHistoryTools(r *registry) {
 				if err != nil {
 					return nil, listOut{}, err
 				}
-				opts.EpisodeId = new(picked[0].Id)
+				opts.EpisodeId = picked[0].Id
 			}
 		} else if in.Episode != "" {
 			return nil, listOut{}, errors.New("an episode needs its series")
@@ -392,7 +393,7 @@ func registerHistoryTools(r *registry) {
 				return nil, 0, err
 			}
 
-			return res.Model.Records, res.Model.TotalRecords, nil
+			return res.Answer.Records, res.Answer.TotalRecords, nil
 		}
 
 		// with no age asked for, Sonarr does the paging and says how many
@@ -414,22 +415,15 @@ func registerHistoryTools(r *registry) {
 		// until the first one older than the cutoff, and paged from those
 		cutoff := time.Now().AddDate(0, 0, -in.Days)
 		var rows []historyRow
-		for page := 1; ; page++ {
-			records, _, err := fetch(page, historyPage)
+		opts.Page, opts.PageSize = nil, new(historyPage)
+		for h, err := range client.GetHistoryEach(ctx, opts) {
 			if err != nil {
 				return nil, listOut{}, err
 			}
-			older := slices.IndexFunc(records, func(h sonarr.HistoryResource) bool { return parseTime(h.Date).Before(cutoff) })
-			keep := len(records)
-			if older >= 0 {
-				keep = older
-			}
-			for i := range records[:keep] {
-				rows = append(rows, projectHistory(&records[i]))
-			}
-			if older >= 0 || len(records) < historyPage {
+			if parseTime(h.Date).Before(cutoff) {
 				break
 			}
+			rows = append(rows, projectHistory(&h))
 		}
 		out := listOut{}
 		out.Entries, out.pageOut = pageRows(rows, in.pageIn)
@@ -473,13 +467,13 @@ func registerHistoryTools(r *registry) {
 		Name:        "blocklist_list",
 		Description: "The releases Sonarr will not grab again - failed downloads and releases removed with blocklisting - newest first, with why each was blocklisted.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in blockIn) (*mcp.CallToolResult, blockOut, error) {
-		opts := sonarr.GetBlocklistOperationOptions{SortKey: "date", SortDirection: sonarr.SortDirectionDescending}
+		opts := sonarr.GetBlocklistOptions{SortKey: "date", SortDirection: sonarr.SortDirectionDescending}
 		if in.Series != "" {
 			s, err := r.resolveSeries(ctx, in.Series)
 			if err != nil {
 				return nil, blockOut{}, err
 			}
-			opts.SeriesIds = []int{s.Id}
+			opts.SeriesIds = []sonarr.SeriesID{s.Id}
 		}
 		res, err := client.GetBlocklistComplete(ctx, opts)
 		if err != nil {
@@ -489,7 +483,7 @@ func registerHistoryTools(r *registry) {
 		if err != nil {
 			return nil, blockOut{}, err
 		}
-		titles := map[int]string{}
+		titles := map[sonarr.SeriesID]string{}
 		for i := range series {
 			titles[series[i].Id] = series[i].Title
 		}
@@ -541,21 +535,17 @@ const historyScan = 2000
 
 // historyEntry finds a history entry by id among the recent ones.
 func (r *registry) historyEntry(ctx context.Context, id int) (*sonarr.HistoryResource, error) {
-	const size = historyPage
-	for page := 1; page*size <= historyScan; page++ {
-		res, err := r.client.GetHistory(ctx, sonarr.GetHistoryOperationOptions{
-			Page: new(page), PageSize: new(size), SortKey: "date", SortDirection: sonarr.SortDirectionDescending,
-			IncludeSeries: new(true), IncludeEpisode: new(true),
-		})
+	read := 0
+	for h, err := range r.client.GetHistoryEach(ctx, sonarr.GetHistoryOptions{PageSize: new(historyPage), SortKey: "date", SortDirection: sonarr.SortDirectionDescending, IncludeSeries: new(true), IncludeEpisode: new(true)}) {
 		if err != nil {
 			return nil, err
 		}
-		for i := range res.Model.Records {
-			if res.Model.Records[i].Id == id {
-				return &res.Model.Records[i], nil
-			}
+		if h.Id == id {
+			return &h, nil
 		}
-		if len(res.Model.Records) < size {
+
+		read++
+		if read >= historyScan {
 			break
 		}
 	}

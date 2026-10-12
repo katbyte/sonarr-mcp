@@ -4,30 +4,31 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostNotificationTestOperationResponse is the result of PostNotificationTest.
-type PostNotificationTestOperationResponse struct {
+// PostNotificationTestResponse is the result of PostNotificationTest.
+type PostNotificationTestResponse struct {
 	HttpResponse *http.Response
 }
 
-// PostNotificationTestOperationOptions holds the query and header parameters of PostNotificationTest.
-type PostNotificationTestOperationOptions struct {
+// PostNotificationTestOptions holds the query and header parameters of PostNotificationTest.
+type PostNotificationTestOptions struct {
 	ForceTest *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PostNotificationTestOperationOptions) ToHeaders() *client.Headers {
+func (o PostNotificationTestOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PostNotificationTestOperationOptions) ToQuery() *client.QueryParams {
+func (o PostNotificationTestOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.ForceTest != nil {
 		out.Append("forceTest", strconv.FormatBool(*o.ForceTest))
@@ -36,14 +37,24 @@ func (o PostNotificationTestOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PostNotificationTest calls POST /api/v3/notification/test.
-func (c Client) PostNotificationTest(ctx context.Context, input NotificationResource, options PostNotificationTestOperationOptions) (result PostNotificationTestOperationResponse, err error) {
+func (c Client) PostNotificationTest(ctx context.Context, input NotificationResource, options ...PostNotificationTestOptions) (result PostNotificationTestResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PostNotificationTest takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PostNotificationTestOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodPost,
-		OptionsObject: options,
+		Operation:     "PostNotificationTest",
+		OptionsObject: option,
 		Path:          "/api/v3/notification/test",
 	}
 

@@ -4,21 +4,44 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"iter"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetLogOperationResponse is the result of GetLog.
-type GetLogOperationResponse struct {
+// GetLogResponse is the result of GetLog.
+//
+// Answer is the LogResourcePagingResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetLogResponse struct {
 	HttpResponse *http.Response
-	Model        *LogResourcePagingResource
+	Answer       *LogResourcePagingResource
+	*LogResourcePagingResource
 }
 
-// GetLogOperationOptions holds the query and header parameters of GetLog.
-type GetLogOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetLogResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the LogResourcePagingResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetLogResponse) Record() (LogResourcePagingResource, error) {
+	if r.Answer == nil {
+		return LogResourcePagingResource{}, errors.New("GetLog answered no LogResourcePagingResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// GetLogOptions holds the query and header parameters of GetLog.
+type GetLogOptions struct {
 	Page          *int
 	PageSize      *int
 	SortKey       string
@@ -27,13 +50,13 @@ type GetLogOperationOptions struct {
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetLogOperationOptions) ToHeaders() *client.Headers {
+func (o GetLogOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetLogOperationOptions) ToQuery() *client.QueryParams {
+func (o GetLogOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.Page != nil {
 		out.Append("page", strconv.Itoa(*o.Page))
@@ -54,13 +77,24 @@ func (o GetLogOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetLog calls GET /api/v3/log.
-func (c Client) GetLog(ctx context.Context, options GetLogOperationOptions) (result GetLogOperationResponse, err error) {
+func (c Client) GetLog(ctx context.Context, options ...GetLogOptions) (result GetLogResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetLog takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetLogOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.LogResourcePagingResource = &LogResourcePagingResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetLog",
+		OptionsObject: option,
 		Path:          "/api/v3/log",
 	}
 
@@ -78,11 +112,12 @@ func (c Client) GetLog(ctx context.Context, options GetLogOperationOptions) (res
 		return
 	}
 
-	var model LogResourcePagingResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer LogResourcePagingResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.LogResourcePagingResource = result.Answer
 
 	return
 }
@@ -96,34 +131,102 @@ type GetLogCompleteResult struct {
 // GetLogComplete calls GetLog page by page, from the
 // page options.Page names (the first when unset), until every result is loaded.
 // options.PageSize is the page size, client.DefaultPageSize when unset.
-func (c Client) GetLogComplete(ctx context.Context, options GetLogOperationOptions) (result GetLogCompleteResult, err error) {
+func (c Client) GetLogComplete(ctx context.Context, options ...GetLogOptions) (result GetLogCompleteResult, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetLogComplete takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetLogOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	limit := client.DefaultPageSize
-	if options.PageSize != nil && *options.PageSize > 0 {
-		limit = *options.PageSize
+	if option.PageSize != nil && *option.PageSize > 0 {
+		limit = *option.PageSize
 	}
-	options.PageSize = &limit
+	option.PageSize = &limit
 	number := 1
-	if options.Page != nil && *options.Page > 0 {
-		number = *options.Page
+	if option.Page != nil && *option.Page > 0 {
+		number = *option.Page
 	}
-	options.Page = &number
+	option.Page = &number
 	for {
-		var page GetLogOperationResponse
-		page, err = c.GetLog(ctx, options)
+		var page GetLogResponse
+		page, err = c.GetLog(ctx, option)
 		result.LatestHttpResponse = page.HttpResponse
 		if err != nil {
 			err = fmt.Errorf("loading results: %w", err)
 			return
 		}
-		if page.Model == nil || len(page.Model.Records) == 0 {
+		if page.Answer == nil || len(page.Answer.Records) == 0 {
 			return
 		}
-		result.Items = append(result.Items, page.Model.Records...)
+		result.Items = append(result.Items, page.Answer.Records...)
 		// a short page is the last; so is the page that reaches the total, when
 		// the server reports one
-		if len(page.Model.Records) < limit || page.Model.TotalRecords > 0 && number*limit >= page.Model.TotalRecords {
+		if len(page.Answer.Records) < limit || page.Answer.TotalRecords > 0 && number*limit >= page.Answer.TotalRecords {
 			return
 		}
 		number++
+	}
+}
+
+// GetLogEach calls GetLog page by page as its results are ranged over, so a
+// loop that stops ends the paging:
+//
+//	for item, err := range c.GetLogEach(ctx) {
+//		if err != nil {
+//			return err
+//		}
+//		if found(item) {
+//			break
+//		}
+//	}
+//
+// An error is the last pair handed out, with a zero LogResource. The pages are asked for as GetLogComplete asks for them.
+func (c Client) GetLogEach(ctx context.Context, options ...GetLogOptions) iter.Seq2[LogResource, error] {
+	return func(yield func(LogResource, error) bool) {
+		var zero LogResource
+		if len(options) > 1 {
+			yield(zero, fmt.Errorf("GetLogEach takes one options struct at most, not %d", len(options)))
+			return
+		}
+		var option GetLogOptions
+		if len(options) == 1 {
+			option = options[0]
+		}
+
+		limit := client.DefaultPageSize
+		if option.PageSize != nil && *option.PageSize > 0 {
+			limit = *option.PageSize
+		}
+		option.PageSize = &limit
+		number := 1
+		if option.Page != nil && *option.Page > 0 {
+			number = *option.Page
+		}
+		option.Page = &number
+		for {
+			page, err := c.GetLog(ctx, option)
+			if err != nil {
+				yield(zero, fmt.Errorf("loading results: %w", err))
+				return
+			}
+			if page.Answer == nil || len(page.Answer.Records) == 0 {
+				return
+			}
+			for _, item := range page.Answer.Records {
+				if !yield(item, nil) {
+					return
+				}
+			}
+			// a short page is the last; so is the page that reaches the total, when
+			// the server reports one
+			if len(page.Answer.Records) < limit || page.Answer.TotalRecords > 0 && number*limit >= page.Answer.TotalRecords {
+				return
+			}
+			number++
+		}
 	}
 }

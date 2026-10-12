@@ -6,14 +6,46 @@
   "Source": "api-defs/sonarr-openapi-4.0.20.3014.json",
   "Auth": "APIKey",
   "Workarounds": [
+    "sonarr-numbered-path-ids",
     "sonarr-ui-routes",
     "sonarr-undeclared-responses",
     "sonarr-undeclared-write-responses",
     "sonarr-created-accepted",
     "sonarr-test-all-results",
     "sonarr-command-body",
+    "sonarr-commands",
     "sonarr-command-resource-body",
     "sonarr-http-uri-string",
     "sonarr-bulk-update-lists"
+  ],
+  "IDs": [
+    {
+      "Name": "SeriesID",
+      "Base": "Integer"
+    },
+    {
+      "Name": "EpisodeID",
+      "Base": "Integer"
+    },
+    {
+      "Name": "EpisodeFileID",
+      "Base": "Integer"
+    },
+    {
+      "Name": "TagID",
+      "Base": "Integer"
+    },
+    {
+      "Name": "QualityProfileID",
+      "Base": "Integer"
+    },
+    {
+      "Name": "CommandID",
+      "Base": "Integer"
+    },
+    {
+      "Name": "TvdbID",
+      "Base": "Integer"
+    }
   ]
 }

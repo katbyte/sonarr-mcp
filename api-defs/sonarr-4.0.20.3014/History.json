@@ -72,7 +72,8 @@
           "Field": "EpisodeId",
           "In": "Query",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeID"
           }
         },
         {
@@ -90,7 +91,8 @@
           "Type": {
             "Type": "List",
             "NestedItem": {
-              "Type": "Integer"
+              "Type": "ID",
+              "ReferenceName": "SeriesID"
             }
           }
         },
@@ -149,7 +151,8 @@
           "Field": "SeriesId",
           "In": "Query",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         },
         {
@@ -333,7 +336,8 @@
           "Name": "EpisodeId",
           "JsonName": "episodeId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeID"
           }
         },
         {
@@ -390,7 +394,8 @@
           "Name": "SeriesId",
           "JsonName": "seriesId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         },
         {

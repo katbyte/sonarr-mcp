@@ -110,7 +110,7 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "String"
+            "Type": "Integer"
           }
         }
       ],
@@ -178,7 +178,8 @@
           "Type": {
             "Type": "List",
             "NestedItem": {
-              "Type": "Integer"
+              "Type": "ID",
+              "ReferenceName": "TagID"
             }
           },
           "Nullable": true

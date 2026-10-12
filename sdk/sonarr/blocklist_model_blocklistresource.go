@@ -6,7 +6,7 @@ package sonarr
 type BlocklistResource struct {
 	CustomFormats []CustomFormatResource `json:"customFormats,omitzero"`
 	Date          string                 `json:"date,omitempty"`
-	EpisodeIds    []int                  `json:"episodeIds,omitzero"`
+	EpisodeIds    []EpisodeID            `json:"episodeIds,omitzero"`
 	Id            int                    `json:"id,omitempty"`
 	Indexer       string                 `json:"indexer,omitempty"`
 	Languages     []Language             `json:"languages,omitzero"`
@@ -14,6 +14,6 @@ type BlocklistResource struct {
 	Protocol      DownloadProtocol       `json:"protocol,omitempty"`
 	Quality       *QualityModel          `json:"quality,omitempty"`
 	Series        *SeriesResource        `json:"series,omitempty"`
-	SeriesId      int                    `json:"seriesId,omitempty"`
+	SeriesId      SeriesID               `json:"seriesId,omitempty"`
 	SourceTitle   string                 `json:"sourceTitle,omitempty"`
 }

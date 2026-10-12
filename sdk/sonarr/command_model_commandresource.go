@@ -11,17 +11,23 @@ type CommandResource struct {
 	Duration            string          `json:"duration,omitempty"`
 	Ended               string          `json:"ended,omitempty"`
 	Exception           string          `json:"exception,omitempty"`
-	Id                  int             `json:"id,omitempty"`
+	Id                  CommandID       `json:"id,omitempty"`
 	LastExecutionTime   string          `json:"lastExecutionTime,omitempty"`
 	Message             string          `json:"message,omitempty"`
 	Name                string          `json:"name,omitempty"`
 	Priority            CommandPriority `json:"priority,omitempty"`
 	Queued              string          `json:"queued,omitempty"`
 	Result              CommandResult   `json:"result,omitempty"`
-	SendUpdatesToClient *bool           `json:"sendUpdatesToClient,omitempty"`
+	SendUpdatesToClient bool            `json:"sendUpdatesToClient"`
 	Started             string          `json:"started,omitempty"`
 	StateChangeTime     string          `json:"stateChangeTime,omitempty"`
 	Status              CommandStatus   `json:"status,omitempty"`
 	Trigger             CommandTrigger  `json:"trigger,omitempty"`
-	UpdateScheduledTask *bool           `json:"updateScheduledTask,omitempty"`
+	UpdateScheduledTask bool            `json:"updateScheduledTask"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m CommandResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m CommandResource) GetId() CommandID { return m.Id }

@@ -7,7 +7,6 @@ import (
 	"maps"
 	"reflect"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
@@ -29,7 +28,7 @@ type configSection struct {
 }
 
 // section describes a settings section from how the SDK reads and writes it.
-func section[T any](name string, aliases []string, get func(ctx context.Context) (*T, error), put func(ctx context.Context, id string, body T) error) configSection {
+func section[T any](name string, aliases []string, get func(ctx context.Context) (*T, error), put func(ctx context.Context, id int, body T) error) configSection {
 	return configSection{
 		name: name, aliases: aliases,
 		names: slices.DeleteFunc(propertyNames(reflect.TypeFor[T]()), func(n string) bool { return n == "id" }),
@@ -52,7 +51,7 @@ func section[T any](name string, aliases []string, get func(ctx context.Context)
 			if err != nil {
 				return err
 			}
-			return put(ctx, strconv.Itoa(recordID(settings)), body)
+			return put(ctx, recordID(settings), body)
 		},
 	}
 }
@@ -64,50 +63,50 @@ func (r *registry) configSections() []configSection {
 	return []configSection{
 		section("naming", nil, func(ctx context.Context) (*sonarr.NamingConfigResource, error) {
 			res, err := c.GetConfigNaming(ctx)
-			return res.Model, err
-		}, func(ctx context.Context, id string, body sonarr.NamingConfigResource) error {
+			return res.Answer, err
+		}, func(ctx context.Context, id int, body sonarr.NamingConfigResource) error {
 			_, err := c.PutConfigNamingById(ctx, id, body)
 			return err
 		}),
 		section("mediamanagement", []string{"media_management", "media management"}, func(ctx context.Context) (*sonarr.MediaManagementConfigResource, error) {
 			res, err := c.GetConfigMediaManagement(ctx)
-			return res.Model, err
-		}, func(ctx context.Context, id string, body sonarr.MediaManagementConfigResource) error {
+			return res.Answer, err
+		}, func(ctx context.Context, id int, body sonarr.MediaManagementConfigResource) error {
 			_, err := c.PutConfigMediaManagementById(ctx, id, body)
 			return err
 		}),
 		section("host", nil, func(ctx context.Context) (*sonarr.HostConfigResource, error) {
 			res, err := c.GetConfigHost(ctx)
-			return res.Model, err
-		}, func(ctx context.Context, id string, body sonarr.HostConfigResource) error {
+			return res.Answer, err
+		}, func(ctx context.Context, id int, body sonarr.HostConfigResource) error {
 			_, err := c.PutConfigHostById(ctx, id, body)
 			return err
 		}),
 		section("ui", nil, func(ctx context.Context) (*sonarr.UiConfigResource, error) {
 			res, err := c.GetConfigUi(ctx)
-			return res.Model, err
-		}, func(ctx context.Context, id string, body sonarr.UiConfigResource) error {
+			return res.Answer, err
+		}, func(ctx context.Context, id int, body sonarr.UiConfigResource) error {
 			_, err := c.PutConfigUiById(ctx, id, body)
 			return err
 		}),
 		section("indexer", nil, func(ctx context.Context) (*sonarr.IndexerConfigResource, error) {
 			res, err := c.GetConfigIndexer(ctx)
-			return res.Model, err
-		}, func(ctx context.Context, id string, body sonarr.IndexerConfigResource) error {
+			return res.Answer, err
+		}, func(ctx context.Context, id int, body sonarr.IndexerConfigResource) error {
 			_, err := c.PutConfigIndexerById(ctx, id, body)
 			return err
 		}),
 		section("downloadclient", []string{"download_client", "download client"}, func(ctx context.Context) (*sonarr.DownloadClientConfigResource, error) {
 			res, err := c.GetConfigDownloadClient(ctx)
-			return res.Model, err
-		}, func(ctx context.Context, id string, body sonarr.DownloadClientConfigResource) error {
+			return res.Answer, err
+		}, func(ctx context.Context, id int, body sonarr.DownloadClientConfigResource) error {
 			_, err := c.PutConfigDownloadClientById(ctx, id, body)
 			return err
 		}),
 		section("importlist", []string{"import_list", "import list"}, func(ctx context.Context) (*sonarr.ImportListConfigResource, error) {
 			res, err := c.GetConfigImportList(ctx)
-			return res.Model, err
-		}, func(ctx context.Context, id string, body sonarr.ImportListConfigResource) error {
+			return res.Answer, err
+		}, func(ctx context.Context, id int, body sonarr.ImportListConfigResource) error {
 			_, err := c.PutConfigImportListById(ctx, id, body)
 			return err
 		}),
@@ -234,7 +233,7 @@ func registerConfigEdit(r *registry) {
 
 // namingExampleOptions are what the naming examples are asked with: a
 // naming section, as config_get shows one, with any changes over it.
-func namingExampleOptions(settings map[string]any) sonarr.GetConfigNamingExamplesOperationOptions {
+func namingExampleOptions(settings map[string]any) sonarr.GetConfigNamingExamplesOptions {
 	flag := func(name string) *bool {
 		v, ok := settings[name].(bool)
 		if !ok {
@@ -254,7 +253,7 @@ func namingExampleOptions(settings map[string]any) sonarr.GetConfigNamingExample
 
 	// Sonarr answers for its saved settings when no id comes with them,
 	// whatever else does
-	return sonarr.GetConfigNamingExamplesOperationOptions{
+	return sonarr.GetConfigNamingExamplesOptions{
 		Id: number("id"), RenameEpisodes: flag("renameEpisodes"), ReplaceIllegalCharacters: flag("replaceIllegalCharacters"),
 		ColonReplacementFormat: number("colonReplacementFormat"), CustomColonReplacementFormat: asString(settings["customColonReplacementFormat"]), MultiEpisodeStyle: number("multiEpisodeStyle"),
 		StandardEpisodeFormat: asString(settings["standardEpisodeFormat"]), DailyEpisodeFormat: asString(settings["dailyEpisodeFormat"]), AnimeEpisodeFormat: asString(settings["animeEpisodeFormat"]),
@@ -299,7 +298,7 @@ func registerNamingPreview(r *registry) {
 			return nil, previewOut{}, err
 		}
 		examples := map[string]any{}
-		if err := json.Unmarshal(res.Model, &examples); err != nil {
+		if err := json.Unmarshal(res.Answer, &examples); err != nil {
 			return nil, previewOut{}, fmt.Errorf("the naming examples are not an object: %w", err)
 		}
 		delete(shaped, "id")

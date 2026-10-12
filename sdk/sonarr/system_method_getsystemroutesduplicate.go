@@ -10,19 +10,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetSystemRoutesDuplicateOperationResponse is the result of GetSystemRoutesDuplicate.
-type GetSystemRoutesDuplicateOperationResponse struct {
+// GetSystemRoutesDuplicateResponse is the result of GetSystemRoutesDuplicate.
+type GetSystemRoutesDuplicateResponse struct {
 	HttpResponse *http.Response
-	Model        json.RawMessage
+	Answer       json.RawMessage
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetSystemRoutesDuplicateResponse) Answered() bool { return r.Answer != nil }
+
 // GetSystemRoutesDuplicate calls GET /api/v3/system/routes/duplicate.
-func (c Client) GetSystemRoutesDuplicate(ctx context.Context) (result GetSystemRoutesDuplicateOperationResponse, err error) {
+func (c Client) GetSystemRoutesDuplicate(ctx context.Context) (result GetSystemRoutesDuplicateResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetSystemRoutesDuplicate",
 		Path:       "/api/v3/system/routes/duplicate",
 	}
 
@@ -40,7 +45,7 @@ func (c Client) GetSystemRoutesDuplicate(ctx context.Context) (result GetSystemR
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

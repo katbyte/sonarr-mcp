@@ -4,31 +4,54 @@ package sonarr
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostMetadataOperationResponse is the result of PostMetadata.
-type PostMetadataOperationResponse struct {
+// PostMetadataResponse is the result of PostMetadata.
+//
+// Answer is the MetadataResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PostMetadataResponse struct {
 	HttpResponse *http.Response
-	Model        *MetadataResource
+	Answer       *MetadataResource
+	*MetadataResource
 }
 
-// PostMetadataOperationOptions holds the query and header parameters of PostMetadata.
-type PostMetadataOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostMetadataResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the MetadataResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PostMetadataResponse) Record() (MetadataResource, error) {
+	if r.Answer == nil {
+		return MetadataResource{}, errors.New("PostMetadata answered no MetadataResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// PostMetadataOptions holds the query and header parameters of PostMetadata.
+type PostMetadataOptions struct {
 	ForceSave *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PostMetadataOperationOptions) ToHeaders() *client.Headers {
+func (o PostMetadataOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PostMetadataOperationOptions) ToQuery() *client.QueryParams {
+func (o PostMetadataOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.ForceSave != nil {
 		out.Append("forceSave", strconv.FormatBool(*o.ForceSave))
@@ -37,14 +60,25 @@ func (o PostMetadataOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PostMetadata calls POST /api/v3/metadata.
-func (c Client) PostMetadata(ctx context.Context, input MetadataResource, options PostMetadataOperationOptions) (result PostMetadataOperationResponse, err error) {
+func (c Client) PostMetadata(ctx context.Context, input MetadataResource, options ...PostMetadataOptions) (result PostMetadataResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PostMetadata takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PostMetadataOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.MetadataResource = &MetadataResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusCreated,
 		},
 		HTTPMethod:    http.MethodPost,
-		OptionsObject: options,
+		Operation:     "PostMetadata",
+		OptionsObject: option,
 		Path:          "/api/v3/metadata",
 	}
 
@@ -66,11 +100,12 @@ func (c Client) PostMetadata(ctx context.Context, input MetadataResource, option
 		return
 	}
 
-	var model MetadataResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer MetadataResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.MetadataResource = result.Answer
 
 	return
 }

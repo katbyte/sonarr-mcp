@@ -4,28 +4,51 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutConfigDownloadClientByIdOperationResponse is the result of PutConfigDownloadClientById.
-type PutConfigDownloadClientByIdOperationResponse struct {
+// PutConfigDownloadClientByIdResponse is the result of PutConfigDownloadClientById.
+//
+// Answer is the DownloadClientConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutConfigDownloadClientByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *DownloadClientConfigResource
+	Answer       *DownloadClientConfigResource
+	*DownloadClientConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutConfigDownloadClientByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the DownloadClientConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutConfigDownloadClientByIdResponse) Record() (DownloadClientConfigResource, error) {
+	if r.Answer == nil {
+		return DownloadClientConfigResource{}, errors.New("PutConfigDownloadClientById answered no DownloadClientConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PutConfigDownloadClientById calls PUT /api/v3/config/downloadclient/{id}.
-func (c Client) PutConfigDownloadClientById(ctx context.Context, id string, input DownloadClientConfigResource) (result PutConfigDownloadClientByIdOperationResponse, err error) {
+func (c Client) PutConfigDownloadClientById(ctx context.Context, id int, input DownloadClientConfigResource) (result PutConfigDownloadClientByIdResponse, err error) {
+	result.DownloadClientConfigResource = &DownloadClientConfigResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
-		Path:       fmt.Sprintf("/api/v3/config/downloadclient/%s", url.PathEscape(id)),
+		Operation:  "PutConfigDownloadClientById",
+		Path:       fmt.Sprintf("/api/v3/config/downloadclient/%d", id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -46,11 +69,12 @@ func (c Client) PutConfigDownloadClientById(ctx context.Context, id string, inpu
 		return
 	}
 
-	var model DownloadClientConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer DownloadClientConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.DownloadClientConfigResource = result.Answer
 
 	return
 }

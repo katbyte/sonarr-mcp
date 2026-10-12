@@ -4,28 +4,51 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutRemotePathMappingByIdOperationResponse is the result of PutRemotePathMappingById.
-type PutRemotePathMappingByIdOperationResponse struct {
+// PutRemotePathMappingByIdResponse is the result of PutRemotePathMappingById.
+//
+// Answer is the RemotePathMappingResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutRemotePathMappingByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *RemotePathMappingResource
+	Answer       *RemotePathMappingResource
+	*RemotePathMappingResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutRemotePathMappingByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the RemotePathMappingResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutRemotePathMappingByIdResponse) Record() (RemotePathMappingResource, error) {
+	if r.Answer == nil {
+		return RemotePathMappingResource{}, errors.New("PutRemotePathMappingById answered no RemotePathMappingResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PutRemotePathMappingById calls PUT /api/v3/remotepathmapping/{id}.
-func (c Client) PutRemotePathMappingById(ctx context.Context, id string, input RemotePathMappingResource) (result PutRemotePathMappingByIdOperationResponse, err error) {
+func (c Client) PutRemotePathMappingById(ctx context.Context, id int, input RemotePathMappingResource) (result PutRemotePathMappingByIdResponse, err error) {
+	result.RemotePathMappingResource = &RemotePathMappingResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
-		Path:       fmt.Sprintf("/api/v3/remotepathmapping/%s", url.PathEscape(id)),
+		Operation:  "PutRemotePathMappingById",
+		Path:       fmt.Sprintf("/api/v3/remotepathmapping/%d", id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -46,11 +69,12 @@ func (c Client) PutRemotePathMappingById(ctx context.Context, id string, input R
 		return
 	}
 
-	var model RemotePathMappingResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer RemotePathMappingResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.RemotePathMappingResource = result.Answer
 
 	return
 }

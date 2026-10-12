@@ -4,21 +4,26 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetHistorySeriesOperationResponse is the result of GetHistorySeries.
-type GetHistorySeriesOperationResponse struct {
+// GetHistorySeriesResponse is the result of GetHistorySeries.
+type GetHistorySeriesResponse struct {
 	HttpResponse *http.Response
-	Model        []HistoryResource
+	Answer       []HistoryResource
 }
 
-// GetHistorySeriesOperationOptions holds the query and header parameters of GetHistorySeries.
-type GetHistorySeriesOperationOptions struct {
-	SeriesId       *int
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetHistorySeriesResponse) Answered() bool { return r.Answer != nil }
+
+// GetHistorySeriesOptions holds the query and header parameters of GetHistorySeries.
+type GetHistorySeriesOptions struct {
+	SeriesId       SeriesID
 	SeasonNumber   *int
 	EventType      EpisodeHistoryEventType
 	IncludeSeries  *bool
@@ -26,16 +31,16 @@ type GetHistorySeriesOperationOptions struct {
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetHistorySeriesOperationOptions) ToHeaders() *client.Headers {
+func (o GetHistorySeriesOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetHistorySeriesOperationOptions) ToQuery() *client.QueryParams {
+func (o GetHistorySeriesOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
-	if o.SeriesId != nil {
-		out.Append("seriesId", strconv.Itoa(*o.SeriesId))
+	if o.SeriesId != 0 {
+		out.Append("seriesId", strconv.Itoa(int(o.SeriesId)))
 	}
 	if o.SeasonNumber != nil {
 		out.Append("seasonNumber", strconv.Itoa(*o.SeasonNumber))
@@ -53,13 +58,23 @@ func (o GetHistorySeriesOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetHistorySeries calls GET /api/v3/history/series.
-func (c Client) GetHistorySeries(ctx context.Context, options GetHistorySeriesOperationOptions) (result GetHistorySeriesOperationResponse, err error) {
+func (c Client) GetHistorySeries(ctx context.Context, options ...GetHistorySeriesOptions) (result GetHistorySeriesResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetHistorySeries takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetHistorySeriesOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetHistorySeries",
+		OptionsObject: option,
 		Path:          "/api/v3/history/series",
 	}
 
@@ -77,7 +92,7 @@ func (c Client) GetHistorySeries(ctx context.Context, options GetHistorySeriesOp
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

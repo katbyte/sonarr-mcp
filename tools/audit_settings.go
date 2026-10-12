@@ -99,7 +99,7 @@ func (r *registry) auditSeriesSettings(ctx context.Context, s *snapshot, limit i
 			f.Fix = "series_edit series_type daily"
 			out.report(limit, f)
 		}
-		if !slices.ContainsFunc(roots.Model, func(root sonarr.RootFolderResource) bool { return inFolder(series.Path, root.Path) }) {
+		if !slices.ContainsFunc(roots.Answer, func(root sonarr.RootFolderResource) bool { return inFolder(series.Path, root.Path) }) {
 			f := base
 			f.Subject = series.Path
 			f.Problem = problemOutsideRootFolders
@@ -115,7 +115,7 @@ func (r *registry) auditSeriesSettings(ctx context.Context, s *snapshot, limit i
 		var want struct {
 			Folder string `json:"folder"`
 		}
-		if err := unmarshalRaw(res.Model, &want); err != nil {
+		if err := unmarshalRaw(res.Answer, &want); err != nil {
 			return auditOut{}, err
 		}
 		if have := path.Base(strings.TrimRight(series.Path, "/")); want.Folder != "" && have != want.Folder {
@@ -154,8 +154,8 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 		return auditOut{}, err
 	}
 
-	out := auditOut{Scanned: len(profiles) + len(details.Model) + len(formats.Model) + len(release.Model)}
-	onSeries := map[int]int{}
+	out := auditOut{Scanned: len(profiles) + len(details.Answer) + len(formats.Answer) + len(release.Answer)}
+	onSeries := map[sonarr.QualityProfileID]int{}
 	for i := range all {
 		onSeries[all[i].QualityProfileId]++
 	}
@@ -168,7 +168,7 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 		}
 	}
 
-	for _, d := range details.Model {
+	for _, d := range details.Answer {
 		scoped := map[string]int{
 			"delay profiles": len(d.DelayProfileIds), "release profiles": len(d.RestrictionIds), "indexers": len(d.IndexerIds),
 			"download clients": len(d.DownloadClientIds),
@@ -210,7 +210,7 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 			}
 		}
 	}
-	for _, cf := range formats.Model {
+	for _, cf := range formats.Answer {
 		if !scored[cf.Id] {
 			out.report(limit, finding{
 				Subject: cf.Name, Problem: problemFormatUnscored,
@@ -220,7 +220,7 @@ func (r *registry) auditProfiles(ctx context.Context, s *snapshot, limit int) (a
 		}
 	}
 
-	for _, p := range release.Model {
+	for _, p := range release.Answer {
 		if p.Enabled != nil && !*p.Enabled {
 			name := p.Name
 			if name == "" {
@@ -259,9 +259,9 @@ func (r *registry) auditHealth(ctx context.Context, _ *snapshot, limit int) (aud
 		return auditOut{}, err
 	}
 
-	checks := slices.Clone(health.Model)
+	checks := slices.Clone(health.Answer)
 	slices.SortStableFunc(checks, func(a, b sonarr.HealthResource) int { return healthRank(string(a.Type)) - healthRank(string(b.Type)) })
-	out := auditOut{Scanned: len(checks) + len(roots.Model)}
+	out := auditOut{Scanned: len(checks) + len(roots.Answer)}
 	for _, h := range checks {
 		f := finding{Subject: h.Source, Problem: problemHealthCheck + " " + string(h.Type), Detail: h.Message}
 		if h.WikiUrl != "" {
@@ -270,7 +270,7 @@ func (r *registry) auditHealth(ctx context.Context, _ *snapshot, limit int) (aud
 		out.report(limit, f)
 	}
 
-	for _, root := range roots.Model {
+	for _, root := range roots.Answer {
 		if !boolv(root.Accessible) {
 			out.report(limit, finding{
 				Subject: root.Path, Problem: problemRootUnreachable,
@@ -280,8 +280,8 @@ func (r *registry) auditHealth(ctx context.Context, _ *snapshot, limit int) (aud
 		}
 		// the disk a root folder is on is the longest disk path containing it
 		var disk *sonarr.DiskSpaceResource
-		for i := range disks.Model {
-			d := &disks.Model[i]
+		for i := range disks.Answer {
+			d := &disks.Answer[i]
 			if inFolder(root.Path, d.Path) && (disk == nil || len(d.Path) > len(disk.Path)) {
 				disk = d
 			}
@@ -335,14 +335,14 @@ func (r *registry) auditServer(ctx context.Context, _ *snapshot, limit int) (aud
 	if err != nil {
 		return auditOut{}, err
 	}
-	errors, err := r.client.GetLog(ctx, sonarr.GetLogOperationOptions{Page: new(1), PageSize: new(logErrorsPage), SortKey: "time", SortDirection: sonarr.SortDirectionDescending, Level: "error"})
+	errors, err := r.client.GetLog(ctx, sonarr.GetLogOptions{Page: new(1), PageSize: new(logErrorsPage), SortKey: "time", SortDirection: sonarr.SortDirectionDescending, Level: "error"})
 	if err != nil {
 		return auditOut{}, err
 	}
 
 	out := auditOut{Scanned: 3}
 	var newest time.Time
-	for _, b := range backups.Model {
+	for _, b := range backups.Answer {
 		if t := parseTime(b.Time); t.After(newest) {
 			newest = t
 		}
@@ -354,17 +354,17 @@ func (r *registry) auditServer(ctx context.Context, _ *snapshot, limit int) (aud
 		out.report(limit, finding{Subject: "backups", Problem: problemNoRecentBackup, Detail: fmt.Sprintf("the newest backup is from %s, %d days ago", day(newest.Format(time.RFC3339)), int(time.Since(newest).Hours()/24)), Fix: "backup_create (in the admin toolset) makes one now; check backupInterval in the host section, and the log for the Backup task failing"})
 	}
 
-	for _, u := range updates.Model {
-		if !boolv(u.Latest) || boolv(u.Installed) || u.InstalledOn != "" {
+	for _, u := range updates.Answer {
+		if !u.Latest || u.Installed || u.InstalledOn != "" {
 			continue
 		}
 		fix := "server_updates lists what it changes"
-		if boolv(u.Installable) {
+		if u.Installable {
 			fix += "; Sonarr installs it from its own System page, or on its schedule when Updates are set to automatic in the host section"
 		} else {
 			fix += "; this Sonarr runs in a container, so it is updated by replacing the image"
 		}
-		out.report(limit, finding{Subject: u.Version, Problem: problemUpdateAvailable, Detail: fmt.Sprintf("%s was released %s; %s is running", u.Version, day(u.ReleaseDate), runningVersion(updates.Model)), Fix: fix})
+		out.report(limit, finding{Subject: u.Version, Problem: problemUpdateAvailable, Detail: fmt.Sprintf("%s was released %s; %s is running", u.Version, day(u.ReleaseDate), runningVersion(updates.Answer)), Fix: fix})
 	}
 
 	type logged struct {
@@ -373,7 +373,7 @@ func (r *registry) auditServer(ctx context.Context, _ *snapshot, limit int) (aud
 		message string
 	}
 	byLogger := map[string]*logged{}
-	for _, e := range errors.Model.Records {
+	for _, e := range errors.Answer.Records {
 		if time.Since(parseTime(e.Time)) > logErrorsSince {
 			continue
 		}
@@ -405,7 +405,7 @@ const logErrorsPage = 500
 func runningVersion(updates []sonarr.UpdateResource) string {
 	running := "an older release"
 	for _, u := range updates {
-		if boolv(u.Installed) || u.InstalledOn != "" {
+		if u.Installed || u.InstalledOn != "" {
 			running = u.Version
 		}
 	}

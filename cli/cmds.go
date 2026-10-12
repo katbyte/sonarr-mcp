@@ -173,7 +173,7 @@ Needs no server: it reports what would be registered, not what a server accepts.
 			if err != nil {
 				return err
 			}
-			series, err := client.GetSeries(cmd.Context(), sonarr.GetSeriesOperationOptions{})
+			series, err := client.GetSeries(cmd.Context(), sonarr.GetSeriesOptions{})
 			if err != nil {
 				return err
 			}
@@ -182,9 +182,9 @@ Needs no server: it reports what would be registered, not what a server accepts.
 				return err
 			}
 
-			s := status.Model
-			_, _ = fmt.Fprintf(out, "%s %s on %s at %s - %d series\n", s.InstanceName, s.Version, s.OsName, client.Client.BaseURL, len(series.Model))
-			for _, f := range folders.Model {
+			s := status.Answer
+			_, _ = fmt.Fprintf(out, "%s %s on %s at %s - %d series\n", s.InstanceName, s.Version, s.OsName, client.Client.BaseURL, len(series.Answer))
+			for _, f := range folders.Answer {
 				_, _ = fmt.Fprintf(out, "  root folder %s - %s free, %d folders not in Sonarr\n", f.Path, humanBytes(f.FreeSpace), len(f.UnmappedFolders))
 			}
 			return nil

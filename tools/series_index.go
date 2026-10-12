@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -35,7 +36,7 @@ const seriesIndexTTL = 2 * time.Minute
 
 type seriesIndex struct {
 	series []sonarr.SeriesResource
-	byID   map[int]int
+	byID   map[sonarr.SeriesID]int
 	read   time.Time
 }
 
@@ -68,11 +69,11 @@ func (c *seriesCache) get(ctx context.Context, client *sonarr.Client, fresh bool
 	if c.idx != nil && !fresh && time.Since(c.idx.read) < seriesIndexTTL {
 		return c.idx, nil
 	}
-	res, err := client.GetSeries(ctx, sonarr.GetSeriesOperationOptions{})
+	res, err := client.GetSeries(ctx, sonarr.GetSeriesOptions{})
 	if err != nil {
 		return nil, err
 	}
-	idx := &seriesIndex{series: res.Model, byID: map[int]int{}, read: time.Now()}
+	idx := &seriesIndex{series: res.Answer, byID: map[sonarr.SeriesID]int{}, read: time.Now()}
 	for i := range idx.series {
 		idx.byID[idx.series[i].Id] = i
 	}
@@ -95,7 +96,7 @@ func (r *registry) allSeries(ctx context.Context) ([]sonarr.SeriesResource, erro
 		if c := strings.Compare(sortKey(&a), sortKey(&b)); c != 0 {
 			return c
 		}
-		return a.Id - b.Id
+		return cmp.Compare(a.Id, b.Id)
 	})
 
 	return out, nil
@@ -110,8 +111,8 @@ func sortKey(s *sonarr.SeriesResource) string {
 }
 
 // seriesByID reads one series as it stands now.
-func (r *registry) seriesByID(ctx context.Context, id int) (*sonarr.SeriesResource, error) {
-	res, err := r.client.GetSeriesById(ctx, id, sonarr.GetSeriesByIdOperationOptions{})
+func (r *registry) seriesByID(ctx context.Context, id sonarr.SeriesID) (*sonarr.SeriesResource, error) {
+	res, err := r.client.GetSeriesById(ctx, id, sonarr.GetSeriesByIdOptions{})
 	switch {
 	case apiclient.IsNotFound(err):
 		return nil, fmt.Errorf("no series with id %d in Sonarr", id)
@@ -119,15 +120,15 @@ func (r *registry) seriesByID(ctx context.Context, id int) (*sonarr.SeriesResour
 		return nil, err
 	}
 
-	return res.Model, nil
+	return res.Answer, nil
 }
 
 // seriesMatch is a candidate a name could mean, for an ambiguity report.
 type seriesMatch struct {
-	ID     int    `json:"id"`
-	Title  string `json:"title"`
-	Year   int    `json:"year,omitempty"`
-	TvdbID int    `json:"tvdb_id,omitempty"`
+	ID     sonarr.SeriesID `json:"id"`
+	Title  string          `json:"title"`
+	Year   int             `json:"year,omitempty"`
+	TvdbID sonarr.TvdbID   `json:"tvdb_id,omitempty"`
 }
 
 func matchOf(s *sonarr.SeriesResource) seriesMatch {
@@ -150,7 +151,7 @@ func (r *registry) resolveSeries(ctx context.Context, ref string) (*sonarr.Serie
 		return nil, errors.New("name a series: a title, a Sonarr id, or tvdb:<id>")
 	}
 	if id, err := strconv.Atoi(ref); err == nil {
-		return r.seriesByID(ctx, id)
+		return r.seriesByID(ctx, sonarr.SeriesID(id))
 	}
 
 	for _, fresh := range []bool{false, true} {
@@ -239,7 +240,7 @@ func (idx *seriesIndex) matchProvider(provider, id string) (*sonarr.SeriesResour
 		var have string
 		switch provider {
 		case "tvdb":
-			have = strconv.Itoa(s.TvdbId)
+			have = strconv.Itoa(int(s.TvdbId))
 		case "tmdb":
 			have = strconv.Itoa(s.TmdbId)
 		case "tvmaze":

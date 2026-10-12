@@ -29,6 +29,16 @@ type Service struct {
 	Auth string `json:"Auth"`
 	// Workarounds lists the importer workarounds applied, in order.
 	Workarounds []string `json:"Workarounds"`
+	// Dates and Days are the layouts the service writes a date and time
+	// and a day in, first the one it is sent in; empty, dates are strings.
+	Dates []string `json:"Dates,omitempty"`
+	Days  []string `json:"Days,omitempty"`
+	// DatesKeepUnread and DaysKeepUnread read a date no layout reads as
+	// zero with its text kept, rather than failing the decode.
+	DatesKeepUnread bool `json:"DatesKeepUnread,omitempty"`
+	DaysKeepUnread  bool `json:"DaysKeepUnread,omitempty"`
+	// IDs are the kinds of id the package declares types for.
+	IDs []IDKind `json:"IDs,omitempty"`
 
 	Groups []Group `json:"-"`
 }
@@ -72,10 +82,31 @@ type Operation struct {
 	// Pageable is set for the list operations, which also get a Complete
 	// method that pages through every result.
 	Pageable *Pageable `json:"Pageable,omitempty"`
+	// Commands is set on an operation that queues commands named in its body, and says how a queued one is followed; Command is set
+	// on each command's own operation, one per name, which sends the same request with its name fixed and also gets an AndWait.
+	Commands *CommandSet `json:"Commands,omitempty"`
+	Command  string      `json:"Command,omitempty"`
 }
 
-// Key identifies an operation independently of its Go name.
-func (o *Operation) Key() string { return o.Method + " " + o.Path }
+// CommandSet is how a queued command is followed: Get is the Go name of the operation that answers one by its id, Status the field
+// of its answer that says how far it is, Finished the values that mean it is over and Failed those among them that mean it failed.
+type CommandSet struct {
+	Get      string   `json:"Get"`
+	Status   string   `json:"Status"`
+	Finished []string `json:"Finished"`
+	Failed   []string `json:"Failed,omitempty"`
+}
+
+// Key identifies an operation independently of its Go name; a command's
+// operation shares its method and path with the one that queues it, and is
+// told apart by its name.
+func (o *Operation) Key() string {
+	if o.Command != "" {
+		return o.Method + " " + o.Path + " " + o.Command
+	}
+
+	return o.Method + " " + o.Path
+}
 
 // PathParameter is a placeholder of the path template.
 type PathParameter struct {
@@ -146,9 +177,11 @@ func (b *Body) AsksFor() string {
 // Pageable says how a list operation pages.
 type Pageable struct {
 	// StartIndexOption and LimitOption are the options fields: where a page
-	// starts and how many results it holds.
+	// starts and how many results it holds. LimitOption is empty for a
+	// service whose page size is the server's to choose; the pager then
+	// takes the first page's size as the page size.
 	StartIndexOption string `json:"StartIndexOption"`
-	LimitOption      string `json:"LimitOption"`
+	LimitOption      string `json:"LimitOption,omitempty"`
 	// ByPage is set when the list pages by page number: StartIndexOption is
 	// then the page wanted, counted from 1, rather than the index of its
 	// first result.
@@ -189,8 +222,9 @@ type Field struct {
 	// the generated field is then always sent, its zero included.
 	Required bool `json:"Required,omitempty"`
 	// KeepsNull makes the generated field a pointer, so the document's null
-	// is told from the number's zero: the fields the service config names
-	// in KeepNull. Every other number is held by value.
+	// is told from a number's zero, and a string left out from one sent
+	// empty: the fields the service config names in KeepNull. Every other
+	// number and string is held by value.
 	KeepsNull bool `json:"KeepsNull,omitempty"`
 }
 
@@ -229,7 +263,29 @@ const (
 	RawObject  ObjectType = "RawObject"
 	Any        ObjectType = "Any"
 	RawFile    ObjectType = "RawFile"
+	// DateTime and Date are strings the document declares as a date and
+	// time or a day, held as the package's Time and Day when the service
+	// gives the layouts it writes them in (Service.Dates, Days).
+	DateTime ObjectType = "DateTime"
+	Date     ObjectType = "Date"
+	// UnixSeconds and UnixMillis are integers a workaround declares a date
+	// (seconds or milliseconds since 1970), held as the package's Unix and
+	// UnixMilli, which read a number and write one back.
+	UnixSeconds ObjectType = "UnixSeconds"
+	UnixMillis  ObjectType = "UnixMillis"
+	// ID is a kind of id the service tells apart (Service.IDs), named in
+	// ReferenceName, held as a named type over its base.
+	ID ObjectType = "ID"
 )
+
+// IDKind is one kind of id, a named type over an int, an int64 or a string.
+type IDKind struct {
+	Name string     `json:"Name"`
+	Base ObjectType `json:"Base"`
+	// Shape is the regular expression every value of the kind matches, over its text, and Example a value of it; empty for a kind with no shape.
+	Shape   string `json:"Shape,omitempty"`
+	Example string `json:"Example,omitempty"`
+}
 
 // TypeRef is the type of a field, parameter or body.
 type TypeRef struct {
@@ -300,4 +356,27 @@ func (s *Service) Constants() map[string]*Constant {
 	}
 
 	return out
+}
+
+// IDKind is a kind of id by name, or nil for one the service does not declare.
+func (s *Service) IDKind(kind string) *IDKind {
+	for i := range s.IDs {
+		if s.IDs[i].Name == kind {
+			return &s.IDs[i]
+		}
+	}
+
+	return nil
+}
+
+// IDBase is the base type of a kind of id, or "" for a kind the service does
+// not declare.
+func (s *Service) IDBase(kind string) ObjectType {
+	for _, k := range s.IDs {
+		if k.Name == kind {
+			return k.Base
+		}
+	}
+
+	return ""
 }

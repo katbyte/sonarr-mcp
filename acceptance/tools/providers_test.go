@@ -105,16 +105,16 @@ func addBrokenIndexer(t *testing.T) *newznab.Indexer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	idx := schemas.Model[slices.IndexFunc(schemas.Model, func(s sonarr.IndexerResource) bool { return s.Implementation == "Newznab" })]
+	idx := schemas.Answer[slices.IndexFunc(schemas.Answer, func(s sonarr.IndexerResource) bool { return s.Implementation == "Newznab" })]
 	idx.Name, idx.EnableRss, idx.EnableAutomaticSearch, idx.EnableInteractiveSearch = brokenIndexerName, new(true), new(false), new(false)
 	idx.Fields = providerFields(idx.Fields, map[string]any{
 		"baseUrl": srv.URL(), "apiPath": "/api", "apiKey": testenv.FakeKey, "categories": []int{5030, 5040},
 	})
-	made, err := api.PostIndexer(ctx, idx, sonarr.PostIndexerOperationOptions{})
+	made, err := api.PostIndexer(ctx, idx, sonarr.PostIndexerOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = api.DeleteIndexerById(ctx, made.Model.Id) })
+	t.Cleanup(func() { _, _ = api.DeleteIndexerById(ctx, made.Answer.Id) })
 	srv.SetFailure(newznab.Failure{Status: http.StatusInternalServerError})
 
 	return srv

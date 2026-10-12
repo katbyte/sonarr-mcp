@@ -3,6 +3,54 @@
   "Tag": "Command",
   "Operations": [
     {
+      "Name": "Backup",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Description": "Queues the Backup command.",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "BackupCommand"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ],
+      "Command": "Backup"
+    },
+    {
+      "Name": "CutoffUnmetEpisodeSearch",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Description": "Queues the CutoffUnmetEpisodeSearch command.",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CutoffUnmetEpisodeSearchCommand"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ],
+      "Command": "CutoffUnmetEpisodeSearch"
+    },
+    {
       "Name": "DeleteCommandById",
       "Method": "DELETE",
       "Path": "/api/v3/command/{id}",
@@ -11,13 +59,38 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "CommandID"
           }
         }
       ],
       "ExpectedStatusCodes": [
         200
       ]
+    },
+    {
+      "Name": "EpisodeSearch",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Description": "Queues the EpisodeSearch command.",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "EpisodeSearchCommand"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ],
+      "Command": "EpisodeSearch"
     },
     {
       "Name": "GetCommand",
@@ -46,7 +119,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "CommandID"
           }
         }
       ],
@@ -60,6 +134,54 @@
       "ExpectedStatusCodes": [
         200
       ]
+    },
+    {
+      "Name": "ManualImport",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Description": "Queues the ManualImport command.",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "ManualImportCommand"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ],
+      "Command": "ManualImport"
+    },
+    {
+      "Name": "MissingEpisodeSearch",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Description": "Queues the MissingEpisodeSearch command.",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "MissingEpisodeSearchCommand"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ],
+      "Command": "MissingEpisodeSearch"
     },
     {
       "Name": "PostCommand",
@@ -80,10 +202,186 @@
       },
       "ExpectedStatusCodes": [
         201
-      ]
+      ],
+      "Commands": {
+        "Get": "GetCommandById",
+        "Status": "status",
+        "Finished": [
+          "completed",
+          "failed",
+          "aborted",
+          "cancelled",
+          "orphaned"
+        ],
+        "Failed": [
+          "failed",
+          "aborted",
+          "cancelled",
+          "orphaned"
+        ]
+      }
+    },
+    {
+      "Name": "RefreshMonitoredDownloads",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Description": "Queues the RefreshMonitoredDownloads command.",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "RefreshMonitoredDownloadsCommand"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ],
+      "Command": "RefreshMonitoredDownloads"
+    },
+    {
+      "Name": "RefreshSeries",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Description": "Queues the RefreshSeries command.",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "RefreshSeriesCommand"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ],
+      "Command": "RefreshSeries"
+    },
+    {
+      "Name": "RenameFiles",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Description": "Queues the RenameFiles command.",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "RenameFilesCommand"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ],
+      "Command": "RenameFiles"
+    },
+    {
+      "Name": "RescanSeries",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Description": "Queues the RescanSeries command.",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "RescanSeriesCommand"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ],
+      "Command": "RescanSeries"
+    },
+    {
+      "Name": "SeasonSearch",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Description": "Queues the SeasonSearch command.",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "SeasonSearchCommand"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ],
+      "Command": "SeasonSearch"
+    },
+    {
+      "Name": "SeriesSearch",
+      "Method": "POST",
+      "Path": "/api/v3/command",
+      "Description": "Queues the SeriesSearch command.",
+      "Request": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "SeriesSearchCommand"
+        }
+      },
+      "Response": {
+        "ContentType": "application/json",
+        "Type": {
+          "Type": "Reference",
+          "ReferenceName": "CommandResource"
+        }
+      },
+      "ExpectedStatusCodes": [
+        201
+      ],
+      "Command": "SeriesSearch"
     }
   ],
   "Models": [
+    {
+      "Name": "BackupCommand",
+      "SchemaName": "BackupCommand",
+      "Description": "The Backup command, as POST /api/v3/command queues it.",
+      "Fields": [
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Description": "The command's name, which the method sets.",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ]
+    },
     {
       "Name": "CommandResource",
       "SchemaName": "CommandResource",
@@ -143,7 +441,8 @@
           "Name": "Id",
           "JsonName": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "CommandID"
           }
         },
         {
@@ -237,6 +536,277 @@
           "JsonName": "updateScheduledTask",
           "Type": {
             "Type": "Boolean"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "CutoffUnmetEpisodeSearchCommand",
+      "SchemaName": "CutoffUnmetEpisodeSearchCommand",
+      "Description": "The CutoffUnmetEpisodeSearch command, as POST /api/v3/command queues it.",
+      "Fields": [
+        {
+          "Name": "Monitored",
+          "JsonName": "monitored",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Description": "The command's name, which the method sets.",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "EpisodeSearchCommand",
+      "SchemaName": "EpisodeSearchCommand",
+      "Description": "The EpisodeSearch command, as POST /api/v3/command queues it.",
+      "Fields": [
+        {
+          "Name": "EpisodeIds",
+          "JsonName": "episodeIds",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "ID",
+              "ReferenceName": "EpisodeID"
+            }
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Description": "The command's name, which the method sets.",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "ManualImportCommand",
+      "SchemaName": "ManualImportCommand",
+      "Description": "The ManualImport command, as POST /api/v3/command queues it.",
+      "Fields": [
+        {
+          "Name": "Files",
+          "JsonName": "files",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Dictionary",
+              "NestedItem": {
+                "Type": "Any"
+              }
+            }
+          }
+        },
+        {
+          "Name": "ImportMode",
+          "JsonName": "importMode",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Description": "The command's name, which the method sets.",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "MissingEpisodeSearchCommand",
+      "SchemaName": "MissingEpisodeSearchCommand",
+      "Description": "The MissingEpisodeSearch command, as POST /api/v3/command queues it.",
+      "Fields": [
+        {
+          "Name": "Monitored",
+          "JsonName": "monitored",
+          "Type": {
+            "Type": "Boolean"
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Description": "The command's name, which the method sets.",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "RefreshMonitoredDownloadsCommand",
+      "SchemaName": "RefreshMonitoredDownloadsCommand",
+      "Description": "The RefreshMonitoredDownloads command, as POST /api/v3/command queues it.",
+      "Fields": [
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Description": "The command's name, which the method sets.",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "RefreshSeriesCommand",
+      "SchemaName": "RefreshSeriesCommand",
+      "Description": "The RefreshSeries command, as POST /api/v3/command queues it.",
+      "Fields": [
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Description": "The command's name, which the method sets.",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "RenameFilesCommand",
+      "SchemaName": "RenameFilesCommand",
+      "Description": "The RenameFiles command, as POST /api/v3/command queues it.",
+      "Fields": [
+        {
+          "Name": "Files",
+          "JsonName": "files",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "ID",
+              "ReferenceName": "EpisodeFileID"
+            }
+          }
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Description": "The command's name, which the method sets.",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "RescanSeriesCommand",
+      "SchemaName": "RescanSeriesCommand",
+      "Description": "The RescanSeries command, as POST /api/v3/command queues it.",
+      "Fields": [
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Description": "The command's name, which the method sets.",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "SeasonSearchCommand",
+      "SchemaName": "SeasonSearchCommand",
+      "Description": "The SeasonSearch command, as POST /api/v3/command queues it.",
+      "Fields": [
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Description": "The command's name, which the method sets.",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "SeasonNumber",
+          "JsonName": "seasonNumber",
+          "Type": {
+            "Type": "Integer"
+          },
+          "Nullable": true,
+          "KeepsNull": true
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "SeriesSearchCommand",
+      "SchemaName": "SeriesSearchCommand",
+      "Description": "The SeriesSearch command, as POST /api/v3/command queues it.",
+      "Fields": [
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Description": "The command's name, which the method sets.",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "SeriesId",
+          "JsonName": "seriesId",
+          "Type": {
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         }
       ]

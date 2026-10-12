@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostRootFolderOperationResponse is the result of PostRootFolder.
-type PostRootFolderOperationResponse struct {
+// PostRootFolderResponse is the result of PostRootFolder.
+//
+// Answer is the RootFolderResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PostRootFolderResponse struct {
 	HttpResponse *http.Response
-	Model        *RootFolderResource
+	Answer       *RootFolderResource
+	*RootFolderResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostRootFolderResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the RootFolderResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PostRootFolderResponse) Record() (RootFolderResource, error) {
+	if r.Answer == nil {
+		return RootFolderResource{}, errors.New("PostRootFolder answered no RootFolderResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PostRootFolder calls POST /api/v3/rootfolder.
-func (c Client) PostRootFolder(ctx context.Context, input RootFolderResource) (result PostRootFolderOperationResponse, err error) {
+func (c Client) PostRootFolder(ctx context.Context, input RootFolderResource) (result PostRootFolderResponse, err error) {
+	result.RootFolderResource = &RootFolderResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusCreated,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostRootFolder",
 		Path:       "/api/v3/rootfolder",
 	}
 
@@ -44,11 +68,12 @@ func (c Client) PostRootFolder(ctx context.Context, input RootFolderResource) (r
 		return
 	}
 
-	var model RootFolderResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer RootFolderResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.RootFolderResource = result.Answer
 
 	return
 }

@@ -95,8 +95,8 @@ func TestURLBaseKeyAndUserAgent(t *testing.T) {
 	})
 
 	res, err := c.GetSystemStatus(t.Context())
-	if err != nil || res.Model == nil || res.Model.Version != "4.0.20.3014" {
-		t.Fatalf("a request under a URL base = %+v, %v", res.Model, err)
+	if err != nil || res.Answer == nil || res.Answer.Version != "4.0.20.3014" {
+		t.Fatalf("a request under a URL base = %+v, %v", res.Answer, err)
 	}
 	if len(*seen) != 1 {
 		t.Fatalf("%d requests, want one", len(*seen))

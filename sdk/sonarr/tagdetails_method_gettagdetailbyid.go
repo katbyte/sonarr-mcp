@@ -4,26 +4,52 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetTagDetailByIdOperationResponse is the result of GetTagDetailById.
-type GetTagDetailByIdOperationResponse struct {
+// GetTagDetailByIdResponse is the result of GetTagDetailById.
+//
+// Answer is the TagDetailsResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetTagDetailByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *TagDetailsResource
+	Answer       *TagDetailsResource
+	*TagDetailsResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetTagDetailByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the TagDetailsResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetTagDetailByIdResponse) Record() (TagDetailsResource, error) {
+	if r.Answer == nil {
+		return TagDetailsResource{}, errors.New("GetTagDetailById answered no TagDetailsResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetTagDetailById calls GET /api/v3/tag/detail/{id}.
-func (c Client) GetTagDetailById(ctx context.Context, id int) (result GetTagDetailByIdOperationResponse, err error) {
+func (c Client) GetTagDetailById(ctx context.Context, id TagID) (result GetTagDetailByIdResponse, err error) {
+	result.TagDetailsResource = &TagDetailsResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
-		Path:       fmt.Sprintf("/api/v3/tag/detail/%d", id),
+		Operation:  "GetTagDetailById",
+		Path:       fmt.Sprintf("/api/v3/tag/detail/%s", url.PathEscape(strconv.Itoa(int(id)))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -40,11 +66,12 @@ func (c Client) GetTagDetailById(ctx context.Context, id int) (result GetTagDeta
 		return
 	}
 
-	var model TagDetailsResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer TagDetailsResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.TagDetailsResource = result.Answer
 
 	return
 }

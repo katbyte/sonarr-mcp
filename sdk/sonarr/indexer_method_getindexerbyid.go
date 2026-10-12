@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetIndexerByIdOperationResponse is the result of GetIndexerById.
-type GetIndexerByIdOperationResponse struct {
+// GetIndexerByIdResponse is the result of GetIndexerById.
+//
+// Answer is the IndexerResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetIndexerByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *IndexerResource
+	Answer       *IndexerResource
+	*IndexerResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetIndexerByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the IndexerResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetIndexerByIdResponse) Record() (IndexerResource, error) {
+	if r.Answer == nil {
+		return IndexerResource{}, errors.New("GetIndexerById answered no IndexerResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetIndexerById calls GET /api/v3/indexer/{id}.
-func (c Client) GetIndexerById(ctx context.Context, id int) (result GetIndexerByIdOperationResponse, err error) {
+func (c Client) GetIndexerById(ctx context.Context, id int) (result GetIndexerByIdResponse, err error) {
+	result.IndexerResource = &IndexerResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetIndexerById",
 		Path:       fmt.Sprintf("/api/v3/indexer/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetIndexerById(ctx context.Context, id int) (result GetIndexerBy
 		return
 	}
 
-	var model IndexerResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer IndexerResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.IndexerResource = result.Answer
 
 	return
 }

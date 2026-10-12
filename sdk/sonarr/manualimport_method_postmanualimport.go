@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostManualImportOperationResponse is the result of PostManualImport.
-type PostManualImportOperationResponse struct {
+// PostManualImportResponse is the result of PostManualImport.
+type PostManualImportResponse struct {
 	HttpResponse *http.Response
-	Model        []ManualImportReprocessResource
+	Answer       []ManualImportReprocessResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostManualImportResponse) Answered() bool { return r.Answer != nil }
+
 // PostManualImport calls POST /api/v3/manualimport.
-func (c Client) PostManualImport(ctx context.Context, input []ManualImportReprocessResource) (result PostManualImportOperationResponse, err error) {
+func (c Client) PostManualImport(ctx context.Context, input []ManualImportReprocessResource) (result PostManualImportResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostManualImport",
 		Path:       "/api/v3/manualimport",
 	}
 
@@ -44,7 +49,7 @@ func (c Client) PostManualImport(ctx context.Context, input []ManualImportReproc
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

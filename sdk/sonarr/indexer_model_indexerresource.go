@@ -22,5 +22,11 @@ type IndexerResource struct {
 	SeasonSearchMaximumSingleEpisodeAge int               `json:"seasonSearchMaximumSingleEpisodeAge,omitempty"`
 	SupportsRss                         *bool             `json:"supportsRss,omitempty"`
 	SupportsSearch                      *bool             `json:"supportsSearch,omitempty"`
-	Tags                                []int             `json:"tags,omitzero"`
+	Tags                                []TagID           `json:"tags,omitzero"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m IndexerResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m IndexerResource) GetId() int { return m.Id }

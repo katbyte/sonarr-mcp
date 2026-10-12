@@ -9,3 +9,9 @@ type Quality struct {
 	Resolution int           `json:"resolution,omitempty"`
 	Source     QualitySource `json:"source,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m Quality) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m Quality) GetId() int { return m.Id }

@@ -4,24 +4,48 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetConfigIndexerOperationResponse is the result of GetConfigIndexer.
-type GetConfigIndexerOperationResponse struct {
+// GetConfigIndexerResponse is the result of GetConfigIndexer.
+//
+// Answer is the IndexerConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetConfigIndexerResponse struct {
 	HttpResponse *http.Response
-	Model        *IndexerConfigResource
+	Answer       *IndexerConfigResource
+	*IndexerConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetConfigIndexerResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the IndexerConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetConfigIndexerResponse) Record() (IndexerConfigResource, error) {
+	if r.Answer == nil {
+		return IndexerConfigResource{}, errors.New("GetConfigIndexer answered no IndexerConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetConfigIndexer calls GET /api/v3/config/indexer.
-func (c Client) GetConfigIndexer(ctx context.Context) (result GetConfigIndexerOperationResponse, err error) {
+func (c Client) GetConfigIndexer(ctx context.Context) (result GetConfigIndexerResponse, err error) {
+	result.IndexerConfigResource = &IndexerConfigResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetConfigIndexer",
 		Path:       "/api/v3/config/indexer",
 	}
 
@@ -39,11 +63,12 @@ func (c Client) GetConfigIndexer(ctx context.Context) (result GetConfigIndexerOp
 		return
 	}
 
-	var model IndexerConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer IndexerConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.IndexerConfigResource = result.Answer
 
 	return
 }

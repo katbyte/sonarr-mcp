@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetLogFileUpdateOperationResponse is the result of GetLogFileUpdate.
-type GetLogFileUpdateOperationResponse struct {
+// GetLogFileUpdateResponse is the result of GetLogFileUpdate.
+type GetLogFileUpdateResponse struct {
 	HttpResponse *http.Response
-	Model        []LogFileResource
+	Answer       []LogFileResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetLogFileUpdateResponse) Answered() bool { return r.Answer != nil }
+
 // GetLogFileUpdate calls GET /api/v3/log/file/update.
-func (c Client) GetLogFileUpdate(ctx context.Context) (result GetLogFileUpdateOperationResponse, err error) {
+func (c Client) GetLogFileUpdate(ctx context.Context) (result GetLogFileUpdateResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetLogFileUpdate",
 		Path:       "/api/v3/log/file/update",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetLogFileUpdate(ctx context.Context) (result GetLogFileUpdateOp
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

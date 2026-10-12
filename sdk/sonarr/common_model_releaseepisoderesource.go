@@ -4,9 +4,9 @@ package sonarr
 
 // ReleaseEpisodeResource is the "ReleaseEpisodeResource" schema.
 type ReleaseEpisodeResource struct {
-	AbsoluteEpisodeNumber int    `json:"absoluteEpisodeNumber,omitempty"`
-	EpisodeNumber         int    `json:"episodeNumber,omitempty"`
-	Id                    int    `json:"id,omitempty"`
-	SeasonNumber          int    `json:"seasonNumber,omitempty"`
-	Title                 string `json:"title,omitempty"`
+	AbsoluteEpisodeNumber int       `json:"absoluteEpisodeNumber,omitempty"`
+	EpisodeNumber         int       `json:"episodeNumber,omitempty"`
+	Id                    EpisodeID `json:"id,omitempty"`
+	SeasonNumber          int       `json:"seasonNumber,omitempty"`
+	Title                 string    `json:"title,omitempty"`
 }

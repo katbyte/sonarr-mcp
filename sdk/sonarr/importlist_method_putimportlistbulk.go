@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutImportListBulkOperationResponse is the result of PutImportListBulk.
-type PutImportListBulkOperationResponse struct {
+// PutImportListBulkResponse is the result of PutImportListBulk.
+type PutImportListBulkResponse struct {
 	HttpResponse *http.Response
-	Model        []ImportListResource
+	Answer       []ImportListResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutImportListBulkResponse) Answered() bool { return r.Answer != nil }
+
 // PutImportListBulk calls PUT /api/v3/importlist/bulk.
-func (c Client) PutImportListBulk(ctx context.Context, input ImportListBulkResource) (result PutImportListBulkOperationResponse, err error) {
+func (c Client) PutImportListBulk(ctx context.Context, input ImportListBulkResource) (result PutImportListBulkResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
+		Operation:  "PutImportListBulk",
 		Path:       "/api/v3/importlist/bulk",
 	}
 
@@ -44,7 +49,7 @@ func (c Client) PutImportListBulk(ctx context.Context, input ImportListBulkResou
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

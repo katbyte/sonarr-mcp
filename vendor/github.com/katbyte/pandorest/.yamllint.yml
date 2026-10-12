@@ -2,7 +2,7 @@
 extends: default
 
 ignore:
-  - .tools/venv/ # gitignored python venv, yamllint's own bundled configs live in here
+  - .tools/ # gitignored tool installs (python venv, npm prefix) carry third-party yaml
 
 rules:
   comments:

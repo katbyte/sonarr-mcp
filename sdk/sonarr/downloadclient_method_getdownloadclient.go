@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetDownloadClientOperationResponse is the result of GetDownloadClient.
-type GetDownloadClientOperationResponse struct {
+// GetDownloadClientResponse is the result of GetDownloadClient.
+type GetDownloadClientResponse struct {
 	HttpResponse *http.Response
-	Model        []DownloadClientResource
+	Answer       []DownloadClientResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetDownloadClientResponse) Answered() bool { return r.Answer != nil }
+
 // GetDownloadClient calls GET /api/v3/downloadclient.
-func (c Client) GetDownloadClient(ctx context.Context) (result GetDownloadClientOperationResponse, err error) {
+func (c Client) GetDownloadClient(ctx context.Context) (result GetDownloadClientResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetDownloadClient",
 		Path:       "/api/v3/downloadclient",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetDownloadClient(ctx context.Context) (result GetDownloadClient
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

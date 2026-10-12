@@ -7,10 +7,16 @@ type QualityProfileResource struct {
 	Cutoff                int                                 `json:"cutoff,omitempty"`
 	CutoffFormatScore     int                                 `json:"cutoffFormatScore,omitempty"`
 	FormatItems           []ProfileFormatItemResource         `json:"formatItems,omitzero"`
-	Id                    int                                 `json:"id,omitempty"`
+	Id                    QualityProfileID                    `json:"id,omitempty"`
 	Items                 []QualityProfileQualityItemResource `json:"items,omitzero"`
 	MinFormatScore        int                                 `json:"minFormatScore,omitempty"`
 	MinUpgradeFormatScore int                                 `json:"minUpgradeFormatScore,omitempty"`
 	Name                  string                              `json:"name,omitempty"`
 	UpgradeAllowed        *bool                               `json:"upgradeAllowed,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m QualityProfileResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m QualityProfileResource) GetId() QualityProfileID { return m.Id }

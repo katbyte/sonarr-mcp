@@ -4,31 +4,54 @@ package sonarr
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostIndexerOperationResponse is the result of PostIndexer.
-type PostIndexerOperationResponse struct {
+// PostIndexerResponse is the result of PostIndexer.
+//
+// Answer is the IndexerResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PostIndexerResponse struct {
 	HttpResponse *http.Response
-	Model        *IndexerResource
+	Answer       *IndexerResource
+	*IndexerResource
 }
 
-// PostIndexerOperationOptions holds the query and header parameters of PostIndexer.
-type PostIndexerOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostIndexerResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the IndexerResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PostIndexerResponse) Record() (IndexerResource, error) {
+	if r.Answer == nil {
+		return IndexerResource{}, errors.New("PostIndexer answered no IndexerResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// PostIndexerOptions holds the query and header parameters of PostIndexer.
+type PostIndexerOptions struct {
 	ForceSave *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PostIndexerOperationOptions) ToHeaders() *client.Headers {
+func (o PostIndexerOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PostIndexerOperationOptions) ToQuery() *client.QueryParams {
+func (o PostIndexerOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.ForceSave != nil {
 		out.Append("forceSave", strconv.FormatBool(*o.ForceSave))
@@ -37,14 +60,25 @@ func (o PostIndexerOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PostIndexer calls POST /api/v3/indexer.
-func (c Client) PostIndexer(ctx context.Context, input IndexerResource, options PostIndexerOperationOptions) (result PostIndexerOperationResponse, err error) {
+func (c Client) PostIndexer(ctx context.Context, input IndexerResource, options ...PostIndexerOptions) (result PostIndexerResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PostIndexer takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PostIndexerOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.IndexerResource = &IndexerResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusCreated,
 		},
 		HTTPMethod:    http.MethodPost,
-		OptionsObject: options,
+		Operation:     "PostIndexer",
+		OptionsObject: option,
 		Path:          "/api/v3/indexer",
 	}
 
@@ -66,11 +100,12 @@ func (c Client) PostIndexer(ctx context.Context, input IndexerResource, options 
 		return
 	}
 
-	var model IndexerResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer IndexerResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.IndexerResource = result.Answer
 
 	return
 }

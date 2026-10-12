@@ -12,15 +12,15 @@ type SystemResource struct {
 	DatabaseType                  DatabaseType       `json:"databaseType,omitempty"`
 	DatabaseVersion               string             `json:"databaseVersion,omitempty"`
 	InstanceName                  string             `json:"instanceName,omitempty"`
-	IsAdmin                       *bool              `json:"isAdmin,omitempty"`
-	IsDebug                       *bool              `json:"isDebug,omitempty"`
-	IsDocker                      *bool              `json:"isDocker,omitempty"`
-	IsLinux                       *bool              `json:"isLinux,omitempty"`
-	IsNetCore                     *bool              `json:"isNetCore,omitempty"`
-	IsOsx                         *bool              `json:"isOsx,omitempty"`
-	IsProduction                  *bool              `json:"isProduction,omitempty"`
-	IsUserInteractive             *bool              `json:"isUserInteractive,omitempty"`
-	IsWindows                     *bool              `json:"isWindows,omitempty"`
+	IsAdmin                       bool               `json:"isAdmin"`
+	IsDebug                       bool               `json:"isDebug"`
+	IsDocker                      bool               `json:"isDocker"`
+	IsLinux                       bool               `json:"isLinux"`
+	IsNetCore                     bool               `json:"isNetCore"`
+	IsOsx                         bool               `json:"isOsx"`
+	IsProduction                  bool               `json:"isProduction"`
+	IsUserInteractive             bool               `json:"isUserInteractive"`
+	IsWindows                     bool               `json:"isWindows"`
 	MigrationVersion              int                `json:"migrationVersion,omitempty"`
 	Mode                          RuntimeMode        `json:"mode,omitempty"`
 	OsName                        string             `json:"osName,omitempty"`

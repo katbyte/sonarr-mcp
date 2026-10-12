@@ -9,18 +9,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostSystemShutdownOperationResponse is the result of PostSystemShutdown.
-type PostSystemShutdownOperationResponse struct {
+// PostSystemShutdownResponse is the result of PostSystemShutdown.
+type PostSystemShutdownResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostSystemShutdown calls POST /api/v3/system/shutdown.
-func (c Client) PostSystemShutdown(ctx context.Context) (result PostSystemShutdownOperationResponse, err error) {
+func (c Client) PostSystemShutdown(ctx context.Context) (result PostSystemShutdownResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostSystemShutdown",
 		Path:       "/api/v3/system/shutdown",
 	}
 

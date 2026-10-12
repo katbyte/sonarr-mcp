@@ -16,25 +16,25 @@ import (
 
 // episodeRow is an episode as a list reads it.
 type episodeRow struct {
-	ID        int      `json:"id"`
-	Episode   string   `json:"episode"            jsonschema:"S01E02"`
-	Absolute  int      `json:"absolute,omitempty" jsonschema:"the absolute number, for anime"`
-	Title     string   `json:"title"`
-	AirDate   string   `json:"air_date,omitempty"`
-	Aired     bool     `json:"aired"`
-	Monitored bool     `json:"monitored"`
-	HasFile   bool     `json:"has_file"`
-	File      *fileRef `json:"file,omitempty"`
+	ID        sonarr.EpisodeID `json:"id"`
+	Episode   string           `json:"episode"            jsonschema:"S01E02"`
+	Absolute  int              `json:"absolute,omitempty" jsonschema:"the absolute number, for anime"`
+	Title     string           `json:"title"`
+	AirDate   string           `json:"air_date,omitempty"`
+	Aired     bool             `json:"aired"`
+	Monitored bool             `json:"monitored"`
+	HasFile   bool             `json:"has_file"`
+	File      *fileRef         `json:"file,omitempty"`
 }
 
 // fileRef is the file an episode has, in brief.
 type fileRef struct {
-	ID           int      `json:"id"`
-	Quality      string   `json:"quality"`
-	Size         string   `json:"size"`
-	Languages    []string `json:"languages"`
-	CutoffNotMet bool     `json:"below_cutoff"  jsonschema:"the file's quality is below what the profile wants, so Sonarr would upgrade it"`
-	RelativePath string   `json:"relative_path"`
+	ID           sonarr.EpisodeFileID `json:"id"`
+	Quality      string               `json:"quality"`
+	Size         string               `json:"size"`
+	Languages    []string             `json:"languages"`
+	CutoffNotMet bool                 `json:"below_cutoff"  jsonschema:"the file's quality is below what the profile wants, so Sonarr would upgrade it"`
+	RelativePath string               `json:"relative_path"`
 }
 
 func projectFileRef(f *sonarr.EpisodeFileResource) *fileRef {
@@ -57,13 +57,13 @@ func projectEpisode(e *sonarr.EpisodeResource, now time.Time) episodeRow {
 }
 
 // episodesOf reads a series' episodes, every season or one.
-func (r *registry) episodesOf(ctx context.Context, seriesID int, season *int, files bool) ([]sonarr.EpisodeResource, error) {
+func (r *registry) episodesOf(ctx context.Context, seriesID sonarr.SeriesID, season *int, files bool) ([]sonarr.EpisodeResource, error) {
 	// season 0 is the specials, and is asked for like any other
-	res, err := r.client.GetEpisode(ctx, sonarr.GetEpisodeOperationOptions{SeriesId: new(seriesID), SeasonNumber: season, IncludeEpisodeFile: new(files)})
+	res, err := r.client.GetEpisode(ctx, sonarr.GetEpisodeOptions{SeriesId: seriesID, SeasonNumber: season, IncludeEpisodeFile: new(files)})
 	if err != nil {
 		return nil, err
 	}
-	eps := res.Model
+	eps := res.Answer
 	slices.SortFunc(eps, func(a, b sonarr.EpisodeResource) int {
 		if a.SeasonNumber != b.SeasonNumber {
 			return a.SeasonNumber - b.SeasonNumber
@@ -91,7 +91,7 @@ func pickEpisodes(eps []sonarr.EpisodeResource, refs []string) ([]sonarr.Episode
 			ep, _ := strconv.Atoi(m[2])
 			i = slices.IndexFunc(eps, func(e sonarr.EpisodeResource) bool { return e.SeasonNumber == season && e.EpisodeNumber == ep })
 		} else if id, err := strconv.Atoi(ref); err == nil {
-			i = slices.IndexFunc(eps, func(e sonarr.EpisodeResource) bool { return e.Id == id })
+			i = slices.IndexFunc(eps, func(e sonarr.EpisodeResource) bool { return e.Id == sonarr.EpisodeID(id) })
 		} else {
 			return nil, fmt.Errorf("%q is not an episode: use S01E02, 1x02 or an episode id", ref)
 		}
@@ -116,8 +116,8 @@ func noSeason(s *sonarr.SeriesResource, season int) error {
 	return fmt.Errorf("%s has no season %d (it has: %s)", s.Title, season, strings.Join(have, ", "))
 }
 
-func episodeIDs(eps []sonarr.EpisodeResource) []int {
-	out := make([]int, 0, len(eps))
+func episodeIDs(eps []sonarr.EpisodeResource) []sonarr.EpisodeID {
+	out := make([]sonarr.EpisodeID, 0, len(eps))
 	for _, e := range eps {
 		out = append(out, e.Id)
 	}
@@ -190,14 +190,14 @@ func registerEpisodeTools(r *registry) {
 		if err != nil {
 			return nil, monitorOut{}, err
 		}
-		res, err := client.PutEpisodeMonitor(ctx, sonarr.EpisodesMonitoredResource{EpisodeIds: episodeIDs(picked), Monitored: new(in.Monitored)}, sonarr.PutEpisodeMonitorOperationOptions{})
+		res, err := client.PutEpisodeMonitor(ctx, sonarr.EpisodesMonitoredResource{EpisodeIds: episodeIDs(picked), Monitored: new(in.Monitored)}, sonarr.PutEpisodeMonitorOptions{})
 		if err != nil {
 			return nil, monitorOut{}, err
 		}
 		now := time.Now()
 		out := monitorOut{}
-		for i := range res.Model {
-			out.Episodes = append(out.Episodes, projectEpisode(&res.Model[i], now))
+		for i := range res.Answer {
+			out.Episodes = append(out.Episodes, projectEpisode(&res.Answer[i], now))
 		}
 
 		return nil, out, nil
@@ -230,11 +230,11 @@ func registerEpisodeTools(r *registry) {
 		unlock := r.locking().By(seriesLock(s.Id))
 		defer unlock()
 
-		cur, err := client.GetSeriesById(ctx, s.Id, sonarr.GetSeriesByIdOperationOptions{})
+		cur, err := client.GetSeriesById(ctx, s.Id, sonarr.GetSeriesByIdOptions{})
 		if err != nil {
 			return nil, seasonMonitorOut{}, err
 		}
-		body, err := answered(cur.Model, s.Title)
+		body, err := answered(cur.Answer, s.Title)
 		if err != nil {
 			return nil, seasonMonitorOut{}, err
 		}
@@ -261,7 +261,7 @@ func registerEpisodeTools(r *registry) {
 		// A season whose flag is already as asked is not therefore done, and
 		// Sonarr only sets the episodes of a season whose flag changed, so
 		// those episodes are set here.
-		var stragglers []int
+		var stragglers []sonarr.EpisodeID
 		if len(settled) > 0 {
 			eps, err := r.episodesOf(ctx, s.Id, nil, false)
 			if err != nil {
@@ -291,12 +291,12 @@ func registerEpisodeTools(r *registry) {
 		// Sonarr sets every episode of a season whose flag changed to match
 		// it (SeriesService.UpdateSeries), as its own season toggle does
 		if write {
-			if _, err := client.PutSeriesById(ctx, strconv.Itoa(body.Id), body, sonarr.PutSeriesByIdOperationOptions{}); err != nil {
+			if _, err := client.PutSeriesById(ctx, body.Id, body, sonarr.PutSeriesByIdOptions{}); err != nil {
 				return nil, seasonMonitorOut{}, err
 			}
 		}
 		if len(stragglers) > 0 {
-			if _, err := client.PutEpisodeMonitor(ctx, sonarr.EpisodesMonitoredResource{EpisodeIds: stragglers, Monitored: new(in.Monitored)}, sonarr.PutEpisodeMonitorOperationOptions{}); err != nil {
+			if _, err := client.PutEpisodeMonitor(ctx, sonarr.EpisodesMonitoredResource{EpisodeIds: stragglers, Monitored: new(in.Monitored)}, sonarr.PutEpisodeMonitorOptions{}); err != nil {
 				return nil, out, err
 			}
 		}
@@ -373,7 +373,8 @@ func registerEpisodeTools(r *registry) {
 			return nil, searchOut{}, err
 		}
 		ids := episodeIDs(picked)
-		cmd, err := r.runCommand(ctx, "EpisodeSearch", map[string]any{"episodeIds": ids}, waitFor(in.Wait))
+		sent, err := client.EpisodeSearch(ctx, sonarr.EpisodeSearchCommand{EpisodeIds: ids})
+		cmd, err := r.settleCommand(ctx, "EpisodeSearch", waitFor(in.Wait), sent, err)
 		if err != nil {
 			return nil, searchOut{}, err
 		}
@@ -403,7 +404,8 @@ func registerEpisodeTools(r *registry) {
 		if !slices.ContainsFunc(s.Seasons, func(season sonarr.SeasonResource) bool { return season.SeasonNumber == in.Season }) {
 			return nil, searchOut{}, noSeason(s, in.Season)
 		}
-		cmd, err := r.runCommand(ctx, "SeasonSearch", map[string]any{"seriesId": s.Id, "seasonNumber": in.Season}, waitFor(in.Wait))
+		sent, err := client.SeasonSearch(ctx, sonarr.SeasonSearchCommand{SeriesId: s.Id, SeasonNumber: new(in.Season)})
+		cmd, err := r.settleCommand(ctx, "SeasonSearch", waitFor(in.Wait), sent, err)
 		if err != nil {
 			return nil, searchOut{}, err
 		}
@@ -423,14 +425,14 @@ func registerEpisodeTools(r *registry) {
 		pageIn
 	}
 	type calendarRow struct {
-		AirDateUTC string `json:"air_date_utc"`
-		Series     string `json:"series"`
-		SeriesID   int    `json:"series_id"`
-		Episode    string `json:"episode"`
-		Title      string `json:"title"`
-		Network    string `json:"network,omitempty"`
-		Monitored  bool   `json:"monitored"`
-		HasFile    bool   `json:"has_file"`
+		AirDateUTC string          `json:"air_date_utc"`
+		Series     string          `json:"series"`
+		SeriesID   sonarr.SeriesID `json:"series_id"`
+		Episode    string          `json:"episode"`
+		Title      string          `json:"title"`
+		Network    string          `json:"network,omitempty"`
+		Monitored  bool            `json:"monitored"`
+		HasFile    bool            `json:"has_file"`
 	}
 	type calendarOut struct {
 		From string `json:"from"`
@@ -445,15 +447,15 @@ func registerEpisodeTools(r *registry) {
 		now := time.Now().UTC()
 		from := now.AddDate(0, 0, -in.PastDays)
 		to := now.AddDate(0, 0, limitOr(in.Days, 7))
-		res, err := client.GetCalendar(ctx, sonarr.GetCalendarOperationOptions{
+		res, err := client.GetCalendar(ctx, sonarr.GetCalendarOptions{
 			Start: from.Format(time.RFC3339), End: to.Format(time.RFC3339),
 			Unmonitored: new(in.Unmonitored), IncludeSeries: new(true),
 		})
 		if err != nil {
 			return nil, calendarOut{}, err
 		}
-		rows := make([]calendarRow, 0, len(res.Model))
-		for _, e := range res.Model {
+		rows := make([]calendarRow, 0, len(res.Answer))
+		for _, e := range res.Answer {
 			row := calendarRow{
 				AirDateUTC: e.AirDateUtc, SeriesID: e.SeriesId, Episode: episodeLabel(e.SeasonNumber, e.EpisodeNumber),
 				Title: e.Title, Monitored: boolv(e.Monitored), HasFile: boolv(e.HasFile),

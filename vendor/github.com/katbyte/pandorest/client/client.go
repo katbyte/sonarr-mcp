@@ -45,11 +45,14 @@ package client
 
 import (
 	"cmp"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/katbyte/go-kt/chttp"
@@ -124,6 +127,12 @@ type Service struct {
 	// reached; a hosted API gives its whole address.
 	Example string
 
+	// SendDateAs picks the layout a date goes out in for one query or path parameter, where the server
+	// wants something other than the layout its config sends every date in (Dates.Send): "2006-01-02"
+	// for a parameter that takes a day, say. Nil, or "", is the usual layout. A generated package asks
+	// it with the operation's name and the parameter's name as the document has them.
+	SendDateAs func(operation, parameter string) string
+
 	// SecretHeaders are the headers the service takes its credential in,
 	// beside Authorization and X-Api-Key: a trace does not show them, and a
 	// redirect that leaves the server's host does not carry them.
@@ -132,6 +141,10 @@ type Service struct {
 	// they appear - a query parameter, a form field, a JSON field - beside
 	// the ones chttp hides unasked (see chttp.Options).
 	SecretNames []string
+	// Outcome is where a server that answers 200 to everything says whether
+	// the call worked, for a service that does; nil for one whose status
+	// says it.
+	Outcome *Outcome
 
 	// FollowRedirects follows a redirect no operation documents, without
 	// the credentials when it leaves the server's host or goes from https
@@ -215,6 +228,13 @@ func (s Service) secretHeaders() []string {
 	return append([]string{apiKeyHeader}, s.SecretHeaders...)
 }
 
+// Logger is what WithLog takes: chttp's, named here so a generated package
+// can offer the option under its own name without importing chttp.
+type Logger = chttp.Logger
+
+// Retry is what WithRetry takes: chttp's, named here for the same reason.
+type Retry = chttp.Retry
+
 // Option is something a client is made with beside its address, its
 // credentials and its Service: what the application using the SDK decides,
 // not what the service is.
@@ -223,6 +243,8 @@ type Option func(c *settings)
 type settings struct {
 	http    chttp.Options
 	cookies http.CookieJar
+	calls   *Calls
+	secrets []string
 }
 
 // WithLog has the client say what it sends and is sent to a logger, each
@@ -265,6 +287,10 @@ type Client struct {
 	Authorizer Authorizer
 
 	service Service
+	// calls records what is sent, when the application asks; secrets are
+	// the values no error may repeat
+	calls   *Calls
+	secrets []string
 	// retries is how HTTPClient was made, kept so an answer read whole is
 	// asked again for the same failures a request is
 	retries *chttp.Client
@@ -320,5 +346,210 @@ func (s Service) New(baseURL string, authorizer Authorizer, opts ...Option) (*Cl
 		retries.CheckRedirect = follow
 	}
 
-	return &Client{BaseURL: strings.TrimRight(baseURL, "/"), HTTPClient: retries.Client, Authorizer: authorizer, service: s, retries: retries, redirects: retries.CheckRedirect, follow: follow}, nil
+	secrets := cfg.secrets
+	if holder, ok := authorizer.(secretHolder); ok {
+		secrets = append(secrets, holder.Secrets()...)
+	}
+
+	return &Client{BaseURL: strings.TrimRight(baseURL, "/"), HTTPClient: retries.Client, Authorizer: authorizer, service: s, calls: cfg.calls, secrets: secrets, retries: retries, redirects: retries.CheckRedirect, follow: follow}, nil
 }
+
+// Call is one request a client sent: its method, the path it went to, and
+// the Go name of the operation it was for when a generated method sent it,
+// empty for one written by hand.
+type Call struct {
+	Method, Path string
+	Operation    string
+}
+
+// Calls records every request a client sends, for a live suite to ask at
+// its end which operations it never reached (sweep.NeverCalled). Safe to
+// share between clients and goroutines.
+type Calls struct {
+	mu   sync.Mutex
+	seen []Call
+}
+
+// Seen is every call so far, in order.
+func (c *Calls) Seen() []Call {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return slices.Clone(c.seen)
+}
+
+func (c *Calls) record(method, path, operation string) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.seen = append(c.seen, Call{Method: method, Path: path, Operation: operation})
+}
+
+// WithCalls has the client record every request it sends in calls, whether
+// or not the server answers it.
+func WithCalls(calls *Calls) Option {
+	return func(c *settings) { c.calls = calls }
+}
+
+// WithSecrets names values the client must not repeat: a second token, a
+// password sent in a body. The credential the authorizer holds is one
+// already. Wherever one of them would appear in an error, a status error's
+// body or message included, it reads *** instead. A value shorter than six
+// characters is left as it is, since hiding it would hide pieces of
+// ordinary words.
+func WithSecrets(values ...string) Option {
+	return func(c *settings) { c.secrets = append(c.secrets, values...) }
+}
+
+// secretHolder is an authorizer that can say what it holds, so the client
+// keeps it out of errors.
+type secretHolder interface{ Secrets() []string }
+
+// Secrets is the key.
+func (k APIKey) Secrets() []string { return nonEmpty(string(k)) }
+
+// Secrets is the token.
+func (t Bearer) Secrets() []string { return nonEmpty(string(t)) }
+
+func nonEmpty(s string) []string {
+	if s == "" {
+		return nil
+	}
+
+	return []string{s}
+}
+
+// minSecret is how long a value must be to be hidden: a shorter one would hide pieces of ordinary words.
+const minSecret = 6
+
+// redact replaces every secret in s with ***.
+func (c *Client) redact(s string) string {
+	if c == nil {
+		return s
+	}
+	for _, secret := range c.secrets {
+		if len(secret) >= minSecret {
+			s = strings.ReplaceAll(s, secret, "***")
+		}
+	}
+
+	return s
+}
+
+// redactErr is err with every secret in its text replaced, still unwrapping
+// to err; err itself when its text carries none.
+func (c *Client) redactErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	text := err.Error()
+	if redacted := c.redact(text); redacted != text {
+		return &redactedError{text: redacted, err: err}
+	}
+
+	return err
+}
+
+type redactedError struct {
+	text string
+	err  error
+}
+
+func (e *redactedError) Error() string { return e.text }
+func (e *redactedError) Unwrap() error { return e.err }
+
+// Outcome is where a service that answers 200 to everything says whether a
+// call worked: Field is the JSON field at the top of the answer that holds
+// it, Failures the values that mean it did not, each with what a reader
+// should know of it, and Message the field that carries the server's own
+// words, if any. A call whose answer carries one of the values returns an
+// *OutcomeError under its documented status, with the answer still decoded.
+type Outcome struct {
+	Field    string
+	Failures map[string]string
+	Message  string
+}
+
+// OutcomeError is a call the server refused in the body of a 200: the
+// outcome value it answered, what the service says of it, and the server's
+// own message when the service names a field for one.
+type OutcomeError struct {
+	Method, Path string
+	Value        string
+	Meaning      string
+	Message      string
+}
+
+func (e *OutcomeError) Error() string {
+	msg := fmt.Sprintf("%s %s: the server answered %s %q", e.Method, e.Path, e.Value, e.Meaning)
+	if e.Message != "" {
+		msg += ": " + e.Message
+	}
+
+	return msg
+}
+
+// OutcomeValue is the outcome value a call was refused with, or "" for any
+// other error, so a caller can branch on the values a service declares.
+func OutcomeValue(err error) string {
+	if oe, ok := errors.AsType[*OutcomeError](err); ok {
+		return oe.Value
+	}
+
+	return ""
+}
+
+// outcomeError reads the outcome of a JSON answer, when the service declares
+// one, and is nil when the call worked or the answer carries no outcome.
+func (r *Request) outcomeError(body []byte) error {
+	o := r.client.service.Outcome
+	if o == nil || o.Field == "" {
+		return nil
+	}
+	top := topLevel(body)
+	value, ok := textAt(top, o.Field)
+	if !ok {
+		return nil
+	}
+	meaning, failed := o.Failures[value]
+	if !failed {
+		return nil
+	}
+	e := &OutcomeError{Method: r.Method, Path: r.URL.Path, Value: value, Meaning: meaning}
+	if msg, ok := textAt(top, o.Message); ok {
+		e.Message = r.client.redact(msg)
+	}
+
+	return e
+}
+
+// topLevel is the fields at the top of a JSON object, or none for anything else.
+func topLevel(body []byte) map[string]json.RawMessage {
+	var top map[string]json.RawMessage
+	_ = json.Unmarshal(body, &top)
+
+	return top
+}
+
+// textAt is the string a top-level field holds, when it holds one.
+func textAt(top map[string]json.RawMessage, field string) (string, bool) {
+	raw, ok := top[field]
+	if !ok || field == "" {
+		return "", false
+	}
+	var text string
+	ok = json.Unmarshal(raw, &text) == nil
+
+	return text, ok
+}
+
+// ErrCommandFailed and ErrCommandRunning are what a generated WaitForCommand
+// wraps its two refusals in, for errors.Is: the server said the command
+// failed, or it was still running when the wait ran out, which a caller may
+// treat as an answer rather than a failure.
+var (
+	ErrCommandFailed  = errors.New("the command failed")
+	ErrCommandRunning = errors.New("the command is still running")
+)

@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteImportListByIdOperationResponse is the result of DeleteImportListById.
-type DeleteImportListByIdOperationResponse struct {
+// DeleteImportListByIdResponse is the result of DeleteImportListById.
+type DeleteImportListByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteImportListById calls DELETE /api/v3/importlist/{id}.
-func (c Client) DeleteImportListById(ctx context.Context, id int) (result DeleteImportListByIdOperationResponse, err error) {
+func (c Client) DeleteImportListById(ctx context.Context, id int) (result DeleteImportListByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteImportListById",
 		Path:       fmt.Sprintf("/api/v3/importlist/%d", id),
 	}
 

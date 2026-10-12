@@ -44,6 +44,11 @@ var Services = []config.Service{{
 	// history, the queue, the blocklist, the wanted lists, the exclusions and the log page by number, and answer a PagingResource
 	Paging:       &config.Paging{Start: "page", Limit: "pageSize", Items: "records", Total: "totalRecords", ByPage: true},
 	WrittenWhole: sonarrSettings,
+	// the ids that travel between calls are told apart by the compiler; the rest stay plain numbers
+	IDs:   sonarrIDs,
+	Plain: sonarrPlainIDs,
+	// season 0 is the specials, so a season search sends its season whenever one is set
+	KeepNull: []string{"SeasonSearchCommand.seasonNumber"},
 	// Swashbuckle lists text/plain beside every JSON response, which Sonarr never sends for them
 	PreferJSON: true,
 	// a test of every indexer, download client, import list or connection answers 400 with the same list of results when any of them fails
@@ -96,12 +101,16 @@ var sonarrWords = map[string]string{
 
 // All is every workaround, in the order they are applied.
 var All = []pandorest.Workaround{
+	// Swashbuckle types the id of every PUT path as text, where the GET and DELETE of the same path take a number
+	pandorest.NumberedPathIDs(pandorest.About{Name: "sonarr-numbered-path-ids", Service: Service, Bug: "a PUT path types its {id} as text where the GET and DELETE of the same path type it as a number"}),
 	sonarrUIRoutes{},
 	sonarrUndeclaredResponses{},
 	sonarrUndeclaredWriteResponses{},
 	sonarrCreatedAccepted{},
 	sonarrTestAllResults{},
 	sonarrCommandBody{},
+	// after the body is an open record: the commands the tools queue get a record and a method each
+	pandorest.Commands(pandorest.About{Name: "sonarr-commands", Service: Service, Bug: "POST /api/v3/command takes every command through one open body, so nothing says what a command is called or which fields it reads"}, sonarrCommands),
 	sonarrCommandResourceBody{},
 	sonarrHTTPURIString{},
 	sonarrBulkUpdateLists{},

@@ -259,7 +259,7 @@ func settingsOf(rec map[string]any) map[string]any {
 // recordRow is a record as a tool answers it: Sonarr's own properties, less
 // its credentials and what says nothing, with its tags by label, its
 // settings by name, and each of its conditions the same way.
-func recordRow(rec map[string]any, tags map[int]string) map[string]any {
+func recordRow(rec map[string]any, tags map[sonarr.TagID]string) map[string]any {
 	out := map[string]any{}
 	for key, value := range rec {
 		switch {
@@ -286,12 +286,12 @@ func recordRow(rec map[string]any, tags map[int]string) map[string]any {
 }
 
 // tagsByLabel are a record's tags by label, where it was sent their ids.
-func tagsByLabel(value any, tags map[int]string) []string {
+func tagsByLabel(value any, tags map[sonarr.TagID]string) []string {
 	list := asList(value)
-	ids := make([]int, 0, len(list))
+	ids := make([]sonarr.TagID, 0, len(list))
 	for _, v := range list {
 		if n, ok := v.(float64); ok {
-			ids = append(ids, int(n))
+			ids = append(ids, sonarr.TagID(n))
 		}
 	}
 

@@ -26,8 +26,8 @@ const tagsLock = "tags"
 
 // seriesLock is the series with this id, for an edit that has resolved it and
 // not yet read the record it will send back.
-func seriesLock(id int) lock.Thing {
-	return lock.ID[sonarr.SeriesResource](strconv.Itoa(id))
+func seriesLock(id sonarr.SeriesID) lock.Thing {
+	return lock.ID[sonarr.SeriesResource](strconv.Itoa(int(id)))
 }
 
 // locking is this server's set of locks, made when the first is asked for.
@@ -41,7 +41,7 @@ func (r *registry) locking() *lock.Set {
 // with the tags held for the length of it. It is for a caller that holds no
 // lock of its own: one that does names tagsLock beside what else it locks,
 // since a caller locks once at a time.
-func (r *registry) makeTags(ctx context.Context, refs []string) ([]int, error) {
+func (r *registry) makeTags(ctx context.Context, refs []string) ([]sonarr.TagID, error) {
 	if len(refs) == 0 {
 		return nil, nil
 	}

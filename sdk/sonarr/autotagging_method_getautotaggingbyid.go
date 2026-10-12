@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetAutoTaggingByIdOperationResponse is the result of GetAutoTaggingById.
-type GetAutoTaggingByIdOperationResponse struct {
+// GetAutoTaggingByIdResponse is the result of GetAutoTaggingById.
+//
+// Answer is the AutoTaggingResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetAutoTaggingByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *AutoTaggingResource
+	Answer       *AutoTaggingResource
+	*AutoTaggingResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetAutoTaggingByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the AutoTaggingResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetAutoTaggingByIdResponse) Record() (AutoTaggingResource, error) {
+	if r.Answer == nil {
+		return AutoTaggingResource{}, errors.New("GetAutoTaggingById answered no AutoTaggingResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetAutoTaggingById calls GET /api/v3/autotagging/{id}.
-func (c Client) GetAutoTaggingById(ctx context.Context, id int) (result GetAutoTaggingByIdOperationResponse, err error) {
+func (c Client) GetAutoTaggingById(ctx context.Context, id int) (result GetAutoTaggingByIdResponse, err error) {
+	result.AutoTaggingResource = &AutoTaggingResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetAutoTaggingById",
 		Path:       fmt.Sprintf("/api/v3/autotagging/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetAutoTaggingById(ctx context.Context, id int) (result GetAutoT
 		return
 	}
 
-	var model AutoTaggingResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer AutoTaggingResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.AutoTaggingResource = result.Answer
 
 	return
 }

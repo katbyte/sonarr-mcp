@@ -10,19 +10,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetApiOperationResponse is the result of GetApi.
-type GetApiOperationResponse struct {
+// GetApiResponse is the result of GetApi.
+type GetApiResponse struct {
 	HttpResponse *http.Response
-	Model        json.RawMessage
+	Answer       json.RawMessage
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetApiResponse) Answered() bool { return r.Answer != nil }
+
 // GetApi calls GET /api.
-func (c Client) GetApi(ctx context.Context) (result GetApiOperationResponse, err error) {
+func (c Client) GetApi(ctx context.Context) (result GetApiResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetApi",
 		Path:       "/api",
 	}
 
@@ -40,7 +45,7 @@ func (c Client) GetApi(ctx context.Context) (result GetApiOperationResponse, err
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

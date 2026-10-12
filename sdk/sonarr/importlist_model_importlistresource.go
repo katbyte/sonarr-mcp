@@ -18,11 +18,17 @@ type ImportListResource struct {
 	MonitorNewItems          NewItemMonitorTypes  `json:"monitorNewItems,omitempty"`
 	Name                     string               `json:"name,omitempty"`
 	Presets                  []ImportListResource `json:"presets,omitzero"`
-	QualityProfileId         int                  `json:"qualityProfileId,omitempty"`
+	QualityProfileId         QualityProfileID     `json:"qualityProfileId,omitempty"`
 	RootFolderPath           string               `json:"rootFolderPath,omitempty"`
 	SearchForMissingEpisodes *bool                `json:"searchForMissingEpisodes,omitempty"`
 	SeasonFolder             *bool                `json:"seasonFolder,omitempty"`
 	SeriesType               SeriesTypes          `json:"seriesType,omitempty"`
 	ShouldMonitor            MonitorTypes         `json:"shouldMonitor,omitempty"`
-	Tags                     []int                `json:"tags,omitzero"`
+	Tags                     []TagID              `json:"tags,omitzero"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m ImportListResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m ImportListResource) GetId() int { return m.Id }

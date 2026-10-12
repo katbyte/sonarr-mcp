@@ -6,23 +6,26 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteEpisodeFileByIdOperationResponse is the result of DeleteEpisodeFileById.
-type DeleteEpisodeFileByIdOperationResponse struct {
+// DeleteEpisodeFileByIdResponse is the result of DeleteEpisodeFileById.
+type DeleteEpisodeFileByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteEpisodeFileById calls DELETE /api/v3/episodefile/{id}.
-func (c Client) DeleteEpisodeFileById(ctx context.Context, id int) (result DeleteEpisodeFileByIdOperationResponse, err error) {
+func (c Client) DeleteEpisodeFileById(ctx context.Context, id EpisodeFileID) (result DeleteEpisodeFileByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
-		Path:       fmt.Sprintf("/api/v3/episodefile/%d", id),
+		Operation:  "DeleteEpisodeFileById",
+		Path:       fmt.Sprintf("/api/v3/episodefile/%s", url.PathEscape(strconv.Itoa(int(id)))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)

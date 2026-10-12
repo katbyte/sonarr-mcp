@@ -2,6 +2,8 @@
 
 package sonarr
 
+import "slices"
+
 // RejectionType is the "RejectionType" enum.
 type RejectionType string
 
@@ -17,4 +19,9 @@ func PossibleValuesForRejectionType() []string {
 		string(RejectionTypePermanent),
 		string(RejectionTypeTemporary),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v RejectionType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForRejectionType(), string(v))
 }

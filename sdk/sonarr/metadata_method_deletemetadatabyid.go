@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteMetadataByIdOperationResponse is the result of DeleteMetadataById.
-type DeleteMetadataByIdOperationResponse struct {
+// DeleteMetadataByIdResponse is the result of DeleteMetadataById.
+type DeleteMetadataByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteMetadataById calls DELETE /api/v3/metadata/{id}.
-func (c Client) DeleteMetadataById(ctx context.Context, id int) (result DeleteMetadataByIdOperationResponse, err error) {
+func (c Client) DeleteMetadataById(ctx context.Context, id int) (result DeleteMetadataByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteMetadataById",
 		Path:       fmt.Sprintf("/api/v3/metadata/%d", id),
 	}
 

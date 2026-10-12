@@ -4,21 +4,44 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"iter"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetQueueOperationResponse is the result of GetQueue.
-type GetQueueOperationResponse struct {
+// GetQueueResponse is the result of GetQueue.
+//
+// Answer is the QueueResourcePagingResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetQueueResponse struct {
 	HttpResponse *http.Response
-	Model        *QueueResourcePagingResource
+	Answer       *QueueResourcePagingResource
+	*QueueResourcePagingResource
 }
 
-// GetQueueOperationOptions holds the query and header parameters of GetQueue.
-type GetQueueOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetQueueResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the QueueResourcePagingResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetQueueResponse) Record() (QueueResourcePagingResource, error) {
+	if r.Answer == nil {
+		return QueueResourcePagingResource{}, errors.New("GetQueue answered no QueueResourcePagingResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// GetQueueOptions holds the query and header parameters of GetQueue.
+type GetQueueOptions struct {
 	Page                      *int
 	PageSize                  *int
 	SortKey                   string
@@ -26,7 +49,7 @@ type GetQueueOperationOptions struct {
 	IncludeUnknownSeriesItems *bool
 	IncludeSeries             *bool
 	IncludeEpisode            *bool
-	SeriesIds                 []int
+	SeriesIds                 []SeriesID
 	Protocol                  DownloadProtocol
 	Languages                 []int
 	Quality                   []int
@@ -34,13 +57,13 @@ type GetQueueOperationOptions struct {
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetQueueOperationOptions) ToHeaders() *client.Headers {
+func (o GetQueueOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetQueueOperationOptions) ToQuery() *client.QueryParams {
+func (o GetQueueOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.Page != nil {
 		out.Append("page", strconv.Itoa(*o.Page))
@@ -64,7 +87,7 @@ func (o GetQueueOperationOptions) ToQuery() *client.QueryParams {
 		out.Append("includeEpisode", strconv.FormatBool(*o.IncludeEpisode))
 	}
 	for _, v := range o.SeriesIds {
-		out.Append("seriesIds", strconv.Itoa(v))
+		out.Append("seriesIds", strconv.Itoa(int(v)))
 	}
 	if o.Protocol != "" {
 		out.Append("protocol", string(o.Protocol))
@@ -82,13 +105,24 @@ func (o GetQueueOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetQueue calls GET /api/v3/queue.
-func (c Client) GetQueue(ctx context.Context, options GetQueueOperationOptions) (result GetQueueOperationResponse, err error) {
+func (c Client) GetQueue(ctx context.Context, options ...GetQueueOptions) (result GetQueueResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetQueue takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetQueueOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.QueueResourcePagingResource = &QueueResourcePagingResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetQueue",
+		OptionsObject: option,
 		Path:          "/api/v3/queue",
 	}
 
@@ -106,11 +140,12 @@ func (c Client) GetQueue(ctx context.Context, options GetQueueOperationOptions) 
 		return
 	}
 
-	var model QueueResourcePagingResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer QueueResourcePagingResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.QueueResourcePagingResource = result.Answer
 
 	return
 }
@@ -124,34 +159,102 @@ type GetQueueCompleteResult struct {
 // GetQueueComplete calls GetQueue page by page, from the
 // page options.Page names (the first when unset), until every result is loaded.
 // options.PageSize is the page size, client.DefaultPageSize when unset.
-func (c Client) GetQueueComplete(ctx context.Context, options GetQueueOperationOptions) (result GetQueueCompleteResult, err error) {
+func (c Client) GetQueueComplete(ctx context.Context, options ...GetQueueOptions) (result GetQueueCompleteResult, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetQueueComplete takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetQueueOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	limit := client.DefaultPageSize
-	if options.PageSize != nil && *options.PageSize > 0 {
-		limit = *options.PageSize
+	if option.PageSize != nil && *option.PageSize > 0 {
+		limit = *option.PageSize
 	}
-	options.PageSize = &limit
+	option.PageSize = &limit
 	number := 1
-	if options.Page != nil && *options.Page > 0 {
-		number = *options.Page
+	if option.Page != nil && *option.Page > 0 {
+		number = *option.Page
 	}
-	options.Page = &number
+	option.Page = &number
 	for {
-		var page GetQueueOperationResponse
-		page, err = c.GetQueue(ctx, options)
+		var page GetQueueResponse
+		page, err = c.GetQueue(ctx, option)
 		result.LatestHttpResponse = page.HttpResponse
 		if err != nil {
 			err = fmt.Errorf("loading results: %w", err)
 			return
 		}
-		if page.Model == nil || len(page.Model.Records) == 0 {
+		if page.Answer == nil || len(page.Answer.Records) == 0 {
 			return
 		}
-		result.Items = append(result.Items, page.Model.Records...)
+		result.Items = append(result.Items, page.Answer.Records...)
 		// a short page is the last; so is the page that reaches the total, when
 		// the server reports one
-		if len(page.Model.Records) < limit || page.Model.TotalRecords > 0 && number*limit >= page.Model.TotalRecords {
+		if len(page.Answer.Records) < limit || page.Answer.TotalRecords > 0 && number*limit >= page.Answer.TotalRecords {
 			return
 		}
 		number++
+	}
+}
+
+// GetQueueEach calls GetQueue page by page as its results are ranged over, so a
+// loop that stops ends the paging:
+//
+//	for item, err := range c.GetQueueEach(ctx) {
+//		if err != nil {
+//			return err
+//		}
+//		if found(item) {
+//			break
+//		}
+//	}
+//
+// An error is the last pair handed out, with a zero QueueResource. The pages are asked for as GetQueueComplete asks for them.
+func (c Client) GetQueueEach(ctx context.Context, options ...GetQueueOptions) iter.Seq2[QueueResource, error] {
+	return func(yield func(QueueResource, error) bool) {
+		var zero QueueResource
+		if len(options) > 1 {
+			yield(zero, fmt.Errorf("GetQueueEach takes one options struct at most, not %d", len(options)))
+			return
+		}
+		var option GetQueueOptions
+		if len(options) == 1 {
+			option = options[0]
+		}
+
+		limit := client.DefaultPageSize
+		if option.PageSize != nil && *option.PageSize > 0 {
+			limit = *option.PageSize
+		}
+		option.PageSize = &limit
+		number := 1
+		if option.Page != nil && *option.Page > 0 {
+			number = *option.Page
+		}
+		option.Page = &number
+		for {
+			page, err := c.GetQueue(ctx, option)
+			if err != nil {
+				yield(zero, fmt.Errorf("loading results: %w", err))
+				return
+			}
+			if page.Answer == nil || len(page.Answer.Records) == 0 {
+				return
+			}
+			for _, item := range page.Answer.Records {
+				if !yield(item, nil) {
+					return
+				}
+			}
+			// a short page is the last; so is the page that reaches the total, when
+			// the server reports one
+			if len(page.Answer.Records) < limit || page.Answer.TotalRecords > 0 && number*limit >= page.Answer.TotalRecords {
+				return
+			}
+			number++
+		}
 	}
 }

@@ -11,7 +11,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "TagID"
           }
         }
       ],
@@ -46,7 +47,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "TagID"
           }
         }
       ],
@@ -92,7 +94,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "String"
+            "Type": "ID",
+            "ReferenceName": "TagID"
           }
         }
       ],
@@ -124,7 +127,8 @@
           "Name": "Id",
           "JsonName": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "TagID"
           }
         },
         {

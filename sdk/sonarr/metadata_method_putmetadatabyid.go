@@ -4,6 +4,7 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,25 +12,46 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutMetadataByIdOperationResponse is the result of PutMetadataById.
-type PutMetadataByIdOperationResponse struct {
+// PutMetadataByIdResponse is the result of PutMetadataById.
+//
+// Answer is the MetadataResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutMetadataByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *MetadataResource
+	Answer       *MetadataResource
+	*MetadataResource
 }
 
-// PutMetadataByIdOperationOptions holds the query and header parameters of PutMetadataById.
-type PutMetadataByIdOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutMetadataByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the MetadataResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutMetadataByIdResponse) Record() (MetadataResource, error) {
+	if r.Answer == nil {
+		return MetadataResource{}, errors.New("PutMetadataById answered no MetadataResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// PutMetadataByIdOptions holds the query and header parameters of PutMetadataById.
+type PutMetadataByIdOptions struct {
 	ForceSave *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PutMetadataByIdOperationOptions) ToHeaders() *client.Headers {
+func (o PutMetadataByIdOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PutMetadataByIdOperationOptions) ToQuery() *client.QueryParams {
+func (o PutMetadataByIdOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.ForceSave != nil {
 		out.Append("forceSave", strconv.FormatBool(*o.ForceSave))
@@ -38,14 +60,25 @@ func (o PutMetadataByIdOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PutMetadataById calls PUT /api/v3/metadata/{id}.
-func (c Client) PutMetadataById(ctx context.Context, id int, input MetadataResource, options PutMetadataByIdOperationOptions) (result PutMetadataByIdOperationResponse, err error) {
+func (c Client) PutMetadataById(ctx context.Context, id int, input MetadataResource, options ...PutMetadataByIdOptions) (result PutMetadataByIdResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PutMetadataById takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PutMetadataByIdOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.MetadataResource = &MetadataResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod:    http.MethodPut,
-		OptionsObject: options,
+		Operation:     "PutMetadataById",
+		OptionsObject: option,
 		Path:          fmt.Sprintf("/api/v3/metadata/%d", id),
 	}
 
@@ -67,11 +100,12 @@ func (c Client) PutMetadataById(ctx context.Context, id int, input MetadataResou
 		return
 	}
 
-	var model MetadataResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer MetadataResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.MetadataResource = result.Answer
 
 	return
 }

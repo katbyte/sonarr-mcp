@@ -9,7 +9,6 @@ package sonarr_test
 
 import (
 	"net/http"
-	"strconv"
 	"testing"
 
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
@@ -18,20 +17,20 @@ import (
 func TestConfigNaming(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	cfg := *must(sc.GetConfigNaming(ctx)).Model
+	cfg := *must(sc.GetConfigNaming(ctx)).Answer
 	if cfg.StandardEpisodeFormat == "" || cfg.SeriesFolderFormat == "" || cfg.SeasonFolderFormat == "" {
 		t.Fatalf("GetConfigNaming = %+v", cfg)
 	}
-	if byID := must(sc.GetConfigNamingById(ctx, cfg.Id)).Model; byID.StandardEpisodeFormat != cfg.StandardEpisodeFormat {
+	if byID := must(sc.GetConfigNamingById(ctx, cfg.Id)).Answer; byID.StandardEpisodeFormat != cfg.StandardEpisodeFormat {
 		t.Errorf("GetConfigNamingById = %+v", byID)
 	}
 	// the examples are the formats given applied to a sample episode: the
 	// settings page previews a form not yet saved
-	examples := must(sc.GetConfigNamingExamples(ctx, sonarr.GetConfigNamingExamplesOperationOptions{
+	examples := must(sc.GetConfigNamingExamples(ctx, sonarr.GetConfigNamingExamplesOptions{
 		RenameEpisodes: new(true), StandardEpisodeFormat: cfg.StandardEpisodeFormat, DailyEpisodeFormat: cfg.DailyEpisodeFormat,
 		AnimeEpisodeFormat: cfg.AnimeEpisodeFormat, SeriesFolderFormat: cfg.SeriesFolderFormat, SeasonFolderFormat: cfg.SeasonFolderFormat,
 		SpecialsFolderFormat: cfg.SpecialsFolderFormat, MultiEpisodeStyle: new(cfg.MultiEpisodeStyle),
-	})).Model
+	})).Answer
 	var ex map[string]any
 	if err := unmarshal(examples, &ex); err != nil || ex["singleEpisodeExample"] == nil || ex["seriesFolderExample"] == nil {
 		t.Errorf("GetConfigNamingExamples = %s, %v", examples, err)
@@ -41,28 +40,28 @@ func TestConfigNaming(t *testing.T) {
 	// rename preview is empty whatever they are; on, it lists Chernobyl's
 	// scene-named files
 	chernobylID := seriesIDs[chernobyl.Title]
-	if plan := must(sc.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: new(chernobylID)})).Model; boolValue(cfg.RenameEpisodes) || len(plan) != 0 {
-		t.Errorf("with renaming %v, GetRename = %d renames, want none while it is off", boolValue(cfg.RenameEpisodes), len(plan))
+	if plan := must(sc.GetRename(ctx, sonarr.GetRenameOptions{SeriesId: chernobylID})).Answer; cfg.RenameEpisodes || len(plan) != 0 {
+		t.Errorf("with renaming %v, GetRename = %d renames, want none while it is off", cfg.RenameEpisodes, len(plan))
 	}
 	on := cfg
-	on.RenameEpisodes = new(true)
-	res := must(sc.PutConfigNamingById(ctx, strconv.Itoa(cfg.Id), on))
+	on.RenameEpisodes = true
+	res := must(sc.PutConfigNamingById(ctx, cfg.Id, on))
 	status(t, res.HttpResponse, http.StatusAccepted)
-	t.Cleanup(func() { _, _ = sc.PutConfigNamingById(ctx, strconv.Itoa(cfg.Id), cfg) })
-	if !boolValue(res.Model.RenameEpisodes) || res.Model.StandardEpisodeFormat != cfg.StandardEpisodeFormat {
-		t.Errorf("PutConfigNamingById = %+v", res.Model)
+	t.Cleanup(func() { _, _ = sc.PutConfigNamingById(ctx, cfg.Id, cfg) })
+	if !res.Answer.RenameEpisodes || res.Answer.StandardEpisodeFormat != cfg.StandardEpisodeFormat {
+		t.Errorf("PutConfigNamingById = %+v", res.Answer)
 	}
-	plan := must(sc.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: new(chernobylID)})).Model
+	plan := must(sc.GetRename(ctx, sonarr.GetRenameOptions{SeriesId: chernobylID})).Answer
 	if len(plan) != chernobyl.Files || plan[0].EpisodeFileId == 0 || plan[0].ExistingPath == plan[0].NewPath {
 		t.Errorf("GetRename with renaming on = %+v, want the %d scene-named files", plan, chernobyl.Files)
 	}
-	season := must(sc.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: new(chernobylID), SeasonNumber: new(1)})).Model
+	season := must(sc.GetRename(ctx, sonarr.GetRenameOptions{SeriesId: chernobylID, SeasonNumber: new(1)})).Answer
 	if len(season) != len(plan) {
 		t.Errorf("GetRename for season 1 = %d renames, want %d", len(season), len(plan))
 	}
 
-	status(t, must(sc.PutConfigNamingById(ctx, strconv.Itoa(cfg.Id), cfg)).HttpResponse, http.StatusAccepted)
-	if got := must(sc.GetConfigNaming(ctx)).Model; boolValue(got.RenameEpisodes) != boolValue(cfg.RenameEpisodes) {
+	status(t, must(sc.PutConfigNamingById(ctx, cfg.Id, cfg)).HttpResponse, http.StatusAccepted)
+	if got := must(sc.GetConfigNaming(ctx)).Answer; got.RenameEpisodes != cfg.RenameEpisodes {
 		t.Errorf("the naming settings were not put back: %+v", got)
 	}
 }
@@ -70,22 +69,22 @@ func TestConfigNaming(t *testing.T) {
 func TestConfigMediaManagement(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	cfg := *must(sc.GetConfigMediaManagement(ctx)).Model
+	cfg := *must(sc.GetConfigMediaManagement(ctx)).Answer
 	if cfg.Id == 0 || cfg.FileDate == "" || cfg.RescanAfterRefresh == "" || cfg.MinimumFreeSpaceWhenImporting == 0 {
 		t.Fatalf("GetConfigMediaManagement = %+v", cfg)
 	}
-	if byID := must(sc.GetConfigMediaManagementById(ctx, cfg.Id)).Model; byID.MinimumFreeSpaceWhenImporting != cfg.MinimumFreeSpaceWhenImporting {
+	if byID := must(sc.GetConfigMediaManagementById(ctx, cfg.Id)).Answer; byID.MinimumFreeSpaceWhenImporting != cfg.MinimumFreeSpaceWhenImporting {
 		t.Errorf("GetConfigMediaManagementById = %+v", byID)
 	}
 	changed := cfg
 	changed.MinimumFreeSpaceWhenImporting++
-	res := must(sc.PutConfigMediaManagementById(ctx, strconv.Itoa(cfg.Id), changed))
+	res := must(sc.PutConfigMediaManagementById(ctx, cfg.Id, changed))
 	status(t, res.HttpResponse, http.StatusAccepted)
-	if res.Model.MinimumFreeSpaceWhenImporting != changed.MinimumFreeSpaceWhenImporting || res.Model.FileDate != cfg.FileDate {
-		t.Errorf("PutConfigMediaManagementById = %+v", res.Model)
+	if res.Answer.MinimumFreeSpaceWhenImporting != changed.MinimumFreeSpaceWhenImporting || res.Answer.FileDate != cfg.FileDate {
+		t.Errorf("PutConfigMediaManagementById = %+v", res.Answer)
 	}
-	status(t, must(sc.PutConfigMediaManagementById(ctx, strconv.Itoa(cfg.Id), cfg)).HttpResponse, http.StatusAccepted)
-	if got := must(sc.GetConfigMediaManagement(ctx)).Model; got.MinimumFreeSpaceWhenImporting != cfg.MinimumFreeSpaceWhenImporting || got.RecycleBin != cfg.RecycleBin {
+	status(t, must(sc.PutConfigMediaManagementById(ctx, cfg.Id, cfg)).HttpResponse, http.StatusAccepted)
+	if got := must(sc.GetConfigMediaManagement(ctx)).Answer; got.MinimumFreeSpaceWhenImporting != cfg.MinimumFreeSpaceWhenImporting || got.RecycleBin != cfg.RecycleBin {
 		t.Errorf("the media management settings were not put back: %+v", got)
 	}
 }
@@ -93,21 +92,21 @@ func TestConfigMediaManagement(t *testing.T) {
 func TestConfigUI(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	cfg := *must(sc.GetConfigUi(ctx)).Model
+	cfg := *must(sc.GetConfigUi(ctx)).Answer
 	if cfg.Id == 0 || cfg.CalendarWeekColumnHeader == "" || cfg.ShortDateFormat == "" || cfg.UiLanguage == 0 {
 		t.Fatalf("GetConfigUi = %+v", cfg)
 	}
-	if byID := must(sc.GetConfigUiById(ctx, cfg.Id)).Model; byID.ShortDateFormat != cfg.ShortDateFormat {
+	if byID := must(sc.GetConfigUiById(ctx, cfg.Id)).Answer; byID.ShortDateFormat != cfg.ShortDateFormat {
 		t.Errorf("GetConfigUiById = %+v", byID)
 	}
 	changed := cfg
 	changed.FirstDayOfWeek = 1 - cfg.FirstDayOfWeek
-	res := must(sc.PutConfigUiById(ctx, strconv.Itoa(cfg.Id), changed))
+	res := must(sc.PutConfigUiById(ctx, cfg.Id, changed))
 	status(t, res.HttpResponse, http.StatusAccepted)
-	if res.Model.FirstDayOfWeek != changed.FirstDayOfWeek {
-		t.Errorf("PutConfigUiById = %+v", res.Model)
+	if res.Answer.FirstDayOfWeek != changed.FirstDayOfWeek {
+		t.Errorf("PutConfigUiById = %+v", res.Answer)
 	}
-	status(t, must(sc.PutConfigUiById(ctx, strconv.Itoa(cfg.Id), cfg)).HttpResponse, http.StatusAccepted)
+	status(t, must(sc.PutConfigUiById(ctx, cfg.Id, cfg)).HttpResponse, http.StatusAccepted)
 }
 
 // The host settings hold the API key the suite runs on, the port and the
@@ -116,11 +115,11 @@ func TestConfigUI(t *testing.T) {
 func TestConfigHost(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	cfg := *must(sc.GetConfigHost(ctx)).Model
+	cfg := *must(sc.GetConfigHost(ctx)).Answer
 	if cfg.Id == 0 || cfg.Port != 8989 || cfg.ApiKey == "" || cfg.InstanceName == "" || cfg.Branch == "" {
 		t.Fatalf("GetConfigHost = %+v", cfg)
 	}
-	if byID := must(sc.GetConfigHostById(ctx, cfg.Id)).Model; byID.Port != cfg.Port || byID.ApiKey != cfg.ApiKey {
+	if byID := must(sc.GetConfigHostById(ctx, cfg.Id)).Answer; byID.Port != cfg.Port || byID.ApiKey != cfg.ApiKey {
 		t.Errorf("GetConfigHostById = %+v", byID)
 	}
 	// Sonarr 4.0.20 refuses to save the host settings while Allowed Hosts is
@@ -135,13 +134,13 @@ func TestConfigHost(t *testing.T) {
 	}
 	changed := cfg
 	changed.BackupRetention = cfg.BackupRetention - 1
-	res := must(sc.PutConfigHostById(ctx, strconv.Itoa(cfg.Id), changed))
+	res := must(sc.PutConfigHostById(ctx, cfg.Id, changed))
 	status(t, res.HttpResponse, http.StatusAccepted)
-	if res.Model.BackupRetention != changed.BackupRetention {
-		t.Errorf("PutConfigHostById = %+v", res.Model)
+	if res.Answer.BackupRetention != changed.BackupRetention {
+		t.Errorf("PutConfigHostById = %+v", res.Answer)
 	}
-	status(t, must(sc.PutConfigHostById(ctx, strconv.Itoa(cfg.Id), cfg)).HttpResponse, http.StatusAccepted)
-	got := must(sc.GetConfigHost(ctx)).Model
+	status(t, must(sc.PutConfigHostById(ctx, cfg.Id, cfg)).HttpResponse, http.StatusAccepted)
+	got := must(sc.GetConfigHost(ctx)).Answer
 	if got.ApiKey != cfg.ApiKey || got.Port != cfg.Port || got.UrlBase != cfg.UrlBase || got.BackupRetention != cfg.BackupRetention {
 		t.Errorf("the host settings changed under a write-back: %+v", got)
 	}
@@ -150,55 +149,55 @@ func TestConfigHost(t *testing.T) {
 func TestConfigIndexer(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	cfg := *must(sc.GetConfigIndexer(ctx)).Model
+	cfg := *must(sc.GetConfigIndexer(ctx)).Answer
 	if cfg.Id == 0 || cfg.RssSyncInterval == 0 || cfg.Retention < 0 {
 		t.Fatalf("GetConfigIndexer = %+v", cfg)
 	}
-	if byID := must(sc.GetConfigIndexerById(ctx, cfg.Id)).Model; byID.RssSyncInterval != cfg.RssSyncInterval {
+	if byID := must(sc.GetConfigIndexerById(ctx, cfg.Id)).Answer; byID.RssSyncInterval != cfg.RssSyncInterval {
 		t.Errorf("GetConfigIndexerById = %+v", byID)
 	}
 	changed := cfg
 	changed.RssSyncInterval = cfg.RssSyncInterval + 5
-	res := must(sc.PutConfigIndexerById(ctx, strconv.Itoa(cfg.Id), changed))
+	res := must(sc.PutConfigIndexerById(ctx, cfg.Id, changed))
 	status(t, res.HttpResponse, http.StatusAccepted)
-	if res.Model.RssSyncInterval != changed.RssSyncInterval {
-		t.Errorf("PutConfigIndexerById = %+v", res.Model)
+	if res.Answer.RssSyncInterval != changed.RssSyncInterval {
+		t.Errorf("PutConfigIndexerById = %+v", res.Answer)
 	}
-	status(t, must(sc.PutConfigIndexerById(ctx, strconv.Itoa(cfg.Id), cfg)).HttpResponse, http.StatusAccepted)
+	status(t, must(sc.PutConfigIndexerById(ctx, cfg.Id, cfg)).HttpResponse, http.StatusAccepted)
 }
 
 func TestConfigDownloadClient(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	cfg := *must(sc.GetConfigDownloadClient(ctx)).Model
+	cfg := *must(sc.GetConfigDownloadClient(ctx)).Answer
 	// the seed turned the re-search after a failure off
-	if cfg.Id == 0 || cfg.DownloadClientWorkingFolders == "" || boolValue(cfg.AutoRedownloadFailed) {
+	if cfg.Id == 0 || cfg.DownloadClientWorkingFolders == "" || cfg.AutoRedownloadFailed {
 		t.Fatalf("GetConfigDownloadClient = %+v", cfg)
 	}
-	if byID := must(sc.GetConfigDownloadClientById(ctx, cfg.Id)).Model; byID.DownloadClientWorkingFolders != cfg.DownloadClientWorkingFolders {
+	if byID := must(sc.GetConfigDownloadClientById(ctx, cfg.Id)).Answer; byID.DownloadClientWorkingFolders != cfg.DownloadClientWorkingFolders {
 		t.Errorf("GetConfigDownloadClientById = %+v", byID)
 	}
-	res := must(sc.PutConfigDownloadClientById(ctx, strconv.Itoa(cfg.Id), cfg))
+	res := must(sc.PutConfigDownloadClientById(ctx, cfg.Id, cfg))
 	status(t, res.HttpResponse, http.StatusAccepted)
-	if boolValue(res.Model.AutoRedownloadFailed) || res.Model.DownloadClientWorkingFolders != cfg.DownloadClientWorkingFolders {
-		t.Errorf("PutConfigDownloadClientById = %+v", res.Model)
+	if res.Answer.AutoRedownloadFailed || res.Answer.DownloadClientWorkingFolders != cfg.DownloadClientWorkingFolders {
+		t.Errorf("PutConfigDownloadClientById = %+v", res.Answer)
 	}
 }
 
 func TestConfigImportList(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	cfg := *must(sc.GetConfigImportList(ctx)).Model
+	cfg := *must(sc.GetConfigImportList(ctx)).Answer
 	if cfg.Id == 0 || cfg.ListSyncLevel == "" {
 		t.Fatalf("GetConfigImportList = %+v", cfg)
 	}
-	if byID := must(sc.GetConfigImportListById(ctx, cfg.Id)).Model; byID.ListSyncLevel != cfg.ListSyncLevel {
+	if byID := must(sc.GetConfigImportListById(ctx, cfg.Id)).Answer; byID.ListSyncLevel != cfg.ListSyncLevel {
 		t.Errorf("GetConfigImportListById = %+v", byID)
 	}
-	res := must(sc.PutConfigImportListById(ctx, strconv.Itoa(cfg.Id), cfg))
+	res := must(sc.PutConfigImportListById(ctx, cfg.Id, cfg))
 	status(t, res.HttpResponse, http.StatusAccepted)
-	if res.Model.ListSyncLevel != cfg.ListSyncLevel {
-		t.Errorf("PutConfigImportListById = %+v", res.Model)
+	if res.Answer.ListSyncLevel != cfg.ListSyncLevel {
+		t.Errorf("PutConfigImportListById = %+v", res.Answer)
 	}
 }
 

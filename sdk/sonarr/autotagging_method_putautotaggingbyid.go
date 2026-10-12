@@ -4,28 +4,51 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutAutoTaggingByIdOperationResponse is the result of PutAutoTaggingById.
-type PutAutoTaggingByIdOperationResponse struct {
+// PutAutoTaggingByIdResponse is the result of PutAutoTaggingById.
+//
+// Answer is the AutoTaggingResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutAutoTaggingByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *AutoTaggingResource
+	Answer       *AutoTaggingResource
+	*AutoTaggingResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutAutoTaggingByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the AutoTaggingResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutAutoTaggingByIdResponse) Record() (AutoTaggingResource, error) {
+	if r.Answer == nil {
+		return AutoTaggingResource{}, errors.New("PutAutoTaggingById answered no AutoTaggingResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PutAutoTaggingById calls PUT /api/v3/autotagging/{id}.
-func (c Client) PutAutoTaggingById(ctx context.Context, id string, input AutoTaggingResource) (result PutAutoTaggingByIdOperationResponse, err error) {
+func (c Client) PutAutoTaggingById(ctx context.Context, id int, input AutoTaggingResource) (result PutAutoTaggingByIdResponse, err error) {
+	result.AutoTaggingResource = &AutoTaggingResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
-		Path:       fmt.Sprintf("/api/v3/autotagging/%s", url.PathEscape(id)),
+		Operation:  "PutAutoTaggingById",
+		Path:       fmt.Sprintf("/api/v3/autotagging/%d", id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -46,11 +69,12 @@ func (c Client) PutAutoTaggingById(ctx context.Context, id string, input AutoTag
 		return
 	}
 
-	var model AutoTaggingResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer AutoTaggingResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.AutoTaggingResource = result.Answer
 
 	return
 }

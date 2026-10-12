@@ -4,7 +4,7 @@ package sonarr
 
 // SeasonPassSeriesResource is the "SeasonPassSeriesResource" schema.
 type SeasonPassSeriesResource struct {
-	Id        int              `json:"id,omitempty"`
+	Id        SeriesID         `json:"id,omitempty"`
 	Monitored *bool            `json:"monitored,omitempty"`
 	Seasons   []SeasonResource `json:"seasons,omitzero"`
 }

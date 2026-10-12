@@ -8,5 +8,11 @@ type AutoTaggingResource struct {
 	Name                    string                           `json:"name,omitempty"`
 	RemoveTagsAutomatically *bool                            `json:"removeTagsAutomatically,omitempty"`
 	Specifications          []AutoTaggingSpecificationSchema `json:"specifications,omitzero"`
-	Tags                    []int                            `json:"tags,omitzero"`
+	Tags                    []TagID                          `json:"tags,omitzero"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m AutoTaggingResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m AutoTaggingResource) GetId() int { return m.Id }

@@ -169,7 +169,7 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "String"
+            "Type": "Integer"
           }
         }
       ],
@@ -233,7 +233,8 @@
           "Name": "TvdbId",
           "JsonName": "tvdbId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "TvdbID"
           }
         }
       ]

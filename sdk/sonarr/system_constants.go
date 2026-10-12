@@ -2,6 +2,8 @@
 
 package sonarr
 
+import "slices"
+
 // DatabaseType is the "DatabaseType" enum.
 type DatabaseType string
 
@@ -17,6 +19,11 @@ func PossibleValuesForDatabaseType() []string {
 		string(DatabaseTypeSqLite),
 		string(DatabaseTypePostgreSQL),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v DatabaseType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForDatabaseType(), string(v))
 }
 
 // RuntimeMode is the "RuntimeMode" enum.
@@ -36,4 +43,9 @@ func PossibleValuesForRuntimeMode() []string {
 		string(RuntimeModeService),
 		string(RuntimeModeTray),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v RuntimeMode) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForRuntimeMode(), string(v))
 }

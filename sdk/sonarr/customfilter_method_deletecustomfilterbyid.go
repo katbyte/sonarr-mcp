@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteCustomFilterByIdOperationResponse is the result of DeleteCustomFilterById.
-type DeleteCustomFilterByIdOperationResponse struct {
+// DeleteCustomFilterByIdResponse is the result of DeleteCustomFilterById.
+type DeleteCustomFilterByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteCustomFilterById calls DELETE /api/v3/customfilter/{id}.
-func (c Client) DeleteCustomFilterById(ctx context.Context, id int) (result DeleteCustomFilterByIdOperationResponse, err error) {
+func (c Client) DeleteCustomFilterById(ctx context.Context, id int) (result DeleteCustomFilterByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteCustomFilterById",
 		Path:       fmt.Sprintf("/api/v3/customfilter/%d", id),
 	}
 

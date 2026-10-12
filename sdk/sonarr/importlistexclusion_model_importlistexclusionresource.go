@@ -6,5 +6,5 @@ package sonarr
 type ImportListExclusionResource struct {
 	Id     int    `json:"id,omitempty"`
 	Title  string `json:"title,omitempty"`
-	TvdbId int    `json:"tvdbId,omitempty"`
+	TvdbId TvdbID `json:"tvdbId,omitempty"`
 }

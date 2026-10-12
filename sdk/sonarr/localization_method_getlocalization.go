@@ -4,24 +4,48 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetLocalizationOperationResponse is the result of GetLocalization.
-type GetLocalizationOperationResponse struct {
+// GetLocalizationResponse is the result of GetLocalization.
+//
+// Answer is the LocalizationResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetLocalizationResponse struct {
 	HttpResponse *http.Response
-	Model        *LocalizationResource
+	Answer       *LocalizationResource
+	*LocalizationResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetLocalizationResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the LocalizationResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetLocalizationResponse) Record() (LocalizationResource, error) {
+	if r.Answer == nil {
+		return LocalizationResource{}, errors.New("GetLocalization answered no LocalizationResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetLocalization calls GET /api/v3/localization.
-func (c Client) GetLocalization(ctx context.Context) (result GetLocalizationOperationResponse, err error) {
+func (c Client) GetLocalization(ctx context.Context) (result GetLocalizationResponse, err error) {
+	result.LocalizationResource = &LocalizationResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetLocalization",
 		Path:       "/api/v3/localization",
 	}
 
@@ -39,11 +63,12 @@ func (c Client) GetLocalization(ctx context.Context) (result GetLocalizationOper
 		return
 	}
 
-	var model LocalizationResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer LocalizationResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.LocalizationResource = result.Answer
 
 	return
 }

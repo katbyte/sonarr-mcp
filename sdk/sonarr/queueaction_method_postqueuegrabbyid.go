@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostQueueGrabByIdOperationResponse is the result of PostQueueGrabById.
-type PostQueueGrabByIdOperationResponse struct {
+// PostQueueGrabByIdResponse is the result of PostQueueGrabById.
+type PostQueueGrabByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostQueueGrabById calls POST /api/v3/queue/grab/{id}.
-func (c Client) PostQueueGrabById(ctx context.Context, id int) (result PostQueueGrabByIdOperationResponse, err error) {
+func (c Client) PostQueueGrabById(ctx context.Context, id int) (result PostQueueGrabByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostQueueGrabById",
 		Path:       fmt.Sprintf("/api/v3/queue/grab/%d", id),
 	}
 

@@ -318,25 +318,25 @@ func setupState(t *testing.T) map[string]string {
 		out[kind] = string(raw)
 	}
 	tags, err := api.GetTag(ctx)
-	keep("tags", tags.Model, err)
+	keep("tags", tags.Answer, err)
 	profiles, err := api.GetQualityProfile(ctx)
-	keep("quality profiles", profiles.Model, err)
+	keep("quality profiles", profiles.Answer, err)
 	formats, err := api.GetCustomFormat(ctx)
-	keep("custom formats", formats.Model, err)
+	keep("custom formats", formats.Answer, err)
 	delays, err := api.GetDelayProfile(ctx)
-	keep("delay profiles", delays.Model, err)
+	keep("delay profiles", delays.Answer, err)
 	rules, err := api.GetReleaseProfile(ctx)
-	keep("release profiles", rules.Model, err)
+	keep("release profiles", rules.Answer, err)
 	indexers, err := api.GetIndexer(ctx)
-	keep("indexers", indexers.Model, err)
+	keep("indexers", indexers.Answer, err)
 	clients, err := api.GetDownloadClient(ctx)
-	keep("download clients", clients.Model, err)
+	keep("download clients", clients.Answer, err)
 	hooks, err := api.GetNotification(ctx)
-	keep("notifications", hooks.Model, err)
+	keep("notifications", hooks.Answer, err)
 	lists, err := api.GetImportList(ctx)
-	keep("import lists", lists.Model, err)
-	exclusions, err := api.GetImportListExclusionPaged(ctx, sonarr.GetImportListExclusionPagedOperationOptions{})
-	keep("exclusions", exclusions.Model.Records, err)
+	keep("import lists", lists.Answer, err)
+	exclusions, err := api.GetImportListExclusionPaged(ctx, sonarr.GetImportListExclusionPagedOptions{})
+	keep("exclusions", exclusions.Answer.Records, err)
 	// a root folder's free space moves with every file written, so it is
 	// named by what the journey could change
 	roots, err := api.GetRootFolder(ctx)
@@ -345,26 +345,26 @@ func setupState(t *testing.T) map[string]string {
 		Path       string
 		Accessible *bool
 	}
-	folders := make([]root, 0, len(roots.Model))
-	for _, r := range roots.Model {
+	folders := make([]root, 0, len(roots.Answer))
+	for _, r := range roots.Answer {
 		folders = append(folders, root{r.Id, r.Path, r.Accessible})
 	}
 	keep("root folders", folders, err)
 	backups, err := api.GetSystemBackup(ctx)
-	keep("backups", backups.Model, err)
+	keep("backups", backups.Answer, err)
 	// a series is named by what the journey could change; its statistics
 	// move with time and with the other tests
-	series, err := api.GetSeries(ctx, sonarr.GetSeriesOperationOptions{})
+	series, err := api.GetSeries(ctx, sonarr.GetSeriesOptions{})
 	type named struct {
-		ID      int
+		ID      sonarr.SeriesID
 		Title   string
 		Path    string
-		Profile int
-		Tags    []int
+		Profile sonarr.QualityProfileID
+		Tags    []sonarr.TagID
 	}
-	kept := make([]named, 0, len(series.Model))
-	for i := range series.Model {
-		s := &series.Model[i]
+	kept := make([]named, 0, len(series.Answer))
+	for i := range series.Answer {
+		s := &series.Answer[i]
 		kept = append(kept, named{s.Id, s.Title, s.Path, s.QualityProfileId, s.Tags})
 	}
 	keep("series", kept, err)

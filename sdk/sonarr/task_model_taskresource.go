@@ -13,3 +13,9 @@ type TaskResource struct {
 	NextExecution string `json:"nextExecution,omitempty"`
 	TaskName      string `json:"taskName,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m TaskResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m TaskResource) GetId() int { return m.Id }

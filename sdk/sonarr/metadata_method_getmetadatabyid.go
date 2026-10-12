@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetMetadataByIdOperationResponse is the result of GetMetadataById.
-type GetMetadataByIdOperationResponse struct {
+// GetMetadataByIdResponse is the result of GetMetadataById.
+//
+// Answer is the MetadataResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetMetadataByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *MetadataResource
+	Answer       *MetadataResource
+	*MetadataResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetMetadataByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the MetadataResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetMetadataByIdResponse) Record() (MetadataResource, error) {
+	if r.Answer == nil {
+		return MetadataResource{}, errors.New("GetMetadataById answered no MetadataResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetMetadataById calls GET /api/v3/metadata/{id}.
-func (c Client) GetMetadataById(ctx context.Context, id int) (result GetMetadataByIdOperationResponse, err error) {
+func (c Client) GetMetadataById(ctx context.Context, id int) (result GetMetadataByIdResponse, err error) {
+	result.MetadataResource = &MetadataResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetMetadataById",
 		Path:       fmt.Sprintf("/api/v3/metadata/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetMetadataById(ctx context.Context, id int) (result GetMetadata
 		return
 	}
 
-	var model MetadataResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer MetadataResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.MetadataResource = result.Answer
 
 	return
 }

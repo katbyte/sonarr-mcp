@@ -158,7 +158,9 @@ type Sweep struct {
 	// Definitions are the service's, as definitions.Load reads them.
 	Definitions *definitions.Service
 	// Client is the generated package's client, on which each operation's
-	// method is called by name.
+	// method is called by name: the one Client of the flat layout, or the
+	// client of the grouped one, whose field for the operation's tag has
+	// the method.
 	Client any
 	// StatusCode is the base client's: the status of an error for a status
 	// the operation does not document, and 0 for any other error.
@@ -171,6 +173,12 @@ type Sweep struct {
 	// for, by model and key. Without it only an object lost whole is a
 	// failure, since servers send many fields their documents leave out.
 	Strict bool
+	// MissingIDs are, per kind of id the service declares, a value of the
+	// right shape that nothing on the server has: the sweep calls the first
+	// GET whose path takes the kind with it and notes what the server
+	// answers (a 404, or a 200 with nothing), so the service's own file can
+	// say it rather than each tool learning it from the server.
+	MissingIDs map[string]string
 	// Timeout is how long one operation gets; zero is DefaultTimeout.
 	Timeout time.Duration
 	// EventWait is how long an event stream gets, once it has answered, to
@@ -188,6 +196,8 @@ type Outcome struct {
 	Failures []string
 	// Notes are what went as its case said it would.
 	Notes []string
+	// empty is an answer with nothing in it that its case allows, and refused a status or an undecodable body its case expects
+	empty, refused bool
 }
 
 func (o *Outcome) failf(format string, args ...any) {
@@ -207,6 +217,8 @@ func (s Sweep) Run(t *testing.T) {
 		t.Fatal("a sweep needs the service's definitions, its client and the base client's StatusCode")
 	}
 
+	var report Report
+	cov := newCoverage(s)
 	for _, op := range s.Definitions.Operations() {
 		if op.Method != http.MethodGet {
 			continue
@@ -216,7 +228,8 @@ func (s Sweep) Run(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), cmp.Or(s.Timeout, DefaultTimeout))
 			defer cancel()
 
-			out := s.Operation(ctx, op)
+			out := s.runOperation(ctx, op, cov)
+			report.add(out)
 			if out.Skipped != "" {
 				t.Skip(out.Skipped)
 			}
@@ -232,6 +245,57 @@ func (s Sweep) Run(t *testing.T) {
 	for _, name := range s.StaleCases() {
 		t.Errorf("the case for %s names no GET operation", name)
 	}
+
+	// what a missing id of each kind gets, what the run came to, and what its answers left unproven
+	for _, kind := range slices.Sorted(maps.Keys(s.MissingIDs)) {
+		ctx, cancel := context.WithTimeout(t.Context(), cmp.Or(s.Timeout, DefaultTimeout))
+		report.Notes = append(report.Notes, s.probeMissing(ctx, kind, s.MissingIDs[kind]))
+		cancel()
+	}
+	report.Notes = append(report.Notes, cov.notes()...)
+	t.Log(report.Summary(s.Definitions.Name))
+	for _, note := range report.Notes {
+		t.Log(s.Definitions.Name + ": " + note)
+	}
+}
+
+// probeMissing calls the first GET whose path takes the kind with an id nothing has, and says what the server answered.
+func (s Sweep) probeMissing(ctx context.Context, kind, id string) string {
+	for _, op := range s.Definitions.Operations() {
+		if op.Method != http.MethodGet {
+			continue
+		}
+		for _, p := range op.PathParameters {
+			if p.Type.Type != definitions.ID || p.Type.ReferenceName != kind {
+				continue
+			}
+			c := s.Cases[op.Name]
+			c.Path = maps.Clone(c.Path)
+			if c.Path == nil {
+				c.Path = map[string]string{}
+			}
+			c.Path[p.Name] = id
+			args, err := s.arguments(ctx, op, c)
+			if err != nil {
+				return fmt.Sprintf("a missing %s could not be probed through %s: %v", kind, op.Key(), err)
+			}
+			called, hangUp := context.WithCancel(ctx)
+			a, err := s.call(called, hangUp, op, args, nil)
+			hangUp()
+			switch {
+			case err != nil && a.status != 0:
+				return fmt.Sprintf("a missing %s answers HTTP %d (%s)", kind, a.status, op.Key())
+			case err != nil:
+				return fmt.Sprintf("a missing %s fails %s: %v", kind, op.Key(), err)
+			case a.empty:
+				return fmt.Sprintf("a missing %s answers %s with nothing", kind, op.Key())
+			default:
+				return fmt.Sprintf("a missing %s answers %s with something", kind, op.Key())
+			}
+		}
+	}
+
+	return fmt.Sprintf("no GET takes a %s in its path, so a missing one was not probed", kind)
 }
 
 // StaleCases names the cases that are for no GET operation of the service,
@@ -254,6 +318,11 @@ func (s Sweep) StaleCases() []string {
 
 // Operation calls one operation and holds its answer to its case.
 func (s Sweep) Operation(ctx context.Context, op *definitions.Operation) Outcome {
+	return s.runOperation(ctx, op, nil)
+}
+
+// runOperation is Operation noting what the answer carried in cov, when there is one.
+func (s Sweep) runOperation(ctx context.Context, op *definitions.Operation, cov *coverage) Outcome {
 	var out Outcome
 	c := s.Cases[op.Name]
 	if c.Skip != "" {
@@ -273,7 +342,7 @@ func (s Sweep) Operation(ctx context.Context, op *definitions.Operation) Outcome
 		return out
 	}
 
-	a, err := s.call(ctx, hangUp, op, args)
+	a, err := s.call(ctx, hangUp, op, args, cov)
 	expectsFailure := c.Status != 0 || c.Decode
 	switch {
 	case err == nil && expectsFailure && !c.Sometimes:
@@ -281,8 +350,10 @@ func (s Sweep) Operation(ctx context.Context, op *definitions.Operation) Outcome
 	case err == nil:
 		s.check(&out, op, c, a)
 	case c.Status != 0 && a.status == c.Status:
+		out.refused = true
 		out.notef("%s: HTTP %d, as expected: %s", op.Key(), a.status, c.Why)
 	case c.Decode && a.undecoded:
+		out.refused = true
 		out.notef("%s: does not decode, as expected: %s", op.Key(), c.Why)
 	case a.undecoded:
 		out.failf("%s answers what its model cannot decode: %v", op.Key(), err)
@@ -296,7 +367,7 @@ func (s Sweep) Operation(ctx context.Context, op *definitions.Operation) Outcome
 // arguments builds the call: the context, the path parameters, and an options
 // struct with the required options and the case's options set.
 func (s Sweep) arguments(ctx context.Context, op *definitions.Operation, c Case) ([]reflect.Value, error) {
-	method := reflect.ValueOf(s.Client).MethodByName(op.Name)
+	method := s.method(op)
 	if !method.IsValid() {
 		return nil, errors.New("the client has no such method")
 	}
@@ -328,21 +399,47 @@ func (s Sweep) arguments(ctx context.Context, op *definitions.Operation, c Case)
 		if len(args) >= mt.NumIn() {
 			return nil, errors.New("the method takes no options")
 		}
-		options := reflect.New(mt.In(len(args))).Elem()
-		for _, o := range op.Options {
-			value, ok := c.Options[o.Field]
-			if !ok {
-				var always string
-				always, ok = lookupFold(s.Fixtures.Always, o.Name)
-				value = always
+		optionsType := mt.In(len(args))
+		if mt.IsVariadic() {
+			// options that may all be left out are taken variadically; Call fills the slice from the one value
+			optionsType = optionsType.Elem()
+		}
+		if optionsType.Kind() != reflect.Struct {
+			// the one option is an argument (InlineSingleOptions), given when the case or the fixtures have a value for it
+			o := &op.Options[0]
+			value, ok, err := s.optionValue(o, c)
+			if err != nil {
+				return nil, err
 			}
-			if !ok && o.Required {
-				var required string
-				required, ok = lookupFold(s.Fixtures.Options, o.Name)
-				if !ok {
-					return nil, fmt.Errorf("no value for required option %s", o.Name)
+			switch {
+			case ok && mt.IsVariadic() && o.Type.Type == definitions.List:
+				// a list goes as its elements
+				list := reflect.New(mt.In(len(args))).Elem()
+				if err := setValue(list, value); err != nil {
+					return nil, fmt.Errorf("option %s: %w", o.Name, err)
 				}
-				value = required
+				for i := range list.Len() {
+					args = append(args, list.Index(i))
+				}
+			case ok:
+				v := reflect.New(optionsType).Elem()
+				if err := setValue(v, value); err != nil {
+					return nil, fmt.Errorf("option %s: %w", o.Name, err)
+				}
+				args = append(args, v)
+			}
+			if len(args) != mt.NumIn() && !mt.IsVariadic() {
+				return nil, fmt.Errorf("built %d arguments for a method that takes %d", len(args), mt.NumIn())
+			}
+
+			return args, nil
+		}
+		options := reflect.New(optionsType).Elem()
+		for i := range op.Options {
+			o := &op.Options[i]
+			value, ok, err := s.optionValue(o, c)
+			if err != nil {
+				return nil, err
 			}
 			if !ok {
 				continue
@@ -358,6 +455,48 @@ func (s Sweep) arguments(ctx context.Context, op *definitions.Operation, c Case)
 	}
 
 	return args, nil
+}
+
+// optionValue is an option's value for a case: the case's own, else the
+// fixtures' Always, else, for a required option, the fixtures' Options,
+// without which a required option is an error.
+func (s Sweep) optionValue(o *definitions.Option, c Case) (value any, ok bool, err error) {
+	value, ok = c.Options[o.Field]
+	if !ok {
+		var always string
+		always, ok = lookupFold(s.Fixtures.Always, o.Name)
+		value = always
+	}
+	if !ok && o.Required {
+		var required string
+		required, ok = lookupFold(s.Fixtures.Options, o.Name)
+		if !ok {
+			return nil, false, fmt.Errorf("no value for required option %s", o.Name)
+		}
+		value = required
+	}
+
+	return value, ok, nil
+}
+
+// method finds the operation's method: on the client itself, or on the
+// client's field named for the operation's group.
+func (s Sweep) method(op *definitions.Operation) reflect.Value {
+	v := reflect.ValueOf(s.Client)
+	if m := v.MethodByName(op.Name); m.IsValid() {
+		return m
+	}
+	for gi := range s.Definitions.Groups {
+		grp := &s.Definitions.Groups[gi]
+		if !slices.ContainsFunc(grp.Operations, func(o definitions.Operation) bool { return o.Name == op.Name }) {
+			continue
+		}
+		if f := reflect.Indirect(v).FieldByName(grp.Name); f.IsValid() {
+			return f.MethodByName(op.Name)
+		}
+	}
+
+	return reflect.Value{}
 }
 
 // setValue sets a path argument or options field from a fixture: a string, a
@@ -396,6 +535,11 @@ func setValue(v reflect.Value, value any) error {
 			return fmt.Errorf("cannot set %s from %q: %w", v.Type(), s, err)
 		}
 		v.Set(elem)
+	case reflect.Struct:
+		// a date (the package's Time or Day): decoded as the JSON string it is written as
+		if err := json.Unmarshal([]byte(strconv.Quote(s)), v.Addr().Interface()); err != nil {
+			return fmt.Errorf("cannot set %s from %q: %w", v.Type(), s, err)
+		}
 	case reflect.Slice:
 		parts := strings.Split(s, ",")
 		list := reflect.MakeSlice(v.Type(), len(parts), len(parts))
@@ -428,13 +572,135 @@ type answer struct {
 	// whole, and undeclared the keys it has no field for, as Model.key
 	dropped    []string
 	undeclared []string
+	// unread are the dates no layout read, which the model kept as text,
+	// and unknown the enum values the document does not list
+	unread  []string
+	unknown []string
+}
+
+// known is what a generated enum answers whether its value is listed by.
+type known interface{ Known() bool }
+
+// unknownValues walks a decoded model for enum values the document does not
+// list, naming each by its place in the model and by its path in the answer
+// as a workaround's In takes it: the JSON names, lists adding nothing.
+func unknownValues(v reflect.Value, at, path string, found []string) []string {
+	if !v.IsValid() {
+		return found
+	}
+	if v.CanInterface() {
+		if k, ok := reflect.TypeAssert[known](v); ok {
+			if !k.Known() {
+				found = append(found, fmt.Sprintf("%s = %q (%s, at %s)", at, v.String(), v.Type().Name(), inForm(path)))
+			}
+
+			return found
+		}
+	}
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if !v.IsNil() {
+			found = unknownValues(v.Elem(), at, path, found)
+		}
+	case reflect.Struct:
+		for i := range v.NumField() {
+			f := v.Type().Field(i)
+			if f.IsExported() {
+				found = unknownValues(v.Field(i), at+"."+f.Name, pathJoin(path, jsonName(f)), found)
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range v.Len() {
+			found = unknownValues(v.Index(i), fmt.Sprintf("%s[%d]", at, i), path, found)
+		}
+	case reflect.Map:
+		for _, k := range v.MapKeys() {
+			found = unknownValues(v.MapIndex(k), fmt.Sprintf("%s[%v]", at, k), path, found)
+		}
+	default:
+	}
+
+	return found
+}
+
+// inForm is a path as a workaround's In takes it: a top-level name alone
+// carries a leading dot, so that what is copied types that place and not
+// every place of the name.
+func inForm(path string) string {
+	if !strings.Contains(path, ".") {
+		return "." + path
+	}
+
+	return path
+}
+
+// jsonName is the name a field has on the wire.
+func jsonName(f reflect.StructField) string {
+	name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+	if name == "" {
+		return f.Name
+	}
+
+	return name
+}
+
+// pathJoin is path with name under it, the name alone at the top.
+func pathJoin(path, name string) string {
+	if path == "" {
+		return name
+	}
+
+	return path + "." + name
+}
+
+// unreadDate is what a generated Time or Day set to keep an unread date
+// answers it by.
+type unreadDate interface{ UnreadDate() string }
+
+// unreadDates walks a decoded model for the dates no layout read.
+func unreadDates(v reflect.Value, at string, found []string) []string {
+	if !v.IsValid() {
+		return found
+	}
+	if v.CanInterface() {
+		if u, ok := reflect.TypeAssert[unreadDate](v); ok {
+			if text := u.UnreadDate(); text != "" {
+				found = append(found, fmt.Sprintf("%s = %q", at, text))
+			}
+
+			return found
+		}
+	}
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if !v.IsNil() {
+			found = unreadDates(v.Elem(), at, found)
+		}
+	case reflect.Struct:
+		for i := range v.NumField() {
+			if v.Type().Field(i).IsExported() {
+				found = unreadDates(v.Field(i), at+"."+v.Type().Field(i).Name, found)
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range v.Len() {
+			found = unreadDates(v.Index(i), fmt.Sprintf("%s[%d]", at, i), found)
+		}
+	case reflect.Map:
+		for _, k := range v.MapKeys() {
+			found = unreadDates(v.MapIndex(k), fmt.Sprintf("%s[%v]", at, k), found)
+		}
+	default:
+	}
+
+	return found
 }
 
 // call calls the operation, reads what it answered, and classifies a
 // failure. hangUp cancels ctx, the context the call was given.
-func (s Sweep) call(ctx context.Context, hangUp context.CancelFunc, op *definitions.Operation, args []reflect.Value) (answer, error) {
+func (s Sweep) call(ctx context.Context, hangUp context.CancelFunc, op *definitions.Operation, args []reflect.Value, cov *coverage) (answer, error) {
 	var a answer
-	results := reflect.ValueOf(s.Client).MethodByName(op.Name).Call(args)
+	results := s.method(op).Call(args)
 	if len(results) != 2 || results[0].Kind() != reflect.Struct {
 		return a, errors.New("the method does not return a result and an error, as a generated one does")
 	}
@@ -475,7 +741,7 @@ func (s Sweep) call(ctx context.Context, hangUp context.CancelFunc, op *definiti
 		return a, nil
 	}
 
-	return judgeJSON(body, results[0].FieldByName("Model")), nil
+	return judgeJSON(body, results[0].FieldByName("Answer"), cov), nil
 }
 
 func isEventStream(contentType string) bool {
@@ -537,6 +803,7 @@ func readEvent(r io.Reader) error {
 func (s Sweep) check(out *Outcome, op *definitions.Operation, c Case, a answer) {
 	switch {
 	case c.MayBeEmpty != "":
+		out.empty = a.empty
 		out.notef("%s: may answer with nothing (it did: %t): %s", op.Key(), a.empty, c.MayBeEmpty)
 	case a.empty && c.Empty == "" && a.stream:
 		out.failf("%s is an event stream that sent no event in %s, which proves only its status: point it at a fixture that sends one, or give it an Empty case", op.Key(), cmp.Or(s.EventWait, DefaultEventWait))
@@ -545,6 +812,7 @@ func (s Sweep) check(out *Outcome, op *definitions.Operation, c Case, a answer) 
 	case !a.empty && c.Empty != "":
 		out.failf("%s now answers with something; drop its Empty case (%s)", op.Key(), c.Empty)
 	case a.empty:
+		out.empty = true
 		out.notef("%s: answers with nothing, as expected: %s", op.Key(), c.Empty)
 	case a.stream:
 		out.notef("%s: an event stream, read as far as its first event and no further", op.Key())
@@ -556,10 +824,16 @@ func (s Sweep) check(out *Outcome, op *definitions.Operation, c Case, a answer) 
 	if s.Strict && len(a.undeclared) > 0 {
 		out.failf("%s answers fields the document does not declare: %s", op.Key(), strings.Join(a.undeclared, ", "))
 	}
+	for _, u := range a.unread {
+		out.failf("%s answers a date no layout reads: %s; add the layout to the service's Dates or Days", op.Key(), u)
+	}
+	for _, u := range a.unknown {
+		out.failf("%s answers a value its enum does not list: %s; add it to the enum's values, or narrow the enum's In to leave the place out", op.Key(), u)
+	}
 }
 
 // judgeJSON reads a JSON answer against the model it was decoded into.
-func judgeJSON(body []byte, model reflect.Value) answer {
+func judgeJSON(body []byte, model reflect.Value, cov *coverage) answer {
 	var sent any
 	if err := json.Unmarshal(body, &sent); err != nil {
 		// text the model holds whole, or nothing at all
@@ -570,7 +844,10 @@ func judgeJSON(body []byte, model reflect.Value) answer {
 	if !model.IsValid() {
 		return a
 	}
+	cov.observe(sent, model)
 	a.dropped = dropped(sent, model, "the answer")
+	a.unread = unreadDates(model, "Answer", nil)
+	a.unknown = unknownValues(model, "Answer", "", nil)
 	if len(a.dropped) > maxDropped {
 		a.dropped = append(a.dropped[:maxDropped], fmt.Sprintf("%d more places", len(a.dropped)-maxDropped))
 	}

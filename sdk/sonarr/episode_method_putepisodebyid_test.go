@@ -5,6 +5,7 @@ package sonarr
 import (
 	"encoding/json"
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/katbyte/pandorest/client"
@@ -14,7 +15,7 @@ func TestOperationPutEpisodeById(t *testing.T) {
 	t.Parallel()
 
 	c, s := newOperationServer(t, 202, "application/json", "{}")
-	result, err := c.PutEpisodeById(t.Context(), 7, EpisodeResource{})
+	result, err := c.PutEpisodeById(t.Context(), EpisodeID(7), EpisodeResource{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,23 +27,32 @@ func TestOperationPutEpisodeById(t *testing.T) {
 	if !json.Valid([]byte(body)) {
 		t.Errorf("body = %q, want JSON", body)
 	}
+	if body != "{}" {
+		t.Errorf("an empty record sent %q, want %q: a field never set went out", body, "{}")
+	}
 	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 202 {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
-	if result.Model == nil {
-		t.Error("the model was not decoded")
+	if result.Answer == nil || !result.Answered() {
+		t.Error("the answer was not decoded")
+	}
+	if result.EpisodeResource != result.Answer {
+		t.Error("the embedded answer is not the answer")
+	}
+	if record, err := result.Record(); err != nil || !reflect.DeepEqual(record, *result.Answer) {
+		t.Errorf("Record = %+v, %v", record, err)
 	}
 
 	// an answer that does not decode is an error, with the response
 	c, _ = newOperationServer(t, 202, "application/json", "<html>")
-	result, err = c.PutEpisodeById(t.Context(), 7, EpisodeResource{})
+	result, err = c.PutEpisodeById(t.Context(), EpisodeID(7), EpisodeResource{})
 	if err == nil || client.StatusCode(err) != 0 || result.HttpResponse == nil {
 		t.Errorf("an answer that does not decode = %v", err)
 	}
 
 	// a status the operation does not document is an error, with the response
 	c, _ = newOperationServer(t, 418, "text/plain", "no")
-	result, err = c.PutEpisodeById(t.Context(), 7, EpisodeResource{})
+	result, err = c.PutEpisodeById(t.Context(), EpisodeID(7), EpisodeResource{})
 	if client.StatusCode(err) != 418 || result.HttpResponse == nil {
 		t.Errorf("an undocumented status = %v, %+v", err, result.HttpResponse)
 	}

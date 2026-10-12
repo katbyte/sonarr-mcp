@@ -4,28 +4,51 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutConfigHostByIdOperationResponse is the result of PutConfigHostById.
-type PutConfigHostByIdOperationResponse struct {
+// PutConfigHostByIdResponse is the result of PutConfigHostById.
+//
+// Answer is the HostConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutConfigHostByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *HostConfigResource
+	Answer       *HostConfigResource
+	*HostConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutConfigHostByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the HostConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutConfigHostByIdResponse) Record() (HostConfigResource, error) {
+	if r.Answer == nil {
+		return HostConfigResource{}, errors.New("PutConfigHostById answered no HostConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PutConfigHostById calls PUT /api/v3/config/host/{id}.
-func (c Client) PutConfigHostById(ctx context.Context, id string, input HostConfigResource) (result PutConfigHostByIdOperationResponse, err error) {
+func (c Client) PutConfigHostById(ctx context.Context, id int, input HostConfigResource) (result PutConfigHostByIdResponse, err error) {
+	result.HostConfigResource = &HostConfigResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
-		Path:       fmt.Sprintf("/api/v3/config/host/%s", url.PathEscape(id)),
+		Operation:  "PutConfigHostById",
+		Path:       fmt.Sprintf("/api/v3/config/host/%d", id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -46,11 +69,12 @@ func (c Client) PutConfigHostById(ctx context.Context, id string, input HostConf
 		return
 	}
 
-	var model HostConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer HostConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.HostConfigResource = result.Answer
 
 	return
 }

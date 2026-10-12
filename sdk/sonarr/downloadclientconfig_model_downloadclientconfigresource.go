@@ -4,9 +4,9 @@ package sonarr
 
 // DownloadClientConfigResource is the "DownloadClientConfigResource" schema.
 type DownloadClientConfigResource struct {
-	AutoRedownloadFailed                      *bool  `json:"autoRedownloadFailed,omitempty"`
-	AutoRedownloadFailedFromInteractiveSearch *bool  `json:"autoRedownloadFailedFromInteractiveSearch,omitempty"`
+	AutoRedownloadFailed                      bool   `json:"autoRedownloadFailed"`
+	AutoRedownloadFailedFromInteractiveSearch bool   `json:"autoRedownloadFailedFromInteractiveSearch"`
 	DownloadClientWorkingFolders              string `json:"downloadClientWorkingFolders"`
-	EnableCompletedDownloadHandling           *bool  `json:"enableCompletedDownloadHandling,omitempty"`
+	EnableCompletedDownloadHandling           bool   `json:"enableCompletedDownloadHandling"`
 	Id                                        int    `json:"id"`
 }

@@ -11,3 +11,9 @@ type BackupResource struct {
 	Time string     `json:"time,omitempty"`
 	Type BackupType `json:"type,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m BackupResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m BackupResource) GetId() int { return m.Id }

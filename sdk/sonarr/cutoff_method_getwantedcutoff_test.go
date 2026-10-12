@@ -4,6 +4,7 @@ package sonarr
 
 import (
 	"net/http"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -14,7 +15,7 @@ func TestOperationGetWantedCutoff(t *testing.T) {
 	t.Parallel()
 
 	c, s := newOperationServer(t, 200, "application/json", "{}")
-	result, err := c.GetWantedCutoff(t.Context(), GetWantedCutoffOperationOptions{
+	result, err := c.GetWantedCutoff(t.Context(), GetWantedCutoffOptions{
 		Page:               new(7),
 		PageSize:           new(7),
 		SortKey:            "v-SortKey",
@@ -41,13 +42,19 @@ func TestOperationGetWantedCutoff(t *testing.T) {
 	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
-	if result.Model == nil {
-		t.Error("the model was not decoded")
+	if result.Answer == nil || !result.Answered() {
+		t.Error("the answer was not decoded")
+	}
+	if result.EpisodeResourcePagingResource != result.Answer {
+		t.Error("the embedded answer is not the answer")
+	}
+	if record, err := result.Record(); err != nil || !reflect.DeepEqual(record, *result.Answer) {
+		t.Errorf("Record = %+v, %v", record, err)
 	}
 
 	// an answer that does not decode is an error, with the response
 	c, _ = newOperationServer(t, 200, "application/json", "<html>")
-	result, err = c.GetWantedCutoff(t.Context(), GetWantedCutoffOperationOptions{
+	result, err = c.GetWantedCutoff(t.Context(), GetWantedCutoffOptions{
 		Page:               new(7),
 		PageSize:           new(7),
 		SortKey:            "v-SortKey",
@@ -63,7 +70,7 @@ func TestOperationGetWantedCutoff(t *testing.T) {
 
 	// a status the operation does not document is an error, with the response
 	c, _ = newOperationServer(t, 418, "text/plain", "no")
-	result, err = c.GetWantedCutoff(t.Context(), GetWantedCutoffOperationOptions{
+	result, err = c.GetWantedCutoff(t.Context(), GetWantedCutoffOptions{
 		Page:               new(7),
 		PageSize:           new(7),
 		SortKey:            "v-SortKey",
@@ -76,6 +83,15 @@ func TestOperationGetWantedCutoff(t *testing.T) {
 	if client.StatusCode(err) != 418 || result.HttpResponse == nil {
 		t.Errorf("an undocumented status = %v, %+v", err, result.HttpResponse)
 	}
+
+	// the options may be left out, and two are refused before any request
+	c, s = newOperationServer(t, 200, "application/json", "{}")
+	if _, err = c.GetWantedCutoff(t.Context()); err != nil {
+		t.Errorf("without options = %v", err)
+	}
+	if _, err = c.GetWantedCutoff(t.Context(), GetWantedCutoffOptions{}, GetWantedCutoffOptions{}); err == nil || len(s.requests) != 1 {
+		t.Errorf("two options structs = %v, %d requests", err, len(s.requests))
+	}
 }
 
 func TestOperationGetWantedCutoffComplete(t *testing.T) {
@@ -86,13 +102,13 @@ func TestOperationGetWantedCutoffComplete(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		total, pages int
-		options      GetWantedCutoffOperationOptions
+		options      GetWantedCutoffOptions
 		items        int
 		starts       []string
 	}{
-		{"total reached", 2, 9, GetWantedCutoffOperationOptions{PageSize: new(1)}, 2, []string{"1", "2"}},
-		{"empty page", 0, 2, GetWantedCutoffOperationOptions{PageSize: new(1)}, 2, []string{"1", "2", "3"}},
-		{"short page", 0, 9, GetWantedCutoffOperationOptions{PageSize: new(2)}, 1, []string{"1"}},
+		{"total reached", 2, 9, GetWantedCutoffOptions{PageSize: new(1)}, 2, []string{"1", "2"}},
+		{"empty page", 0, 2, GetWantedCutoffOptions{PageSize: new(1)}, 2, []string{"1", "2", "3"}},
+		{"short page", 0, 9, GetWantedCutoffOptions{PageSize: new(2)}, 1, []string{"1"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -106,5 +122,30 @@ func TestOperationGetWantedCutoffComplete(t *testing.T) {
 				t.Errorf("Complete = %d items over pages starting %q, want %d over %q", len(result.Items), *starts, tc.items, tc.starts)
 			}
 		})
+	}
+}
+
+func TestOperationGetWantedCutoffEach(t *testing.T) {
+	t.Parallel()
+
+	c, starts := pagedServer(t, "page", "{}", 0, 2)
+	n := 0
+	for _, err := range c.GetWantedCutoffEach(t.Context(), GetWantedCutoffOptions{PageSize: new(1)}) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		n++
+	}
+	if n != 2 || len(*starts) != 3 {
+		t.Errorf("Each handed out %d results over %d pages, want 2 over 3", n, len(*starts))
+	}
+
+	// stopping after the first result asks for no page more
+	c, starts = pagedServer(t, "page", "{}", 0, 2)
+	for range c.GetWantedCutoffEach(t.Context(), GetWantedCutoffOptions{PageSize: new(1)}) {
+		break
+	}
+	if len(*starts) != 1 {
+		t.Errorf("a stopped Each asked for %d pages, want 1", len(*starts))
 	}
 }

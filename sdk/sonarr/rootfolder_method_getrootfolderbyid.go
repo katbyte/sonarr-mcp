@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetRootFolderByIdOperationResponse is the result of GetRootFolderById.
-type GetRootFolderByIdOperationResponse struct {
+// GetRootFolderByIdResponse is the result of GetRootFolderById.
+//
+// Answer is the RootFolderResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetRootFolderByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *RootFolderResource
+	Answer       *RootFolderResource
+	*RootFolderResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetRootFolderByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the RootFolderResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetRootFolderByIdResponse) Record() (RootFolderResource, error) {
+	if r.Answer == nil {
+		return RootFolderResource{}, errors.New("GetRootFolderById answered no RootFolderResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetRootFolderById calls GET /api/v3/rootfolder/{id}.
-func (c Client) GetRootFolderById(ctx context.Context, id int) (result GetRootFolderByIdOperationResponse, err error) {
+func (c Client) GetRootFolderById(ctx context.Context, id int) (result GetRootFolderByIdResponse, err error) {
+	result.RootFolderResource = &RootFolderResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetRootFolderById",
 		Path:       fmt.Sprintf("/api/v3/rootfolder/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetRootFolderById(ctx context.Context, id int) (result GetRootFo
 		return
 	}
 
-	var model RootFolderResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer RootFolderResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.RootFolderResource = result.Answer
 
 	return
 }

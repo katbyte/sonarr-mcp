@@ -11,7 +11,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         }
       ],
@@ -47,7 +48,8 @@
           "Field": "TvdbId",
           "In": "Query",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "TvdbID"
           }
         },
         {
@@ -82,7 +84,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         }
       ],
@@ -138,7 +141,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "String"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         }
       ],

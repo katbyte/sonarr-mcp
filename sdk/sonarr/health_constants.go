@@ -2,6 +2,8 @@
 
 package sonarr
 
+import "slices"
+
 // HealthCheckResult is the "HealthCheckResult" enum.
 type HealthCheckResult string
 
@@ -21,4 +23,9 @@ func PossibleValuesForHealthCheckResult() []string {
 		string(HealthCheckResultWarning),
 		string(HealthCheckResultError),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v HealthCheckResult) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForHealthCheckResult(), string(v))
 }

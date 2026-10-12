@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetQualityDefinitionByIdOperationResponse is the result of GetQualityDefinitionById.
-type GetQualityDefinitionByIdOperationResponse struct {
+// GetQualityDefinitionByIdResponse is the result of GetQualityDefinitionById.
+//
+// Answer is the QualityDefinitionResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetQualityDefinitionByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *QualityDefinitionResource
+	Answer       *QualityDefinitionResource
+	*QualityDefinitionResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetQualityDefinitionByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the QualityDefinitionResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetQualityDefinitionByIdResponse) Record() (QualityDefinitionResource, error) {
+	if r.Answer == nil {
+		return QualityDefinitionResource{}, errors.New("GetQualityDefinitionById answered no QualityDefinitionResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetQualityDefinitionById calls GET /api/v3/qualitydefinition/{id}.
-func (c Client) GetQualityDefinitionById(ctx context.Context, id int) (result GetQualityDefinitionByIdOperationResponse, err error) {
+func (c Client) GetQualityDefinitionById(ctx context.Context, id int) (result GetQualityDefinitionByIdResponse, err error) {
+	result.QualityDefinitionResource = &QualityDefinitionResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetQualityDefinitionById",
 		Path:       fmt.Sprintf("/api/v3/qualitydefinition/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetQualityDefinitionById(ctx context.Context, id int) (result Ge
 		return
 	}
 
-	var model QualityDefinitionResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer QualityDefinitionResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.QualityDefinitionResource = result.Answer
 
 	return
 }

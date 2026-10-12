@@ -2,6 +2,8 @@
 
 package sonarr
 
+import "slices"
+
 // EpisodeHistoryEventType is the "EpisodeHistoryEventType" enum.
 type EpisodeHistoryEventType string
 
@@ -29,4 +31,9 @@ func PossibleValuesForEpisodeHistoryEventType() []string {
 		string(EpisodeHistoryEventTypeEpisodeFileRenamed),
 		string(EpisodeHistoryEventTypeDownloadIgnored),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v EpisodeHistoryEventType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForEpisodeHistoryEventType(), string(v))
 }

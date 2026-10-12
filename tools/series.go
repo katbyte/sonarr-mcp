@@ -13,24 +13,24 @@ import (
 // see how complete it is, never the whole SeriesResource (fifty fields, with
 // every season, image and alternate title).
 type seriesSummary struct {
-	ID             int      `json:"id"`
-	Title          string   `json:"title"`
-	Year           int      `json:"year,omitempty"`
-	Status         string   `json:"status"          jsonschema:"continuing, ended or upcoming"`
-	Monitored      bool     `json:"monitored"`
-	QualityProfile string   `json:"quality_profile"`
-	SeriesType     string   `json:"series_type"     jsonschema:"standard, daily or anime: how Sonarr numbers and names the episodes"`
-	Path           string   `json:"path"`
-	Tags           []string `json:"tags"`
-	EpisodesHave   int      `json:"episodes_have"   jsonschema:"episodes with a file"`
-	EpisodesWanted int      `json:"episodes_wanted" jsonschema:"the episodes Sonarr counts toward complete: aired and monitored, or with a file"`
-	EpisodesTotal  int      `json:"episodes_total"  jsonschema:"every episode the series has, aired or not, monitored or not"`
-	Size           string   `json:"size_on_disk"`
+	ID             sonarr.SeriesID `json:"id"`
+	Title          string          `json:"title"`
+	Year           int             `json:"year,omitempty"`
+	Status         string          `json:"status"          jsonschema:"continuing, ended or upcoming"`
+	Monitored      bool            `json:"monitored"`
+	QualityProfile string          `json:"quality_profile"`
+	SeriesType     string          `json:"series_type"     jsonschema:"standard, daily or anime: how Sonarr numbers and names the episodes"`
+	Path           string          `json:"path"`
+	Tags           []string        `json:"tags"`
+	EpisodesHave   int             `json:"episodes_have"   jsonschema:"episodes with a file"`
+	EpisodesWanted int             `json:"episodes_wanted" jsonschema:"the episodes Sonarr counts toward complete: aired and monitored, or with a file"`
+	EpisodesTotal  int             `json:"episodes_total"  jsonschema:"every episode the series has, aired or not, monitored or not"`
+	Size           string          `json:"size_on_disk"`
 }
 
 // summariseSeries projects a series, naming its profile and tags from the
 // maps the caller read once.
-func summariseSeries(s *sonarr.SeriesResource, profiles, tags map[int]string) seriesSummary {
+func summariseSeries(s *sonarr.SeriesResource, profiles map[sonarr.QualityProfileID]string, tags map[sonarr.TagID]string) seriesSummary {
 	out := seriesSummary{
 		ID: s.Id, Title: s.Title, Year: s.Year, Status: string(s.Status), Monitored: boolv(s.Monitored),
 		QualityProfile: profiles[s.QualityProfileId], SeriesType: string(s.SeriesType), Path: s.Path,
@@ -45,7 +45,7 @@ func summariseSeries(s *sonarr.SeriesResource, profiles, tags map[int]string) se
 }
 
 // lookupNames reads the profile and tag names a series summary needs.
-func (r *registry) lookupNames(ctx context.Context) (profiles, tags map[int]string, err error) {
+func (r *registry) lookupNames(ctx context.Context) (profiles map[sonarr.QualityProfileID]string, tags map[sonarr.TagID]string, err error) {
 	if profiles, err = r.profileNames(ctx); err != nil {
 		return nil, nil, err
 	}
@@ -121,10 +121,10 @@ func registerSeriesTools(r *registry) {
 		NextAiring     string `json:"next_airing,omitempty"`
 	}
 	type ids struct {
-		Tvdb   int    `json:"tvdb,omitempty"`
-		Imdb   string `json:"imdb,omitempty"`
-		Tmdb   int    `json:"tmdb,omitempty"`
-		TvMaze int    `json:"tvmaze,omitempty"`
+		Tvdb   sonarr.TvdbID `json:"tvdb,omitempty"`
+		Imdb   string        `json:"imdb,omitempty"`
+		Tmdb   int           `json:"tmdb,omitempty"`
+		TvMaze int           `json:"tvmaze,omitempty"`
 	}
 	type getOut struct {
 		seriesSummary

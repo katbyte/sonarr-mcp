@@ -4,6 +4,7 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,25 +12,46 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutNotificationByIdOperationResponse is the result of PutNotificationById.
-type PutNotificationByIdOperationResponse struct {
+// PutNotificationByIdResponse is the result of PutNotificationById.
+//
+// Answer is the NotificationResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutNotificationByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *NotificationResource
+	Answer       *NotificationResource
+	*NotificationResource
 }
 
-// PutNotificationByIdOperationOptions holds the query and header parameters of PutNotificationById.
-type PutNotificationByIdOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutNotificationByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the NotificationResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutNotificationByIdResponse) Record() (NotificationResource, error) {
+	if r.Answer == nil {
+		return NotificationResource{}, errors.New("PutNotificationById answered no NotificationResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// PutNotificationByIdOptions holds the query and header parameters of PutNotificationById.
+type PutNotificationByIdOptions struct {
 	ForceSave *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PutNotificationByIdOperationOptions) ToHeaders() *client.Headers {
+func (o PutNotificationByIdOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PutNotificationByIdOperationOptions) ToQuery() *client.QueryParams {
+func (o PutNotificationByIdOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.ForceSave != nil {
 		out.Append("forceSave", strconv.FormatBool(*o.ForceSave))
@@ -38,14 +60,25 @@ func (o PutNotificationByIdOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PutNotificationById calls PUT /api/v3/notification/{id}.
-func (c Client) PutNotificationById(ctx context.Context, id int, input NotificationResource, options PutNotificationByIdOperationOptions) (result PutNotificationByIdOperationResponse, err error) {
+func (c Client) PutNotificationById(ctx context.Context, id int, input NotificationResource, options ...PutNotificationByIdOptions) (result PutNotificationByIdResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PutNotificationById takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PutNotificationByIdOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.NotificationResource = &NotificationResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod:    http.MethodPut,
-		OptionsObject: options,
+		Operation:     "PutNotificationById",
+		OptionsObject: option,
 		Path:          fmt.Sprintf("/api/v3/notification/%d", id),
 	}
 
@@ -67,11 +100,12 @@ func (c Client) PutNotificationById(ctx context.Context, id int, input Notificat
 		return
 	}
 
-	var model NotificationResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer NotificationResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.NotificationResource = result.Answer
 
 	return
 }

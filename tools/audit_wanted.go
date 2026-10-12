@@ -22,17 +22,17 @@ func unmarshalRaw(raw json.RawMessage, v any) error {
 
 // seasonKey groups episodes by series and season.
 type seasonKey struct {
-	series int
+	series sonarr.SeriesID
 	season int
 }
 
 // queuedEpisodes is the set of episodes the download queue holds.
-func (r *registry) queuedEpisodes(ctx context.Context) (map[int]bool, error) {
+func (r *registry) queuedEpisodes(ctx context.Context) (map[sonarr.EpisodeID]bool, error) {
 	queue, err := r.queueAll(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := map[int]bool{}
+	out := map[sonarr.EpisodeID]bool{}
 	for _, q := range queue {
 		if q.EpisodeId > 0 {
 			out[q.EpisodeId] = true
@@ -45,7 +45,7 @@ func (r *registry) queuedEpisodes(ctx context.Context) (map[int]bool, error) {
 // auditMissingEpisodes groups Sonarr's own wanted list - monitored, aired,
 // no file - by series and season.
 func (r *registry) auditMissingEpisodes(ctx context.Context, s *snapshot, limit int) (auditOut, error) {
-	res, err := r.client.GetWantedMissingComplete(ctx, sonarr.GetWantedMissingOperationOptions{
+	res, err := r.client.GetWantedMissingComplete(ctx, sonarr.GetWantedMissingOptions{
 		Monitored: new(true), IncludeSeries: new(true), SortKey: "episodes.airDateUtc", SortDirection: sonarr.SortDirectionAscending,
 	})
 	if err != nil {
@@ -155,7 +155,7 @@ func shortList(items []string, n int) string {
 // auditCutoffUnmet groups Sonarr's cutoff-unmet list by series, naming each
 // file's quality and the cutoff it falls short of.
 func (r *registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int) (auditOut, error) {
-	res, err := r.client.GetWantedCutoffComplete(ctx, sonarr.GetWantedCutoffOperationOptions{
+	res, err := r.client.GetWantedCutoffComplete(ctx, sonarr.GetWantedCutoffOptions{
 		Monitored: new(true), IncludeSeries: new(true), IncludeEpisodeFile: new(true),
 		SortKey: "episodes.airDateUtc", SortDirection: sonarr.SortDirectionAscending,
 	})
@@ -166,7 +166,7 @@ func (r *registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int)
 	if err != nil {
 		return auditOut{}, err
 	}
-	byID := map[int]*sonarr.QualityProfileResource{}
+	byID := map[sonarr.QualityProfileID]*sonarr.QualityProfileResource{}
 	for i := range profiles {
 		byID[profiles[i].Id] = &profiles[i]
 	}
@@ -181,8 +181,8 @@ func (r *registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int)
 		// never replace one by itself
 		noUpgrades bool
 	}
-	groups := map[int]*group{}
-	var order []int
+	groups := map[sonarr.SeriesID]*group{}
+	var order []sonarr.SeriesID
 	for i := range res.Items {
 		e := &res.Items[i]
 		if !s.covers(e.SeriesId) {
@@ -243,7 +243,7 @@ func (r *registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int)
 		if err != nil {
 			return auditOut{}, err
 		}
-		monitored := map[int]bool{}
+		monitored := map[sonarr.EpisodeFileID]bool{}
 		numbers := episodeNumbers(eps)
 		for j := range eps {
 			if eps[j].EpisodeFileId > 0 && boolv(eps[j].Monitored) {
@@ -269,7 +269,7 @@ func (r *registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int)
 		}
 	}
 
-	slices.SortStableFunc(order, func(a, b int) int { return strings.Compare(groups[a].title, groups[b].title) })
+	slices.SortStableFunc(order, func(a, b sonarr.SeriesID) int { return strings.Compare(groups[a].title, groups[b].title) })
 	out := auditOut{Scanned: len(s.series)}
 	for _, id := range order {
 		g := groups[id]

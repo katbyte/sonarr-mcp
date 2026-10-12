@@ -4,30 +4,53 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutLanguageProfileByIdOperationResponse is the result of PutLanguageProfileById.
-type PutLanguageProfileByIdOperationResponse struct {
+// PutLanguageProfileByIdResponse is the result of PutLanguageProfileById.
+//
+// Answer is the LanguageProfileResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutLanguageProfileByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *LanguageProfileResource
+	Answer       *LanguageProfileResource
+	*LanguageProfileResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutLanguageProfileByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the LanguageProfileResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutLanguageProfileByIdResponse) Record() (LanguageProfileResource, error) {
+	if r.Answer == nil {
+		return LanguageProfileResource{}, errors.New("PutLanguageProfileById answered no LanguageProfileResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PutLanguageProfileById calls PUT /api/v3/languageprofile/{id}.
 //
 // Deprecated: the document marks this operation deprecated.
-func (c Client) PutLanguageProfileById(ctx context.Context, id string, input LanguageProfileResource) (result PutLanguageProfileByIdOperationResponse, err error) {
+func (c Client) PutLanguageProfileById(ctx context.Context, id int, input LanguageProfileResource) (result PutLanguageProfileByIdResponse, err error) {
+	result.LanguageProfileResource = &LanguageProfileResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
-		Path:       fmt.Sprintf("/api/v3/languageprofile/%s", url.PathEscape(id)),
+		Operation:  "PutLanguageProfileById",
+		Path:       fmt.Sprintf("/api/v3/languageprofile/%d", id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -48,11 +71,12 @@ func (c Client) PutLanguageProfileById(ctx context.Context, id string, input Lan
 		return
 	}
 
-	var model LanguageProfileResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer LanguageProfileResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.LanguageProfileResource = result.Answer
 
 	return
 }

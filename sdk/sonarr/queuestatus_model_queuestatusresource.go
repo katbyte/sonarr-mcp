@@ -4,12 +4,12 @@ package sonarr
 
 // QueueStatusResource is the "QueueStatusResource" schema.
 type QueueStatusResource struct {
-	Count           int   `json:"count,omitempty"`
-	Errors          *bool `json:"errors,omitempty"`
-	Id              int   `json:"id,omitempty"`
-	TotalCount      int   `json:"totalCount,omitempty"`
-	UnknownCount    int   `json:"unknownCount,omitempty"`
-	UnknownErrors   *bool `json:"unknownErrors,omitempty"`
-	UnknownWarnings *bool `json:"unknownWarnings,omitempty"`
-	Warnings        *bool `json:"warnings,omitempty"`
+	Count           int  `json:"count,omitempty"`
+	Errors          bool `json:"errors"`
+	Id              int  `json:"id,omitempty"`
+	TotalCount      int  `json:"totalCount,omitempty"`
+	UnknownCount    int  `json:"unknownCount,omitempty"`
+	UnknownErrors   bool `json:"unknownErrors"`
+	UnknownWarnings bool `json:"unknownWarnings"`
+	Warnings        bool `json:"warnings"`
 }

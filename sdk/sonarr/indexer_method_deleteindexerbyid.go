@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteIndexerByIdOperationResponse is the result of DeleteIndexerById.
-type DeleteIndexerByIdOperationResponse struct {
+// DeleteIndexerByIdResponse is the result of DeleteIndexerById.
+type DeleteIndexerByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteIndexerById calls DELETE /api/v3/indexer/{id}.
-func (c Client) DeleteIndexerById(ctx context.Context, id int) (result DeleteIndexerByIdOperationResponse, err error) {
+func (c Client) DeleteIndexerById(ctx context.Context, id int) (result DeleteIndexerByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteIndexerById",
 		Path:       fmt.Sprintf("/api/v3/indexer/%d", id),
 	}
 

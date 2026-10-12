@@ -4,21 +4,44 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"iter"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetHistoryOperationResponse is the result of GetHistory.
-type GetHistoryOperationResponse struct {
+// GetHistoryResponse is the result of GetHistory.
+//
+// Answer is the HistoryResourcePagingResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetHistoryResponse struct {
 	HttpResponse *http.Response
-	Model        *HistoryResourcePagingResource
+	Answer       *HistoryResourcePagingResource
+	*HistoryResourcePagingResource
 }
 
-// GetHistoryOperationOptions holds the query and header parameters of GetHistory.
-type GetHistoryOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetHistoryResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the HistoryResourcePagingResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetHistoryResponse) Record() (HistoryResourcePagingResource, error) {
+	if r.Answer == nil {
+		return HistoryResourcePagingResource{}, errors.New("GetHistory answered no HistoryResourcePagingResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// GetHistoryOptions holds the query and header parameters of GetHistory.
+type GetHistoryOptions struct {
 	Page           *int
 	PageSize       *int
 	SortKey        string
@@ -26,21 +49,21 @@ type GetHistoryOperationOptions struct {
 	IncludeSeries  *bool
 	IncludeEpisode *bool
 	EventType      []int
-	EpisodeId      *int
+	EpisodeId      EpisodeID
 	DownloadId     string
-	SeriesIds      []int
+	SeriesIds      []SeriesID
 	Languages      []int
 	Quality        []int
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetHistoryOperationOptions) ToHeaders() *client.Headers {
+func (o GetHistoryOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetHistoryOperationOptions) ToQuery() *client.QueryParams {
+func (o GetHistoryOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.Page != nil {
 		out.Append("page", strconv.Itoa(*o.Page))
@@ -63,14 +86,14 @@ func (o GetHistoryOperationOptions) ToQuery() *client.QueryParams {
 	for _, v := range o.EventType {
 		out.Append("eventType", strconv.Itoa(v))
 	}
-	if o.EpisodeId != nil {
-		out.Append("episodeId", strconv.Itoa(*o.EpisodeId))
+	if o.EpisodeId != 0 {
+		out.Append("episodeId", strconv.Itoa(int(o.EpisodeId)))
 	}
 	if o.DownloadId != "" {
 		out.Append("downloadId", o.DownloadId)
 	}
 	for _, v := range o.SeriesIds {
-		out.Append("seriesIds", strconv.Itoa(v))
+		out.Append("seriesIds", strconv.Itoa(int(v)))
 	}
 	for _, v := range o.Languages {
 		out.Append("languages", strconv.Itoa(v))
@@ -82,13 +105,24 @@ func (o GetHistoryOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetHistory calls GET /api/v3/history.
-func (c Client) GetHistory(ctx context.Context, options GetHistoryOperationOptions) (result GetHistoryOperationResponse, err error) {
+func (c Client) GetHistory(ctx context.Context, options ...GetHistoryOptions) (result GetHistoryResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetHistory takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetHistoryOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.HistoryResourcePagingResource = &HistoryResourcePagingResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetHistory",
+		OptionsObject: option,
 		Path:          "/api/v3/history",
 	}
 
@@ -106,11 +140,12 @@ func (c Client) GetHistory(ctx context.Context, options GetHistoryOperationOptio
 		return
 	}
 
-	var model HistoryResourcePagingResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer HistoryResourcePagingResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.HistoryResourcePagingResource = result.Answer
 
 	return
 }
@@ -124,34 +159,102 @@ type GetHistoryCompleteResult struct {
 // GetHistoryComplete calls GetHistory page by page, from the
 // page options.Page names (the first when unset), until every result is loaded.
 // options.PageSize is the page size, client.DefaultPageSize when unset.
-func (c Client) GetHistoryComplete(ctx context.Context, options GetHistoryOperationOptions) (result GetHistoryCompleteResult, err error) {
+func (c Client) GetHistoryComplete(ctx context.Context, options ...GetHistoryOptions) (result GetHistoryCompleteResult, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetHistoryComplete takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetHistoryOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	limit := client.DefaultPageSize
-	if options.PageSize != nil && *options.PageSize > 0 {
-		limit = *options.PageSize
+	if option.PageSize != nil && *option.PageSize > 0 {
+		limit = *option.PageSize
 	}
-	options.PageSize = &limit
+	option.PageSize = &limit
 	number := 1
-	if options.Page != nil && *options.Page > 0 {
-		number = *options.Page
+	if option.Page != nil && *option.Page > 0 {
+		number = *option.Page
 	}
-	options.Page = &number
+	option.Page = &number
 	for {
-		var page GetHistoryOperationResponse
-		page, err = c.GetHistory(ctx, options)
+		var page GetHistoryResponse
+		page, err = c.GetHistory(ctx, option)
 		result.LatestHttpResponse = page.HttpResponse
 		if err != nil {
 			err = fmt.Errorf("loading results: %w", err)
 			return
 		}
-		if page.Model == nil || len(page.Model.Records) == 0 {
+		if page.Answer == nil || len(page.Answer.Records) == 0 {
 			return
 		}
-		result.Items = append(result.Items, page.Model.Records...)
+		result.Items = append(result.Items, page.Answer.Records...)
 		// a short page is the last; so is the page that reaches the total, when
 		// the server reports one
-		if len(page.Model.Records) < limit || page.Model.TotalRecords > 0 && number*limit >= page.Model.TotalRecords {
+		if len(page.Answer.Records) < limit || page.Answer.TotalRecords > 0 && number*limit >= page.Answer.TotalRecords {
 			return
 		}
 		number++
+	}
+}
+
+// GetHistoryEach calls GetHistory page by page as its results are ranged over, so a
+// loop that stops ends the paging:
+//
+//	for item, err := range c.GetHistoryEach(ctx) {
+//		if err != nil {
+//			return err
+//		}
+//		if found(item) {
+//			break
+//		}
+//	}
+//
+// An error is the last pair handed out, with a zero HistoryResource. The pages are asked for as GetHistoryComplete asks for them.
+func (c Client) GetHistoryEach(ctx context.Context, options ...GetHistoryOptions) iter.Seq2[HistoryResource, error] {
+	return func(yield func(HistoryResource, error) bool) {
+		var zero HistoryResource
+		if len(options) > 1 {
+			yield(zero, fmt.Errorf("GetHistoryEach takes one options struct at most, not %d", len(options)))
+			return
+		}
+		var option GetHistoryOptions
+		if len(options) == 1 {
+			option = options[0]
+		}
+
+		limit := client.DefaultPageSize
+		if option.PageSize != nil && *option.PageSize > 0 {
+			limit = *option.PageSize
+		}
+		option.PageSize = &limit
+		number := 1
+		if option.Page != nil && *option.Page > 0 {
+			number = *option.Page
+		}
+		option.Page = &number
+		for {
+			page, err := c.GetHistory(ctx, option)
+			if err != nil {
+				yield(zero, fmt.Errorf("loading results: %w", err))
+				return
+			}
+			if page.Answer == nil || len(page.Answer.Records) == 0 {
+				return
+			}
+			for _, item := range page.Answer.Records {
+				if !yield(item, nil) {
+					return
+				}
+			}
+			// a short page is the last; so is the page that reaches the total, when
+			// the server reports one
+			if len(page.Answer.Records) < limit || page.Answer.TotalRecords > 0 && number*limit >= page.Answer.TotalRecords {
+				return
+			}
+			number++
+		}
 	}
 }

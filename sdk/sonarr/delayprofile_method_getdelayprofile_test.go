@@ -23,8 +23,8 @@ func TestOperationGetDelayProfile(t *testing.T) {
 	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
-	if result.Model == nil {
-		t.Error("the model was not decoded")
+	if result.Answer == nil || !result.Answered() {
+		t.Error("the answer was not decoded")
 	}
 
 	// an answer that does not decode is an error, with the response

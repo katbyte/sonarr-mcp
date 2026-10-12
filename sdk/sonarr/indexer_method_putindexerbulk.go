@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutIndexerBulkOperationResponse is the result of PutIndexerBulk.
-type PutIndexerBulkOperationResponse struct {
+// PutIndexerBulkResponse is the result of PutIndexerBulk.
+type PutIndexerBulkResponse struct {
 	HttpResponse *http.Response
-	Model        []IndexerResource
+	Answer       []IndexerResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutIndexerBulkResponse) Answered() bool { return r.Answer != nil }
+
 // PutIndexerBulk calls PUT /api/v3/indexer/bulk.
-func (c Client) PutIndexerBulk(ctx context.Context, input IndexerBulkResource) (result PutIndexerBulkOperationResponse, err error) {
+func (c Client) PutIndexerBulk(ctx context.Context, input IndexerBulkResource) (result PutIndexerBulkResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
+		Operation:  "PutIndexerBulk",
 		Path:       "/api/v3/indexer/bulk",
 	}
 
@@ -44,7 +49,7 @@ func (c Client) PutIndexerBulk(ctx context.Context, input IndexerBulkResource) (
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

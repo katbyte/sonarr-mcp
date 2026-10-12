@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetCustomFilterOperationResponse is the result of GetCustomFilter.
-type GetCustomFilterOperationResponse struct {
+// GetCustomFilterResponse is the result of GetCustomFilter.
+type GetCustomFilterResponse struct {
 	HttpResponse *http.Response
-	Model        []CustomFilterResource
+	Answer       []CustomFilterResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetCustomFilterResponse) Answered() bool { return r.Answer != nil }
+
 // GetCustomFilter calls GET /api/v3/customfilter.
-func (c Client) GetCustomFilter(ctx context.Context) (result GetCustomFilterOperationResponse, err error) {
+func (c Client) GetCustomFilter(ctx context.Context) (result GetCustomFilterResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetCustomFilter",
 		Path:       "/api/v3/customfilter",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetCustomFilter(ctx context.Context) (result GetCustomFilterOper
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

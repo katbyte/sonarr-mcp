@@ -4,37 +4,60 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"iter"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetBlocklistOperationResponse is the result of GetBlocklist.
-type GetBlocklistOperationResponse struct {
+// GetBlocklistResponse is the result of GetBlocklist.
+//
+// Answer is the BlocklistResourcePagingResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetBlocklistResponse struct {
 	HttpResponse *http.Response
-	Model        *BlocklistResourcePagingResource
+	Answer       *BlocklistResourcePagingResource
+	*BlocklistResourcePagingResource
 }
 
-// GetBlocklistOperationOptions holds the query and header parameters of GetBlocklist.
-type GetBlocklistOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetBlocklistResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the BlocklistResourcePagingResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetBlocklistResponse) Record() (BlocklistResourcePagingResource, error) {
+	if r.Answer == nil {
+		return BlocklistResourcePagingResource{}, errors.New("GetBlocklist answered no BlocklistResourcePagingResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// GetBlocklistOptions holds the query and header parameters of GetBlocklist.
+type GetBlocklistOptions struct {
 	Page          *int
 	PageSize      *int
 	SortKey       string
 	SortDirection SortDirection
-	SeriesIds     []int
+	SeriesIds     []SeriesID
 	Protocols     []DownloadProtocol
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetBlocklistOperationOptions) ToHeaders() *client.Headers {
+func (o GetBlocklistOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetBlocklistOperationOptions) ToQuery() *client.QueryParams {
+func (o GetBlocklistOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.Page != nil {
 		out.Append("page", strconv.Itoa(*o.Page))
@@ -49,7 +72,7 @@ func (o GetBlocklistOperationOptions) ToQuery() *client.QueryParams {
 		out.Append("sortDirection", string(o.SortDirection))
 	}
 	for _, v := range o.SeriesIds {
-		out.Append("seriesIds", strconv.Itoa(v))
+		out.Append("seriesIds", strconv.Itoa(int(v)))
 	}
 	for _, v := range o.Protocols {
 		out.Append("protocols", string(v))
@@ -58,13 +81,24 @@ func (o GetBlocklistOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetBlocklist calls GET /api/v3/blocklist.
-func (c Client) GetBlocklist(ctx context.Context, options GetBlocklistOperationOptions) (result GetBlocklistOperationResponse, err error) {
+func (c Client) GetBlocklist(ctx context.Context, options ...GetBlocklistOptions) (result GetBlocklistResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetBlocklist takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetBlocklistOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.BlocklistResourcePagingResource = &BlocklistResourcePagingResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetBlocklist",
+		OptionsObject: option,
 		Path:          "/api/v3/blocklist",
 	}
 
@@ -82,11 +116,12 @@ func (c Client) GetBlocklist(ctx context.Context, options GetBlocklistOperationO
 		return
 	}
 
-	var model BlocklistResourcePagingResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer BlocklistResourcePagingResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.BlocklistResourcePagingResource = result.Answer
 
 	return
 }
@@ -100,34 +135,102 @@ type GetBlocklistCompleteResult struct {
 // GetBlocklistComplete calls GetBlocklist page by page, from the
 // page options.Page names (the first when unset), until every result is loaded.
 // options.PageSize is the page size, client.DefaultPageSize when unset.
-func (c Client) GetBlocklistComplete(ctx context.Context, options GetBlocklistOperationOptions) (result GetBlocklistCompleteResult, err error) {
+func (c Client) GetBlocklistComplete(ctx context.Context, options ...GetBlocklistOptions) (result GetBlocklistCompleteResult, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetBlocklistComplete takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetBlocklistOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	limit := client.DefaultPageSize
-	if options.PageSize != nil && *options.PageSize > 0 {
-		limit = *options.PageSize
+	if option.PageSize != nil && *option.PageSize > 0 {
+		limit = *option.PageSize
 	}
-	options.PageSize = &limit
+	option.PageSize = &limit
 	number := 1
-	if options.Page != nil && *options.Page > 0 {
-		number = *options.Page
+	if option.Page != nil && *option.Page > 0 {
+		number = *option.Page
 	}
-	options.Page = &number
+	option.Page = &number
 	for {
-		var page GetBlocklistOperationResponse
-		page, err = c.GetBlocklist(ctx, options)
+		var page GetBlocklistResponse
+		page, err = c.GetBlocklist(ctx, option)
 		result.LatestHttpResponse = page.HttpResponse
 		if err != nil {
 			err = fmt.Errorf("loading results: %w", err)
 			return
 		}
-		if page.Model == nil || len(page.Model.Records) == 0 {
+		if page.Answer == nil || len(page.Answer.Records) == 0 {
 			return
 		}
-		result.Items = append(result.Items, page.Model.Records...)
+		result.Items = append(result.Items, page.Answer.Records...)
 		// a short page is the last; so is the page that reaches the total, when
 		// the server reports one
-		if len(page.Model.Records) < limit || page.Model.TotalRecords > 0 && number*limit >= page.Model.TotalRecords {
+		if len(page.Answer.Records) < limit || page.Answer.TotalRecords > 0 && number*limit >= page.Answer.TotalRecords {
 			return
 		}
 		number++
+	}
+}
+
+// GetBlocklistEach calls GetBlocklist page by page as its results are ranged over, so a
+// loop that stops ends the paging:
+//
+//	for item, err := range c.GetBlocklistEach(ctx) {
+//		if err != nil {
+//			return err
+//		}
+//		if found(item) {
+//			break
+//		}
+//	}
+//
+// An error is the last pair handed out, with a zero BlocklistResource. The pages are asked for as GetBlocklistComplete asks for them.
+func (c Client) GetBlocklistEach(ctx context.Context, options ...GetBlocklistOptions) iter.Seq2[BlocklistResource, error] {
+	return func(yield func(BlocklistResource, error) bool) {
+		var zero BlocklistResource
+		if len(options) > 1 {
+			yield(zero, fmt.Errorf("GetBlocklistEach takes one options struct at most, not %d", len(options)))
+			return
+		}
+		var option GetBlocklistOptions
+		if len(options) == 1 {
+			option = options[0]
+		}
+
+		limit := client.DefaultPageSize
+		if option.PageSize != nil && *option.PageSize > 0 {
+			limit = *option.PageSize
+		}
+		option.PageSize = &limit
+		number := 1
+		if option.Page != nil && *option.Page > 0 {
+			number = *option.Page
+		}
+		option.Page = &number
+		for {
+			page, err := c.GetBlocklist(ctx, option)
+			if err != nil {
+				yield(zero, fmt.Errorf("loading results: %w", err))
+				return
+			}
+			if page.Answer == nil || len(page.Answer.Records) == 0 {
+				return
+			}
+			for _, item := range page.Answer.Records {
+				if !yield(item, nil) {
+					return
+				}
+			}
+			// a short page is the last; so is the page that reaches the total, when
+			// the server reports one
+			if len(page.Answer.Records) < limit || page.Answer.TotalRecords > 0 && number*limit >= page.Answer.TotalRecords {
+				return
+			}
+			number++
+		}
 	}
 }

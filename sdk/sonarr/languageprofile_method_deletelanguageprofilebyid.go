@@ -10,20 +10,21 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteLanguageProfileByIdOperationResponse is the result of DeleteLanguageProfileById.
-type DeleteLanguageProfileByIdOperationResponse struct {
+// DeleteLanguageProfileByIdResponse is the result of DeleteLanguageProfileById.
+type DeleteLanguageProfileByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteLanguageProfileById calls DELETE /api/v3/languageprofile/{id}.
 //
 // Deprecated: the document marks this operation deprecated.
-func (c Client) DeleteLanguageProfileById(ctx context.Context, id int) (result DeleteLanguageProfileByIdOperationResponse, err error) {
+func (c Client) DeleteLanguageProfileById(ctx context.Context, id int) (result DeleteLanguageProfileByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteLanguageProfileById",
 		Path:       fmt.Sprintf("/api/v3/languageprofile/%d", id),
 	}
 

@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutQualityDefinitionUpdateOperationResponse is the result of PutQualityDefinitionUpdate.
-type PutQualityDefinitionUpdateOperationResponse struct {
+// PutQualityDefinitionUpdateResponse is the result of PutQualityDefinitionUpdate.
+type PutQualityDefinitionUpdateResponse struct {
 	HttpResponse *http.Response
-	Model        []QualityDefinitionResource
+	Answer       []QualityDefinitionResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutQualityDefinitionUpdateResponse) Answered() bool { return r.Answer != nil }
+
 // PutQualityDefinitionUpdate calls PUT /api/v3/qualitydefinition/update.
-func (c Client) PutQualityDefinitionUpdate(ctx context.Context, input []QualityDefinitionResource) (result PutQualityDefinitionUpdateOperationResponse, err error) {
+func (c Client) PutQualityDefinitionUpdate(ctx context.Context, input []QualityDefinitionResource) (result PutQualityDefinitionUpdateResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
+		Operation:  "PutQualityDefinitionUpdate",
 		Path:       "/api/v3/qualitydefinition/update",
 	}
 
@@ -44,7 +49,7 @@ func (c Client) PutQualityDefinitionUpdate(ctx context.Context, input []QualityD
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

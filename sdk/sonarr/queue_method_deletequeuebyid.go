@@ -11,13 +11,13 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteQueueByIdOperationResponse is the result of DeleteQueueById.
-type DeleteQueueByIdOperationResponse struct {
+// DeleteQueueByIdResponse is the result of DeleteQueueById.
+type DeleteQueueByIdResponse struct {
 	HttpResponse *http.Response
 }
 
-// DeleteQueueByIdOperationOptions holds the query and header parameters of DeleteQueueById.
-type DeleteQueueByIdOperationOptions struct {
+// DeleteQueueByIdOptions holds the query and header parameters of DeleteQueueById.
+type DeleteQueueByIdOptions struct {
 	RemoveFromClient *bool
 	Blocklist        *bool
 	SkipRedownload   *bool
@@ -25,13 +25,13 @@ type DeleteQueueByIdOperationOptions struct {
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o DeleteQueueByIdOperationOptions) ToHeaders() *client.Headers {
+func (o DeleteQueueByIdOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o DeleteQueueByIdOperationOptions) ToQuery() *client.QueryParams {
+func (o DeleteQueueByIdOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.RemoveFromClient != nil {
 		out.Append("removeFromClient", strconv.FormatBool(*o.RemoveFromClient))
@@ -49,13 +49,23 @@ func (o DeleteQueueByIdOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // DeleteQueueById calls DELETE /api/v3/queue/{id}.
-func (c Client) DeleteQueueById(ctx context.Context, id int, options DeleteQueueByIdOperationOptions) (result DeleteQueueByIdOperationResponse, err error) {
+func (c Client) DeleteQueueById(ctx context.Context, id int, options ...DeleteQueueByIdOptions) (result DeleteQueueByIdResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("DeleteQueueById takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option DeleteQueueByIdOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodDelete,
-		OptionsObject: options,
+		Operation:     "DeleteQueueById",
+		OptionsObject: option,
 		Path:          fmt.Sprintf("/api/v3/queue/%d", id),
 	}
 

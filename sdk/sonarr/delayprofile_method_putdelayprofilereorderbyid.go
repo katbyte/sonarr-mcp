@@ -11,25 +11,29 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutDelayProfileReorderByIdOperationResponse is the result of PutDelayProfileReorderById.
-type PutDelayProfileReorderByIdOperationResponse struct {
+// PutDelayProfileReorderByIdResponse is the result of PutDelayProfileReorderById.
+type PutDelayProfileReorderByIdResponse struct {
 	HttpResponse *http.Response
-	Model        []DelayProfileResource
+	Answer       []DelayProfileResource
 }
 
-// PutDelayProfileReorderByIdOperationOptions holds the query and header parameters of PutDelayProfileReorderById.
-type PutDelayProfileReorderByIdOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutDelayProfileReorderByIdResponse) Answered() bool { return r.Answer != nil }
+
+// PutDelayProfileReorderByIdOptions holds the query and header parameters of PutDelayProfileReorderById.
+type PutDelayProfileReorderByIdOptions struct {
 	After *int
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PutDelayProfileReorderByIdOperationOptions) ToHeaders() *client.Headers {
+func (o PutDelayProfileReorderByIdOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PutDelayProfileReorderByIdOperationOptions) ToQuery() *client.QueryParams {
+func (o PutDelayProfileReorderByIdOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.After != nil {
 		out.Append("after", strconv.Itoa(*o.After))
@@ -38,13 +42,23 @@ func (o PutDelayProfileReorderByIdOperationOptions) ToQuery() *client.QueryParam
 }
 
 // PutDelayProfileReorderById calls PUT /api/v3/delayprofile/reorder/{id}.
-func (c Client) PutDelayProfileReorderById(ctx context.Context, id int, options PutDelayProfileReorderByIdOperationOptions) (result PutDelayProfileReorderByIdOperationResponse, err error) {
+func (c Client) PutDelayProfileReorderById(ctx context.Context, id int, options ...PutDelayProfileReorderByIdOptions) (result PutDelayProfileReorderByIdResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PutDelayProfileReorderById takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PutDelayProfileReorderByIdOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodPut,
-		OptionsObject: options,
+		Operation:     "PutDelayProfileReorderById",
+		OptionsObject: option,
 		Path:          fmt.Sprintf("/api/v3/delayprofile/reorder/%d", id),
 	}
 
@@ -62,7 +76,7 @@ func (c Client) PutDelayProfileReorderById(ctx context.Context, id int, options 
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

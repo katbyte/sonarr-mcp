@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetConfigNamingByIdOperationResponse is the result of GetConfigNamingById.
-type GetConfigNamingByIdOperationResponse struct {
+// GetConfigNamingByIdResponse is the result of GetConfigNamingById.
+//
+// Answer is the NamingConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetConfigNamingByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *NamingConfigResource
+	Answer       *NamingConfigResource
+	*NamingConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetConfigNamingByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the NamingConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetConfigNamingByIdResponse) Record() (NamingConfigResource, error) {
+	if r.Answer == nil {
+		return NamingConfigResource{}, errors.New("GetConfigNamingById answered no NamingConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetConfigNamingById calls GET /api/v3/config/naming/{id}.
-func (c Client) GetConfigNamingById(ctx context.Context, id int) (result GetConfigNamingByIdOperationResponse, err error) {
+func (c Client) GetConfigNamingById(ctx context.Context, id int) (result GetConfigNamingByIdResponse, err error) {
+	result.NamingConfigResource = &NamingConfigResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetConfigNamingById",
 		Path:       fmt.Sprintf("/api/v3/config/naming/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetConfigNamingById(ctx context.Context, id int) (result GetConf
 		return
 	}
 
-	var model NamingConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer NamingConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.NamingConfigResource = result.Answer
 
 	return
 }

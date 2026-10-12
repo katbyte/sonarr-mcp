@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutDownloadClientBulkOperationResponse is the result of PutDownloadClientBulk.
-type PutDownloadClientBulkOperationResponse struct {
+// PutDownloadClientBulkResponse is the result of PutDownloadClientBulk.
+type PutDownloadClientBulkResponse struct {
 	HttpResponse *http.Response
-	Model        []DownloadClientResource
+	Answer       []DownloadClientResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutDownloadClientBulkResponse) Answered() bool { return r.Answer != nil }
+
 // PutDownloadClientBulk calls PUT /api/v3/downloadclient/bulk.
-func (c Client) PutDownloadClientBulk(ctx context.Context, input DownloadClientBulkResource) (result PutDownloadClientBulkOperationResponse, err error) {
+func (c Client) PutDownloadClientBulk(ctx context.Context, input DownloadClientBulkResource) (result PutDownloadClientBulkResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
+		Operation:  "PutDownloadClientBulk",
 		Path:       "/api/v3/downloadclient/bulk",
 	}
 
@@ -44,7 +49,7 @@ func (c Client) PutDownloadClientBulk(ctx context.Context, input DownloadClientB
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

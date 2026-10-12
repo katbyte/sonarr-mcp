@@ -2,6 +2,8 @@
 
 package sonarr
 
+import "slices"
+
 // AuthenticationRequiredType is the "AuthenticationRequiredType" enum.
 type AuthenticationRequiredType string
 
@@ -17,6 +19,11 @@ func PossibleValuesForAuthenticationRequiredType() []string {
 		string(AuthenticationRequiredTypeEnabled),
 		string(AuthenticationRequiredTypeDisabledForLocalAddresses),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v AuthenticationRequiredType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForAuthenticationRequiredType(), string(v))
 }
 
 // CertificateValidationType is the "CertificateValidationType" enum.
@@ -38,6 +45,11 @@ func PossibleValuesForCertificateValidationType() []string {
 	}
 }
 
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v CertificateValidationType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForCertificateValidationType(), string(v))
+}
+
 // ProxyType is the "ProxyType" enum.
 type ProxyType string
 
@@ -55,4 +67,9 @@ func PossibleValuesForProxyType() []string {
 		string(ProxyTypeSocks4),
 		string(ProxyTypeSocks5),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v ProxyType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForProxyType(), string(v))
 }

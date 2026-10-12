@@ -8,16 +8,16 @@ type ParsedEpisodeInfo struct {
 	AirDate                       string           `json:"airDate,omitempty"`
 	DailyPart                     int              `json:"dailyPart,omitempty"`
 	EpisodeNumbers                []int            `json:"episodeNumbers,omitzero"`
-	FullSeason                    *bool            `json:"fullSeason,omitempty"`
-	IsAbsoluteNumbering           *bool            `json:"isAbsoluteNumbering,omitempty"`
-	IsDaily                       *bool            `json:"isDaily,omitempty"`
-	IsMiniSeries                  *bool            `json:"isMiniSeries,omitempty"`
-	IsMultiSeason                 *bool            `json:"isMultiSeason,omitempty"`
-	IsPartialSeason               *bool            `json:"isPartialSeason,omitempty"`
-	IsPossibleSceneSeasonSpecial  *bool            `json:"isPossibleSceneSeasonSpecial,omitempty"`
-	IsPossibleSpecialEpisode      *bool            `json:"isPossibleSpecialEpisode,omitempty"`
-	IsSeasonExtra                 *bool            `json:"isSeasonExtra,omitempty"`
-	IsSplitEpisode                *bool            `json:"isSplitEpisode,omitempty"`
+	FullSeason                    bool             `json:"fullSeason"`
+	IsAbsoluteNumbering           bool             `json:"isAbsoluteNumbering"`
+	IsDaily                       bool             `json:"isDaily"`
+	IsMiniSeries                  bool             `json:"isMiniSeries"`
+	IsMultiSeason                 bool             `json:"isMultiSeason"`
+	IsPartialSeason               bool             `json:"isPartialSeason"`
+	IsPossibleSceneSeasonSpecial  bool             `json:"isPossibleSceneSeasonSpecial"`
+	IsPossibleSpecialEpisode      bool             `json:"isPossibleSpecialEpisode"`
+	IsSeasonExtra                 bool             `json:"isSeasonExtra"`
+	IsSplitEpisode                bool             `json:"isSplitEpisode"`
 	Languages                     []Language       `json:"languages,omitzero"`
 	Quality                       *QualityModel    `json:"quality,omitempty"`
 	ReleaseGroup                  string           `json:"releaseGroup,omitempty"`
@@ -29,6 +29,6 @@ type ParsedEpisodeInfo struct {
 	SeasonPart                    int              `json:"seasonPart,omitempty"`
 	SeriesTitle                   string           `json:"seriesTitle,omitempty"`
 	SeriesTitleInfo               *SeriesTitleInfo `json:"seriesTitleInfo,omitempty"`
-	Special                       *bool            `json:"special,omitempty"`
+	Special                       bool             `json:"special"`
 	SpecialAbsoluteEpisodeNumbers []float64        `json:"specialAbsoluteEpisodeNumbers,omitzero"`
 }

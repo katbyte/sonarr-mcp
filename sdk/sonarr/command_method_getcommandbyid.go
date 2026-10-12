@@ -4,26 +4,52 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetCommandByIdOperationResponse is the result of GetCommandById.
-type GetCommandByIdOperationResponse struct {
+// GetCommandByIdResponse is the result of GetCommandById.
+//
+// Answer is the CommandResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetCommandByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *CommandResource
+	Answer       *CommandResource
+	*CommandResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetCommandByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the CommandResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetCommandByIdResponse) Record() (CommandResource, error) {
+	if r.Answer == nil {
+		return CommandResource{}, errors.New("GetCommandById answered no CommandResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetCommandById calls GET /api/v3/command/{id}.
-func (c Client) GetCommandById(ctx context.Context, id int) (result GetCommandByIdOperationResponse, err error) {
+func (c Client) GetCommandById(ctx context.Context, id CommandID) (result GetCommandByIdResponse, err error) {
+	result.CommandResource = &CommandResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
-		Path:       fmt.Sprintf("/api/v3/command/%d", id),
+		Operation:  "GetCommandById",
+		Path:       fmt.Sprintf("/api/v3/command/%s", url.PathEscape(strconv.Itoa(int(id)))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -40,11 +66,12 @@ func (c Client) GetCommandById(ctx context.Context, id int) (result GetCommandBy
 		return
 	}
 
-	var model CommandResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer CommandResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.CommandResource = result.Answer
 
 	return
 }

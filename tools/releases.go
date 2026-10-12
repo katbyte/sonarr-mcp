@@ -73,7 +73,7 @@ func registerReleaseTools(r *registry) {
 		if err != nil {
 			return nil, searchOut{}, err
 		}
-		var opts sonarr.GetReleaseOperationOptions
+		var opts sonarr.GetReleaseOptions
 		switch {
 		case in.Episode != "" && in.Season != nil:
 			return nil, searchOut{}, errors.New("give an episode or a season, not both")
@@ -85,9 +85,9 @@ func registerReleaseTools(r *registry) {
 			if picked, err = pickEpisodes(eps, []string{in.Episode}); err != nil {
 				return nil, searchOut{}, err
 			}
-			opts.EpisodeId = new(picked[0].Id)
+			opts.EpisodeId = picked[0].Id
 		case in.Season != nil:
-			opts.SeriesId, opts.SeasonNumber = new(s.Id), in.Season
+			opts.SeriesId, opts.SeasonNumber = s.Id, in.Season
 			if *in.Season == 0 {
 				return nil, searchOut{}, errors.New("sonarr does not search the specials as a season; search their episodes one at a time")
 			}
@@ -98,9 +98,9 @@ func registerReleaseTools(r *registry) {
 		if err != nil {
 			return nil, searchOut{}, err
 		}
-		rows := make([]releaseRow, 0, len(res.Model))
-		for i := range res.Model {
-			rows = append(rows, projectRelease(&res.Model[i]))
+		rows := make([]releaseRow, 0, len(res.Answer))
+		for i := range res.Answer {
+			rows = append(rows, projectRelease(&res.Answer[i]))
 		}
 		// Sonarr answers in its own preference order; approved first keeps
 		// that order within each half
@@ -149,15 +149,15 @@ func registerReleaseTools(r *registry) {
 		if _, err := client.PostRelease(ctx, sonarr.ReleaseResource{Guid: in.GUID, IndexerId: in.IndexerID}); err != nil {
 			return nil, grabOut{}, err
 		}
-		recent, err := client.GetHistorySince(ctx, sonarr.GetHistorySinceOperationOptions{
+		recent, err := client.GetHistorySince(ctx, sonarr.GetHistorySinceOptions{
 			Date: since.Format(time.RFC3339), EventType: sonarr.EpisodeHistoryEventTypeGrabbed, IncludeSeries: new(true), IncludeEpisode: new(true),
 		})
 		if err != nil {
 			return nil, grabOut{}, err
 		}
 		out := grabOut{Grabbed: historyRow{SourceTitle: in.GUID}}
-		for i := range recent.Model {
-			h := &recent.Model[i]
+		for i := range recent.Answer {
+			h := &recent.Answer[i]
 			if h.Data["guid"] != in.GUID {
 				continue
 			}
@@ -175,19 +175,19 @@ func registerReleaseTools(r *registry) {
 		Title string `json:"title" jsonschema:"a release name or a file name, e.g. Firefly.S01E07.Jaynestown.1080p.WEB-DL-GRP"`
 	}
 	type parseOut struct {
-		Title             string   `json:"title"`
-		Series            string   `json:"series,omitempty"              jsonschema:"the series in the library it matches; empty when it matches none"`
-		SeriesID          int      `json:"series_id,omitempty"`
-		ParsedTitle       string   `json:"parsed_series_title,omitempty" jsonschema:"the series title Sonarr read out of the name"`
-		Episodes          string   `json:"episodes,omitempty"`
-		FullSeason        bool     `json:"full_season"`
-		Special           bool     `json:"special"`
-		Quality           string   `json:"quality"`
-		Languages         []string `json:"languages"`
-		ReleaseGroup      string   `json:"release_group,omitempty"`
-		CustomFormats     []string `json:"custom_formats"`
-		CustomFormatScore int      `json:"custom_format_score"`
-		Understood        bool     `json:"understood"                    jsonschema:"Sonarr could read a series and episodes out of it"`
+		Title             string          `json:"title"`
+		Series            string          `json:"series,omitempty"              jsonschema:"the series in the library it matches; empty when it matches none"`
+		SeriesID          sonarr.SeriesID `json:"series_id,omitempty"`
+		ParsedTitle       string          `json:"parsed_series_title,omitempty" jsonschema:"the series title Sonarr read out of the name"`
+		Episodes          string          `json:"episodes,omitempty"`
+		FullSeason        bool            `json:"full_season"`
+		Special           bool            `json:"special"`
+		Quality           string          `json:"quality"`
+		Languages         []string        `json:"languages"`
+		ReleaseGroup      string          `json:"release_group,omitempty"`
+		CustomFormats     []string        `json:"custom_formats"`
+		CustomFormatScore int             `json:"custom_format_score"`
+		Understood        bool            `json:"understood"                    jsonschema:"Sonarr could read a series and episodes out of it"`
 	}
 	add(r, readTool, &mcp.Tool{
 		Name:        "release_parse",
@@ -196,11 +196,11 @@ func registerReleaseTools(r *registry) {
 		if strings.TrimSpace(in.Title) == "" {
 			return nil, parseOut{}, errors.New("title is required")
 		}
-		res, err := client.GetParse(ctx, sonarr.GetParseOperationOptions{Title: in.Title})
+		res, err := client.GetParse(ctx, sonarr.GetParseOptions{Title: in.Title})
 		if err != nil {
 			return nil, parseOut{}, err
 		}
-		p := res.Model
+		p := res.Answer
 		out := parseOut{Title: in.Title, CustomFormatScore: p.CustomFormatScore, Languages: languageNames(p.Languages)}
 		if p.Series != nil {
 			out.Series, out.SeriesID = p.Series.Title, p.Series.Id
@@ -210,7 +210,7 @@ func registerReleaseTools(r *registry) {
 		}
 		if info := p.ParsedEpisodeInfo; info != nil {
 			out.Understood = true
-			out.ParsedTitle, out.FullSeason, out.Special = info.SeriesTitle, boolv(info.FullSeason), boolv(info.Special)
+			out.ParsedTitle, out.FullSeason, out.Special = info.SeriesTitle, info.FullSeason, info.Special
 			out.Quality, out.ReleaseGroup = qualityName(info.Quality), info.ReleaseGroup
 			if len(out.Languages) == 0 {
 				out.Languages = languageNames(info.Languages)
@@ -243,15 +243,19 @@ func registerReleaseTools(r *registry) {
 		Description: "Search for everything Sonarr wants at once: every missing monitored episode (kind missing) or every file below its cutoff (kind cutoff), across the whole library. On a large library this runs for a long time and hits the indexers hard; audit_missing_episodes and audit_cutoff_unmet size it first.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in wantedIn) (*mcp.CallToolResult, wantedOut, error) {
 		var name string
+		var sent queuedCommand
+		var err error
 		switch strings.ToLower(strings.TrimSpace(in.Kind)) {
 		case "missing":
 			name = "MissingEpisodeSearch"
+			sent, err = client.MissingEpisodeSearch(ctx, sonarr.MissingEpisodeSearchCommand{Monitored: new(true)})
 		case "cutoff", "cutoff_unmet", "cutoffunmet":
 			name = "CutoffUnmetEpisodeSearch"
+			sent, err = client.CutoffUnmetEpisodeSearch(ctx, sonarr.CutoffUnmetEpisodeSearchCommand{Monitored: new(true)})
 		default:
 			return nil, wantedOut{}, fmt.Errorf("kind must be missing or cutoff, got %q", in.Kind)
 		}
-		cmd, err := r.runCommand(ctx, name, map[string]any{"monitored": true}, waitFor(in.Wait))
+		cmd, err := r.settleCommand(ctx, name, waitFor(in.Wait), sent, err)
 		if err != nil {
 			return nil, wantedOut{}, err
 		}

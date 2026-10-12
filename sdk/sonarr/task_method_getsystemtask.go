@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetSystemTaskOperationResponse is the result of GetSystemTask.
-type GetSystemTaskOperationResponse struct {
+// GetSystemTaskResponse is the result of GetSystemTask.
+type GetSystemTaskResponse struct {
 	HttpResponse *http.Response
-	Model        []TaskResource
+	Answer       []TaskResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetSystemTaskResponse) Answered() bool { return r.Answer != nil }
+
 // GetSystemTask calls GET /api/v3/system/task.
-func (c Client) GetSystemTask(ctx context.Context) (result GetSystemTaskOperationResponse, err error) {
+func (c Client) GetSystemTask(ctx context.Context) (result GetSystemTaskResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetSystemTask",
 		Path:       "/api/v3/system/task",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetSystemTask(ctx context.Context) (result GetSystemTaskOperatio
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

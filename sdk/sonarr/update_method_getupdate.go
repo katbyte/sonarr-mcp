@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetUpdateOperationResponse is the result of GetUpdate.
-type GetUpdateOperationResponse struct {
+// GetUpdateResponse is the result of GetUpdate.
+type GetUpdateResponse struct {
 	HttpResponse *http.Response
-	Model        []UpdateResource
+	Answer       []UpdateResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetUpdateResponse) Answered() bool { return r.Answer != nil }
+
 // GetUpdate calls GET /api/v3/update.
-func (c Client) GetUpdate(ctx context.Context) (result GetUpdateOperationResponse, err error) {
+func (c Client) GetUpdate(ctx context.Context) (result GetUpdateResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetUpdate",
 		Path:       "/api/v3/update",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetUpdate(ctx context.Context) (result GetUpdateOperationRespons
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

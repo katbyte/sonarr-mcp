@@ -9,19 +9,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteSeriesEditorOperationResponse is the result of DeleteSeriesEditor.
-type DeleteSeriesEditorOperationResponse struct {
+// DeleteSeriesEditorResponse is the result of DeleteSeriesEditor.
+type DeleteSeriesEditorResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteSeriesEditor calls DELETE /api/v3/series/editor.
-func (c Client) DeleteSeriesEditor(ctx context.Context, input SeriesEditorResource) (result DeleteSeriesEditorOperationResponse, err error) {
+func (c Client) DeleteSeriesEditor(ctx context.Context, input SeriesEditorResource) (result DeleteSeriesEditorResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteSeriesEditor",
 		Path:       "/api/v3/series/editor",
 	}
 

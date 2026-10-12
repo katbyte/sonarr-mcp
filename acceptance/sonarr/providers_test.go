@@ -54,7 +54,7 @@ func allValid(t *testing.T, what string, results []sonarr.ProviderTestAllResult,
 		switch {
 		case i < 0:
 			t.Errorf("%s has no result for %d: %+v", what, id, results)
-		case !boolValue(results[i].IsValid):
+		case !results[i].IsValid:
 			t.Errorf("%s says %d failed: %+v", what, id, results[i].ValidationFailures)
 		}
 	}
@@ -64,11 +64,11 @@ func TestIndexers(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	create := func(name string) sonarr.IndexerResource {
-		res := must(sc.PostIndexer(ctx, newIndexer(ctx, name), sonarr.PostIndexerOperationOptions{}))
+		res := must(sc.PostIndexer(ctx, newIndexer(ctx, name), sonarr.PostIndexerOptions{}))
 		status(t, res.HttpResponse, http.StatusCreated)
-		id := res.Model.Id
+		id := res.Answer.Id
 		t.Cleanup(func() { _, _ = sc.DeleteIndexerById(context.WithoutCancel(ctx), id) })
-		return testenv.Answered(res.Model)
+		return must(res.Record())
 	}
 	idx := create("SDK Indexer Two")
 	if idx.Id == 0 || idx.Implementation != "Newznab" || idx.Protocol != sonarr.DownloadProtocolUsenet || fieldValue(idx.Fields, "baseUrl") != indexer.URL() {
@@ -79,27 +79,27 @@ func TestIndexers(t *testing.T) {
 	if key := fieldValue(idx.Fields, "apiKey"); key == testenv.FakeKey {
 		t.Error("the indexer's API key came back in the clear")
 	}
-	if got := must(sc.GetIndexerById(ctx, idx.Id)).Model; got.Name != "SDK Indexer Two" {
+	if got := must(sc.GetIndexerById(ctx, idx.Id)).Answer; got.Name != "SDK Indexer Two" {
 		t.Errorf("GetIndexerById = %+v", got)
 	}
-	if !slices.ContainsFunc(must(sc.GetIndexer(ctx)).Model, func(x sonarr.IndexerResource) bool { return x.Id == idx.Id }) {
+	if !slices.ContainsFunc(must(sc.GetIndexer(ctx)).Answer, func(x sonarr.IndexerResource) bool { return x.Id == idx.Id }) {
 		t.Error("GetIndexer does not list the new indexer")
 	}
 
 	idx.Priority = 40
-	upd := must(sc.PutIndexerById(ctx, idx.Id, idx, sonarr.PutIndexerByIdOperationOptions{}))
+	upd := must(sc.PutIndexerById(ctx, idx.Id, idx, sonarr.PutIndexerByIdOptions{}))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if upd.Model.Priority != 40 {
-		t.Errorf("PutIndexerById = %+v", upd.Model)
+	if upd.Answer.Priority != 40 {
+		t.Errorf("PutIndexerById = %+v", upd.Answer)
 	}
 	// the key sent back masked still works: the test fetches the feed with it
-	status(t, must(sc.PostIndexerTest(ctx, testenv.Answered(upd.Model), sonarr.PostIndexerTestOperationOptions{})).HttpResponse, http.StatusOK)
+	status(t, must(sc.PostIndexerTest(ctx, must(upd.Record()), sonarr.PostIndexerTestOptions{})).HttpResponse, http.StatusOK)
 	all := must(sc.PostIndexerTestAll(ctx))
 	status(t, all.HttpResponse, http.StatusOK)
-	allValid(t, "PostIndexerTestAll", all.Model, idx.Id, indexerID)
+	allValid(t, "PostIndexerTestAll", all.Answer, idx.Id, indexerID)
 
 	// an action the indexer answers from its caps: the categories to pick from
-	action := must(sc.PostIndexerActionByName(ctx, "newznabCategories", testenv.Answered(upd.Model)))
+	action := must(sc.PostIndexerActionByName(ctx, "newznabCategories", must(upd.Record())))
 	if body := bodyOf(t, action.HttpResponse); !strings.Contains(body, `"options"`) || !strings.Contains(body, "5040") {
 		t.Errorf("PostIndexerActionByName(newznabCategories) = %s", body)
 	}
@@ -110,20 +110,20 @@ func TestIndexers(t *testing.T) {
 	failing := must(sc.PostIndexerTestAll(ctx))
 	indexer.SetFailure(newznab.Failure{})
 	status(t, failing.HttpResponse, http.StatusBadRequest)
-	i := slices.IndexFunc(failing.Model, func(r sonarr.ProviderTestAllResult) bool { return r.Id == idx.Id })
-	if i < 0 || boolValue(failing.Model[i].IsValid) || len(failing.Model[i].ValidationFailures) == 0 || failing.Model[i].ValidationFailures[0].ErrorMessage == "" {
-		t.Errorf("PostIndexerTestAll against a failing indexer = %+v", failing.Model)
+	i := slices.IndexFunc(failing.Answer, func(r sonarr.ProviderTestAllResult) bool { return r.Id == idx.Id })
+	if i < 0 || failing.Answer[i].IsValid || len(failing.Answer[i].ValidationFailures) == 0 || failing.Answer[i].ValidationFailures[0].ErrorMessage == "" {
+		t.Errorf("PostIndexerTestAll against a failing indexer = %+v", failing.Answer)
 	}
 	// the failed test also held every indexer back from searches, until a
 	// test passes again: IndexerFactory.Test records either way
-	allValid(t, "PostIndexerTestAll once the indexer answers again", must(sc.PostIndexerTestAll(ctx)).Model, idx.Id, indexerID)
+	allValid(t, "PostIndexerTestAll once the indexer answers again", must(sc.PostIndexerTestAll(ctx)).Answer, idx.Id, indexerID)
 
 	// the bulk update answers every indexer it changed
 	other := create("SDK Indexer Three")
 	bulk := must(sc.PutIndexerBulk(ctx, sonarr.IndexerBulkResource{Ids: []int{idx.Id, other.Id}, Priority: 45, EnableRss: new(false)}))
 	status(t, bulk.HttpResponse, http.StatusAccepted)
-	if len(bulk.Model) != 2 || slices.ContainsFunc(bulk.Model, func(x sonarr.IndexerResource) bool { return x.Priority != 45 || boolValue(x.EnableRss) }) {
-		t.Errorf("PutIndexerBulk = %+v", bulk.Model)
+	if len(bulk.Answer) != 2 || slices.ContainsFunc(bulk.Answer, func(x sonarr.IndexerResource) bool { return x.Priority != 45 || boolValue(x.EnableRss) }) {
+		t.Errorf("PutIndexerBulk = %+v", bulk.Answer)
 	}
 
 	status(t, must(sc.DeleteIndexerById(ctx, idx.Id)).HttpResponse, http.StatusOK)
@@ -138,35 +138,35 @@ func TestDownloadClients(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	create := func(name string) sonarr.DownloadClientResource {
-		res := must(sc.PostDownloadClient(ctx, newDownloadClient(ctx, name), sonarr.PostDownloadClientOperationOptions{}))
+		res := must(sc.PostDownloadClient(ctx, newDownloadClient(ctx, name), sonarr.PostDownloadClientOptions{}))
 		status(t, res.HttpResponse, http.StatusCreated)
-		id := res.Model.Id
+		id := res.Answer.Id
 		t.Cleanup(func() { _, _ = sc.DeleteDownloadClientById(context.WithoutCancel(ctx), id) })
-		return testenv.Answered(res.Model)
+		return must(res.Record())
 	}
 	dc := create("SDK SABnzbd Two")
 	if dc.Id == 0 || dc.Implementation != "Sabnzbd" || dc.Protocol != sonarr.DownloadProtocolUsenet || fieldValue(dc.Fields, "tvCategory") != "tv" {
 		t.Fatalf("PostDownloadClient = %+v", dc)
 	}
-	if got := must(sc.GetDownloadClientById(ctx, dc.Id)).Model; got.Name != "SDK SABnzbd Two" {
+	if got := must(sc.GetDownloadClientById(ctx, dc.Id)).Answer; got.Name != "SDK SABnzbd Two" {
 		t.Errorf("GetDownloadClientById = %+v", got)
 	}
-	if !slices.ContainsFunc(must(sc.GetDownloadClient(ctx)).Model, func(x sonarr.DownloadClientResource) bool { return x.Id == dc.Id }) {
+	if !slices.ContainsFunc(must(sc.GetDownloadClient(ctx)).Answer, func(x sonarr.DownloadClientResource) bool { return x.Id == dc.Id }) {
 		t.Error("GetDownloadClient does not list the new client")
 	}
 
 	dc.Priority = 10
-	upd := must(sc.PutDownloadClientById(ctx, dc.Id, dc, sonarr.PutDownloadClientByIdOperationOptions{}))
+	upd := must(sc.PutDownloadClientById(ctx, dc.Id, dc, sonarr.PutDownloadClientByIdOptions{}))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if upd.Model.Priority != 10 {
-		t.Errorf("PutDownloadClientById = %+v", upd.Model)
+	if upd.Answer.Priority != 10 {
+		t.Errorf("PutDownloadClientById = %+v", upd.Answer)
 	}
-	status(t, must(sc.PostDownloadClientTest(ctx, testenv.Answered(upd.Model), sonarr.PostDownloadClientTestOperationOptions{})).HttpResponse, http.StatusOK)
+	status(t, must(sc.PostDownloadClientTest(ctx, must(upd.Record()), sonarr.PostDownloadClientTestOptions{})).HttpResponse, http.StatusOK)
 	all := must(sc.PostDownloadClientTestAll(ctx))
 	status(t, all.HttpResponse, http.StatusOK)
-	allValid(t, "PostDownloadClientTestAll", all.Model, dc.Id, downloadClient)
+	allValid(t, "PostDownloadClientTestAll", all.Answer, dc.Id, downloadClient)
 	// SABnzbd has no actions of its own; an unknown one answers null
-	action := must(sc.PostDownloadClientActionByName(ctx, "sdkNoSuchAction", testenv.Answered(upd.Model)))
+	action := must(sc.PostDownloadClientActionByName(ctx, "sdkNoSuchAction", must(upd.Record())))
 	if body := strings.TrimSpace(bodyOf(t, action.HttpResponse)); body != "null" && body != "{}" {
 		t.Errorf("PostDownloadClientActionByName = %s", body)
 	}
@@ -174,8 +174,8 @@ func TestDownloadClients(t *testing.T) {
 	other := create("SDK SABnzbd Three")
 	bulk := must(sc.PutDownloadClientBulk(ctx, sonarr.DownloadClientBulkResource{Ids: []int{dc.Id, other.Id}, Priority: 20}))
 	status(t, bulk.HttpResponse, http.StatusAccepted)
-	if len(bulk.Model) != 2 || slices.ContainsFunc(bulk.Model, func(x sonarr.DownloadClientResource) bool { return x.Priority != 20 }) {
-		t.Errorf("PutDownloadClientBulk = %+v", bulk.Model)
+	if len(bulk.Answer) != 2 || slices.ContainsFunc(bulk.Answer, func(x sonarr.DownloadClientResource) bool { return x.Priority != 20 }) {
+		t.Errorf("PutDownloadClientBulk = %+v", bulk.Answer)
 	}
 
 	status(t, must(sc.DeleteDownloadClientById(ctx, dc.Id)).HttpResponse, http.StatusOK)
@@ -243,7 +243,7 @@ func TestNotifications(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	hooks := newWebhooks(t)
-	schemas := must(sc.GetNotificationSchema(ctx)).Model
+	schemas := must(sc.GetNotificationSchema(ctx)).Answer
 	i := slices.IndexFunc(schemas, func(s sonarr.NotificationResource) bool { return s.Implementation == "Webhook" })
 	if i < 0 {
 		t.Fatal("sonarr has no Webhook notification schema")
@@ -254,9 +254,9 @@ func TestNotifications(t *testing.T) {
 
 	// an enabled notification is tested before it is saved: Sonarr sends it
 	// a test event
-	res := must(sc.PostNotification(ctx, n, sonarr.PostNotificationOperationOptions{}))
+	res := must(sc.PostNotification(ctx, n, sonarr.PostNotificationOptions{}))
 	status(t, res.HttpResponse, http.StatusCreated)
-	created := testenv.Answered(res.Model)
+	created := must(res.Record())
 	t.Cleanup(func() { _, _ = sc.DeleteNotificationById(context.WithoutCancel(ctx), created.Id) })
 	if created.Id == 0 || fieldValue(created.Fields, "url") != hooks.url || !boolValue(created.SupportsOnGrab) {
 		t.Fatalf("PostNotification = %+v", created)
@@ -264,30 +264,30 @@ func TestNotifications(t *testing.T) {
 	if !poll(10*time.Second, func() bool { return hooks.count("Test") >= 1 }) {
 		t.Error("the webhook never received the test Sonarr sends a notification before saving it")
 	}
-	if got := must(sc.GetNotificationById(ctx, created.Id)).Model; got.Name != "SDK Webhook" {
+	if got := must(sc.GetNotificationById(ctx, created.Id)).Answer; got.Name != "SDK Webhook" {
 		t.Errorf("GetNotificationById = %+v", got)
 	}
-	if !slices.ContainsFunc(must(sc.GetNotification(ctx)).Model, func(x sonarr.NotificationResource) bool { return x.Id == created.Id }) {
+	if !slices.ContainsFunc(must(sc.GetNotification(ctx)).Answer, func(x sonarr.NotificationResource) bool { return x.Id == created.Id }) {
 		t.Error("GetNotification does not list the new notification")
 	}
 
 	created.OnDownload = new(false)
-	upd := must(sc.PutNotificationById(ctx, created.Id, created, sonarr.PutNotificationByIdOperationOptions{}))
+	upd := must(sc.PutNotificationById(ctx, created.Id, created, sonarr.PutNotificationByIdOptions{}))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if boolValue(upd.Model.OnDownload) {
-		t.Errorf("PutNotificationById = %+v", upd.Model)
+	if boolValue(upd.Answer.OnDownload) {
+		t.Errorf("PutNotificationById = %+v", upd.Answer)
 	}
 
 	before := hooks.count("Test")
-	status(t, must(sc.PostNotificationTest(ctx, testenv.Answered(upd.Model), sonarr.PostNotificationTestOperationOptions{})).HttpResponse, http.StatusOK)
+	status(t, must(sc.PostNotificationTest(ctx, must(upd.Record()), sonarr.PostNotificationTestOptions{})).HttpResponse, http.StatusOK)
 	if !poll(10*time.Second, func() bool { return hooks.count("Test") > before }) {
 		t.Error("PostNotificationTest sent the webhook nothing")
 	}
 	all := must(sc.PostNotificationTestAll(ctx))
 	status(t, all.HttpResponse, http.StatusOK)
-	allValid(t, "PostNotificationTestAll", all.Model, created.Id)
+	allValid(t, "PostNotificationTestAll", all.Answer, created.Id)
 	// a webhook has no actions; an unknown one answers null
-	action := must(sc.PostNotificationActionByName(ctx, "sdkNoSuchAction", testenv.Answered(upd.Model)))
+	action := must(sc.PostNotificationActionByName(ctx, "sdkNoSuchAction", must(upd.Record())))
 	if body := strings.TrimSpace(bodyOf(t, action.HttpResponse)); body != "null" && body != "{}" {
 		t.Errorf("PostNotificationActionByName = %s", body)
 	}
@@ -301,11 +301,11 @@ func TestMetadata(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	// Sonarr has one of each metadata writer from the start, all off
-	existing := must(sc.GetMetadata(ctx)).Model
+	existing := must(sc.GetMetadata(ctx)).Answer
 	if len(existing) == 0 {
 		t.Fatal("GetMetadata listed nothing")
 	}
-	schemas := must(sc.GetMetadataSchema(ctx)).Model
+	schemas := must(sc.GetMetadataSchema(ctx)).Answer
 	i := slices.IndexFunc(schemas, func(s sonarr.MetadataResource) bool { return s.Implementation == "XbmcMetadata" })
 	if i < 0 {
 		t.Fatalf("GetMetadataSchema has no Kodi writer: %+v", schemas)
@@ -313,27 +313,27 @@ func TestMetadata(t *testing.T) {
 	// a second writer, left off, so it writes nothing into the library
 	md := schemas[i]
 	md.Name, md.Enable = "SDK Kodi", new(false)
-	res := must(sc.PostMetadata(ctx, md, sonarr.PostMetadataOperationOptions{}))
+	res := must(sc.PostMetadata(ctx, md, sonarr.PostMetadataOptions{}))
 	status(t, res.HttpResponse, http.StatusCreated)
-	created := testenv.Answered(res.Model)
+	created := must(res.Record())
 	t.Cleanup(func() { _, _ = sc.DeleteMetadataById(context.WithoutCancel(ctx), created.Id) })
 	if created.Id == 0 || created.Name != "SDK Kodi" || boolValue(created.Enable) {
 		t.Fatalf("PostMetadata = %+v", created)
 	}
-	if got := must(sc.GetMetadataById(ctx, created.Id)).Model; got.Name != "SDK Kodi" {
+	if got := must(sc.GetMetadataById(ctx, created.Id)).Answer; got.Name != "SDK Kodi" {
 		t.Errorf("GetMetadataById = %+v", got)
 	}
 
 	created.Fields = fields(created.Fields, map[string]any{"seriesImages": false})
-	upd := must(sc.PutMetadataById(ctx, created.Id, created, sonarr.PutMetadataByIdOperationOptions{}))
+	upd := must(sc.PutMetadataById(ctx, created.Id, created, sonarr.PutMetadataByIdOptions{}))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if on, ok := fieldValue(upd.Model.Fields, "seriesImages").(bool); !ok || on {
-		t.Errorf("PutMetadataById = %+v", upd.Model.Fields)
+	if on, ok := fieldValue(upd.Answer.Fields, "seriesImages").(bool); !ok || on {
+		t.Errorf("PutMetadataById = %+v", upd.Answer.Fields)
 	}
-	status(t, must(sc.PostMetadataTest(ctx, testenv.Answered(upd.Model), sonarr.PostMetadataTestOperationOptions{})).HttpResponse, http.StatusOK)
+	status(t, must(sc.PostMetadataTest(ctx, must(upd.Record()), sonarr.PostMetadataTestOptions{})).HttpResponse, http.StatusOK)
 	// testing all tests the enabled ones, which is none of these
 	status(t, must(sc.PostMetadataTestAll(ctx)).HttpResponse, http.StatusOK)
-	action := must(sc.PostMetadataActionByName(ctx, "sdkNoSuchAction", testenv.Answered(upd.Model)))
+	action := must(sc.PostMetadataActionByName(ctx, "sdkNoSuchAction", must(upd.Record())))
 	if body := strings.TrimSpace(bodyOf(t, action.HttpResponse)); body != "null" && body != "{}" {
 		t.Errorf("PostMetadataActionByName = %s", body)
 	}
@@ -351,7 +351,7 @@ func TestMetadata(t *testing.T) {
 func newImportList(ctx context.Context, t *testing.T, name string) sonarr.ImportListResource {
 	t.Helper()
 
-	schemas := must(sc.GetImportListSchema(ctx)).Model
+	schemas := must(sc.GetImportListSchema(ctx)).Answer
 	i := slices.IndexFunc(schemas, func(s sonarr.ImportListResource) bool { return s.Implementation == "SonarrImport" })
 	if i < 0 {
 		t.Fatal("sonarr has no Sonarr import list schema")
@@ -361,12 +361,12 @@ func newImportList(ctx context.Context, t *testing.T, name string) sonarr.Import
 	l.QualityProfileId, l.RootFolderPath, l.SeasonFolder = profileID, "/tv", new(true)
 	l.ShouldMonitor, l.MonitorNewItems, l.SeriesType = sonarr.MonitorTypesNone, sonarr.NewItemMonitorTypesNone, sonarr.SeriesTypesStandard
 	l.Fields = fields(l.Fields, map[string]any{"baseUrl": "http://localhost:8989", "apiKey": os.Getenv("SONARR_TOKEN")})
-	res := must(sc.PostImportList(ctx, l, sonarr.PostImportListOperationOptions{}))
+	res := must(sc.PostImportList(ctx, l, sonarr.PostImportListOptions{}))
 	status(t, res.HttpResponse, http.StatusCreated)
-	id := res.Model.Id
+	id := res.Answer.Id
 	t.Cleanup(func() { _, _ = sc.DeleteImportListById(context.WithoutCancel(ctx), id) })
 
-	return testenv.Answered(res.Model)
+	return must(res.Record())
 }
 
 func TestImportLists(t *testing.T) {
@@ -376,28 +376,28 @@ func TestImportLists(t *testing.T) {
 	if list.Id == 0 || list.Implementation != "SonarrImport" || list.ListType == "" {
 		t.Fatalf("PostImportList = %+v", list)
 	}
-	if got := must(sc.GetImportListById(ctx, list.Id)).Model; got.Name != "SDK Sonarr List" {
+	if got := must(sc.GetImportListById(ctx, list.Id)).Answer; got.Name != "SDK Sonarr List" {
 		t.Errorf("GetImportListById = %+v", got)
 	}
-	if !slices.ContainsFunc(must(sc.GetImportList(ctx)).Model, func(x sonarr.ImportListResource) bool { return x.Id == list.Id }) {
+	if !slices.ContainsFunc(must(sc.GetImportList(ctx)).Answer, func(x sonarr.ImportListResource) bool { return x.Id == list.Id }) {
 		t.Error("GetImportList does not list the new list")
 	}
 
 	list.ListOrder = 3
-	upd := must(sc.PutImportListById(ctx, list.Id, list, sonarr.PutImportListByIdOperationOptions{}))
+	upd := must(sc.PutImportListById(ctx, list.Id, list, sonarr.PutImportListByIdOptions{}))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	status(t, must(sc.PostImportListTest(ctx, testenv.Answered(upd.Model), sonarr.PostImportListTestOperationOptions{})).HttpResponse, http.StatusOK)
+	status(t, must(sc.PostImportListTest(ctx, must(upd.Record()), sonarr.PostImportListTestOptions{})).HttpResponse, http.StatusOK)
 	// testing all tests the lists that add series automatically, which this
 	// one (left off, so it never adds this Sonarr's series to itself) is not
 	all := must(sc.PostImportListTestAll(ctx))
 	status(t, all.HttpResponse, http.StatusOK)
-	if slices.ContainsFunc(all.Model, func(r sonarr.ProviderTestAllResult) bool { return r.Id == list.Id }) {
-		t.Errorf("PostImportListTestAll tested a list that adds nothing: %+v", all.Model)
+	if slices.ContainsFunc(all.Answer, func(r sonarr.ProviderTestAllResult) bool { return r.Id == list.Id }) {
+		t.Errorf("PostImportListTestAll tested a list that adds nothing: %+v", all.Answer)
 	}
 
 	// the list's own action: the quality profiles of the Sonarr it reads,
 	// which is this one
-	action := must(sc.PostImportListActionByName(ctx, "getProfiles", testenv.Answered(upd.Model)))
+	action := must(sc.PostImportListActionByName(ctx, "getProfiles", must(upd.Record())))
 	if body := bodyOf(t, action.HttpResponse); !strings.Contains(body, profileName) {
 		t.Errorf("PostImportListActionByName(getProfiles) = %s", body)
 	}
@@ -405,8 +405,8 @@ func TestImportLists(t *testing.T) {
 	other := newImportList(ctx, t, "SDK Sonarr List Two")
 	bulk := must(sc.PutImportListBulk(ctx, sonarr.ImportListBulkResource{Ids: []int{list.Id, other.Id}, EnableAutomaticAdd: new(false), RootFolderPath: "/tv"}))
 	status(t, bulk.HttpResponse, http.StatusAccepted)
-	if len(bulk.Model) != 2 {
-		t.Errorf("PutImportListBulk = %+v", bulk.Model)
+	if len(bulk.Answer) != 2 {
+		t.Errorf("PutImportListBulk = %+v", bulk.Answer)
 	}
 
 	status(t, must(sc.DeleteImportListById(ctx, list.Id)).HttpResponse, http.StatusOK)

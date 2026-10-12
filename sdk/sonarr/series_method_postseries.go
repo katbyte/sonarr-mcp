@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostSeriesOperationResponse is the result of PostSeries.
-type PostSeriesOperationResponse struct {
+// PostSeriesResponse is the result of PostSeries.
+//
+// Answer is the SeriesResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PostSeriesResponse struct {
 	HttpResponse *http.Response
-	Model        *SeriesResource
+	Answer       *SeriesResource
+	*SeriesResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostSeriesResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the SeriesResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PostSeriesResponse) Record() (SeriesResource, error) {
+	if r.Answer == nil {
+		return SeriesResource{}, errors.New("PostSeries answered no SeriesResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PostSeries calls POST /api/v3/series.
-func (c Client) PostSeries(ctx context.Context, input SeriesResource) (result PostSeriesOperationResponse, err error) {
+func (c Client) PostSeries(ctx context.Context, input SeriesResource) (result PostSeriesResponse, err error) {
+	result.SeriesResource = &SeriesResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusCreated,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostSeries",
 		Path:       "/api/v3/series",
 	}
 
@@ -44,11 +68,12 @@ func (c Client) PostSeries(ctx context.Context, input SeriesResource) (result Po
 		return
 	}
 
-	var model SeriesResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer SeriesResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.SeriesResource = result.Answer
 
 	return
 }

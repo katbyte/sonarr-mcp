@@ -5,7 +5,6 @@ package tools_test
 import (
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -41,7 +40,7 @@ func TestCustomFormatList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	specs := schema.Model
+	specs := schema.Answer
 	i := slices.IndexFunc(specs, func(s sonarr.CustomFormatSpecificationSchema) bool {
 		return s.Implementation == "ReleaseTitleSpecification"
 	})
@@ -59,7 +58,7 @@ func TestCustomFormatList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = api.DeleteCustomFormatById(ctx, made.Model.Id) })
+	t.Cleanup(func() { _, _ = api.DeleteCustomFormatById(ctx, made.Answer.Id) })
 
 	out := call(t, "customformat_list", nil)
 	cf := findRow(t, acctest.Rows(t, out["custom_formats"], "custom_formats"), "name", "Test HEVC")
@@ -78,13 +77,13 @@ func TestCustomFormatList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := res.Model[slices.IndexFunc(res.Model, func(p sonarr.QualityProfileResource) bool { return p.Name == profile })]
+	p := res.Answer[slices.IndexFunc(res.Answer, func(p sonarr.QualityProfileResource) bool { return p.Name == profile })]
 	for j := range p.FormatItems {
-		if p.FormatItems[j].Format == made.Model.Id {
+		if p.FormatItems[j].Format == made.Answer.Id {
 			p.FormatItems[j].Score = -100
 		}
 	}
-	if _, err := api.PutQualityProfileById(ctx, strconv.Itoa(p.Id), p); err != nil {
+	if _, err := api.PutQualityProfileById(ctx, p.Id, p); err != nil {
 		t.Fatal(err)
 	}
 	scored := call(t, "customformat_list", nil)
@@ -104,17 +103,17 @@ func TestCustomFormatList(t *testing.T) {
 	// other half of audit_cutoff_unmet. Sonarr refuses a score its formats
 	// cannot reach, so the format is worth more than the score first
 	for j := range p.FormatItems {
-		if p.FormatItems[j].Format == made.Model.Id {
+		if p.FormatItems[j].Format == made.Answer.Id {
 			p.FormatItems[j].Score = 20
 		}
 	}
 	p.CutoffFormatScore = 10
-	if _, err := api.PutQualityProfileById(ctx, strconv.Itoa(p.Id), p); err != nil {
+	if _, err := api.PutQualityProfileById(ctx, p.Id, p); err != nil {
 		t.Fatal(err)
 	}
 	restore := func() {
 		p.CutoffFormatScore = 0
-		if _, err := api.PutQualityProfileById(ctx, strconv.Itoa(p.Id), p); err != nil {
+		if _, err := api.PutQualityProfileById(ctx, p.Id, p); err != nil {
 			t.Error(err)
 		}
 	}

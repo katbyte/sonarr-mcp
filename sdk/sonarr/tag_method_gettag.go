@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetTagOperationResponse is the result of GetTag.
-type GetTagOperationResponse struct {
+// GetTagResponse is the result of GetTag.
+type GetTagResponse struct {
 	HttpResponse *http.Response
-	Model        []TagResource
+	Answer       []TagResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetTagResponse) Answered() bool { return r.Answer != nil }
+
 // GetTag calls GET /api/v3/tag.
-func (c Client) GetTag(ctx context.Context) (result GetTagOperationResponse, err error) {
+func (c Client) GetTag(ctx context.Context) (result GetTagResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetTag",
 		Path:       "/api/v3/tag",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetTag(ctx context.Context) (result GetTagOperationResponse, err
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

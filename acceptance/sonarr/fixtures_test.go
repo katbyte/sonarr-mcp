@@ -27,7 +27,7 @@ func release(title string, tvdb, episode int, sizeGB float64, category int) newz
 // has something to grab and something to reject; and one episode of Firefly
 // for the RSS feed Sonarr's indexer test reads.
 func catalogue() []newznab.Release {
-	bb := breakingBad.TvdbID
+	bb := int(breakingBad.TvdbID)
 	return []newznab.Release{
 		release("Breaking.Bad.S01E01.Pilot.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 1, 1.6, newznab.CategoryTVHD),
 		release("Breaking.Bad.S01E01.Pilot.720p.HDTV.x264-FAKE", bb, 1, 0.9, newznab.CategoryTVHD),
@@ -36,7 +36,7 @@ func catalogue() []newznab.Release {
 		release("Breaking.Bad.S01E03.And.the.Bags.in.the.River.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 3, 1.4, newznab.CategoryTVHD),
 		release("Breaking.Bad.S01E04.Cancer.Man.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 4, 1.4, newznab.CategoryTVHD),
 		release("Breaking.Bad.S01E05.Gray.Matter.1080p.WEB-DL.DD5.1.H.264-FAKE", bb, 5, 1.4, newznab.CategoryTVHD),
-		release("Firefly.S01E07.Safe.1080p.WEB-DL.DD5.1.H.264-FAKE", firefly.TvdbID, 7, 1.3, newznab.CategoryTVHD),
+		release("Firefly.S01E07.Safe.1080p.WEB-DL.DD5.1.H.264-FAKE", int(firefly.TvdbID), 7, 1.3, newznab.CategoryTVHD),
 	}
 }
 

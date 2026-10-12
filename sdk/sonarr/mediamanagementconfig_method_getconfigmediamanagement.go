@@ -4,24 +4,48 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetConfigMediaManagementOperationResponse is the result of GetConfigMediaManagement.
-type GetConfigMediaManagementOperationResponse struct {
+// GetConfigMediaManagementResponse is the result of GetConfigMediaManagement.
+//
+// Answer is the MediaManagementConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetConfigMediaManagementResponse struct {
 	HttpResponse *http.Response
-	Model        *MediaManagementConfigResource
+	Answer       *MediaManagementConfigResource
+	*MediaManagementConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetConfigMediaManagementResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the MediaManagementConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetConfigMediaManagementResponse) Record() (MediaManagementConfigResource, error) {
+	if r.Answer == nil {
+		return MediaManagementConfigResource{}, errors.New("GetConfigMediaManagement answered no MediaManagementConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetConfigMediaManagement calls GET /api/v3/config/mediamanagement.
-func (c Client) GetConfigMediaManagement(ctx context.Context) (result GetConfigMediaManagementOperationResponse, err error) {
+func (c Client) GetConfigMediaManagement(ctx context.Context) (result GetConfigMediaManagementResponse, err error) {
+	result.MediaManagementConfigResource = &MediaManagementConfigResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetConfigMediaManagement",
 		Path:       "/api/v3/config/mediamanagement",
 	}
 
@@ -39,11 +63,12 @@ func (c Client) GetConfigMediaManagement(ctx context.Context) (result GetConfigM
 		return
 	}
 
-	var model MediaManagementConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer MediaManagementConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.MediaManagementConfigResource = result.Answer
 
 	return
 }

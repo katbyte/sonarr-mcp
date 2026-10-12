@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetAutoTaggingOperationResponse is the result of GetAutoTagging.
-type GetAutoTaggingOperationResponse struct {
+// GetAutoTaggingResponse is the result of GetAutoTagging.
+type GetAutoTaggingResponse struct {
 	HttpResponse *http.Response
-	Model        []AutoTaggingResource
+	Answer       []AutoTaggingResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetAutoTaggingResponse) Answered() bool { return r.Answer != nil }
+
 // GetAutoTagging calls GET /api/v3/autotagging.
-func (c Client) GetAutoTagging(ctx context.Context) (result GetAutoTaggingOperationResponse, err error) {
+func (c Client) GetAutoTagging(ctx context.Context) (result GetAutoTaggingResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetAutoTagging",
 		Path:       "/api/v3/autotagging",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetAutoTagging(ctx context.Context) (result GetAutoTaggingOperat
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

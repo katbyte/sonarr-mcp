@@ -367,12 +367,12 @@ func TestQueueGrabDelayed(t *testing.T) {
 	// were published two days ago, so the delay has to be longer than that
 	delay, err := api.PostDelayProfile(ctx, sonarr.DelayProfileResource{
 		EnableUsenet: new(true), EnableTorrent: new(true), PreferredProtocol: sonarr.DownloadProtocolUsenet,
-		UsenetDelay: 7 * 24 * 60, Tags: []int{tag}, BypassIfHighestQuality: new(false),
+		UsenetDelay: 7 * 24 * 60, Tags: []sonarr.TagID{sonarr.TagID(tag)}, BypassIfHighestQuality: new(false),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = api.DeleteDelayProfileById(ctx, delay.Model.Id) })
+	t.Cleanup(func() { _, _ = api.DeleteDelayProfileById(ctx, delay.Answer.Id) })
 
 	// Sonarr ignores delays for a search a person asks for, so the release
 	// has to arrive the automatic way: an RSS sync, with the feed holding
@@ -425,13 +425,13 @@ func setIndexerRSS(t *testing.T, on bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	i := slices.IndexFunc(res.Model, func(x sonarr.IndexerResource) bool { return x.Name == fakeIndexerName })
+	i := slices.IndexFunc(res.Answer, func(x sonarr.IndexerResource) bool { return x.Name == fakeIndexerName })
 	if i < 0 {
 		t.Fatal("no fake indexer")
 	}
-	body := res.Model[i]
+	body := res.Answer[i]
 	body.EnableRss = new(on)
-	if _, err := api.PutIndexerById(ctx, body.Id, body, sonarr.PutIndexerByIdOperationOptions{}); err != nil {
+	if _, err := api.PutIndexerById(ctx, body.Id, body, sonarr.PutIndexerByIdOptions{}); err != nil {
 		t.Fatal(err)
 	}
 }

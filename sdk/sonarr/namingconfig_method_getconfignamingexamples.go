@@ -5,20 +5,25 @@ package sonarr
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetConfigNamingExamplesOperationResponse is the result of GetConfigNamingExamples.
-type GetConfigNamingExamplesOperationResponse struct {
+// GetConfigNamingExamplesResponse is the result of GetConfigNamingExamples.
+type GetConfigNamingExamplesResponse struct {
 	HttpResponse *http.Response
-	Model        json.RawMessage
+	Answer       json.RawMessage
 }
 
-// GetConfigNamingExamplesOperationOptions holds the query and header parameters of GetConfigNamingExamples.
-type GetConfigNamingExamplesOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetConfigNamingExamplesResponse) Answered() bool { return r.Answer != nil }
+
+// GetConfigNamingExamplesOptions holds the query and header parameters of GetConfigNamingExamples.
+type GetConfigNamingExamplesOptions struct {
 	RenameEpisodes               *bool
 	ReplaceIllegalCharacters     *bool
 	ColonReplacementFormat       *int
@@ -35,13 +40,13 @@ type GetConfigNamingExamplesOperationOptions struct {
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetConfigNamingExamplesOperationOptions) ToHeaders() *client.Headers {
+func (o GetConfigNamingExamplesOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetConfigNamingExamplesOperationOptions) ToQuery() *client.QueryParams {
+func (o GetConfigNamingExamplesOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.RenameEpisodes != nil {
 		out.Append("renameEpisodes", strconv.FormatBool(*o.RenameEpisodes))
@@ -86,13 +91,23 @@ func (o GetConfigNamingExamplesOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetConfigNamingExamples calls GET /api/v3/config/naming/examples.
-func (c Client) GetConfigNamingExamples(ctx context.Context, options GetConfigNamingExamplesOperationOptions) (result GetConfigNamingExamplesOperationResponse, err error) {
+func (c Client) GetConfigNamingExamples(ctx context.Context, options ...GetConfigNamingExamplesOptions) (result GetConfigNamingExamplesResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetConfigNamingExamples takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetConfigNamingExamplesOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetConfigNamingExamples",
+		OptionsObject: option,
 		Path:          "/api/v3/config/naming/examples",
 	}
 
@@ -110,7 +125,7 @@ func (c Client) GetConfigNamingExamples(ctx context.Context, options GetConfigNa
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

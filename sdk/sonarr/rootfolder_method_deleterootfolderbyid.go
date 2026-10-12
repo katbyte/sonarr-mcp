@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteRootFolderByIdOperationResponse is the result of DeleteRootFolderById.
-type DeleteRootFolderByIdOperationResponse struct {
+// DeleteRootFolderByIdResponse is the result of DeleteRootFolderById.
+type DeleteRootFolderByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteRootFolderById calls DELETE /api/v3/rootfolder/{id}.
-func (c Client) DeleteRootFolderById(ctx context.Context, id int) (result DeleteRootFolderByIdOperationResponse, err error) {
+func (c Client) DeleteRootFolderById(ctx context.Context, id int) (result DeleteRootFolderByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteRootFolderById",
 		Path:       fmt.Sprintf("/api/v3/rootfolder/%d", id),
 	}
 

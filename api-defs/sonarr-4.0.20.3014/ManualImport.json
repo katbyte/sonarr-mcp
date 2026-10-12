@@ -28,7 +28,8 @@
           "Field": "SeriesId",
           "In": "Query",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         },
         {
@@ -151,7 +152,8 @@
           "Type": {
             "Type": "List",
             "NestedItem": {
-              "Type": "Integer"
+              "Type": "ID",
+              "ReferenceName": "EpisodeID"
             }
           },
           "Nullable": true
@@ -250,7 +252,8 @@
           "Name": "SeriesId",
           "JsonName": "seriesId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         }
       ]
@@ -290,7 +293,8 @@
           "Name": "EpisodeFileId",
           "JsonName": "episodeFileId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeFileID"
           },
           "Nullable": true
         },

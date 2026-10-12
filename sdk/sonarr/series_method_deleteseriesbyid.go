@@ -6,30 +6,31 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteSeriesByIdOperationResponse is the result of DeleteSeriesById.
-type DeleteSeriesByIdOperationResponse struct {
+// DeleteSeriesByIdResponse is the result of DeleteSeriesById.
+type DeleteSeriesByIdResponse struct {
 	HttpResponse *http.Response
 }
 
-// DeleteSeriesByIdOperationOptions holds the query and header parameters of DeleteSeriesById.
-type DeleteSeriesByIdOperationOptions struct {
+// DeleteSeriesByIdOptions holds the query and header parameters of DeleteSeriesById.
+type DeleteSeriesByIdOptions struct {
 	DeleteFiles            *bool
 	AddImportListExclusion *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o DeleteSeriesByIdOperationOptions) ToHeaders() *client.Headers {
+func (o DeleteSeriesByIdOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o DeleteSeriesByIdOperationOptions) ToQuery() *client.QueryParams {
+func (o DeleteSeriesByIdOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.DeleteFiles != nil {
 		out.Append("deleteFiles", strconv.FormatBool(*o.DeleteFiles))
@@ -41,14 +42,24 @@ func (o DeleteSeriesByIdOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // DeleteSeriesById calls DELETE /api/v3/series/{id}.
-func (c Client) DeleteSeriesById(ctx context.Context, id int, options DeleteSeriesByIdOperationOptions) (result DeleteSeriesByIdOperationResponse, err error) {
+func (c Client) DeleteSeriesById(ctx context.Context, id SeriesID, options ...DeleteSeriesByIdOptions) (result DeleteSeriesByIdResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("DeleteSeriesById takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option DeleteSeriesByIdOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodDelete,
-		OptionsObject: options,
-		Path:          fmt.Sprintf("/api/v3/series/%d", id),
+		Operation:     "DeleteSeriesById",
+		OptionsObject: option,
+		Path:          fmt.Sprintf("/api/v3/series/%s", url.PathEscape(strconv.Itoa(int(id)))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)

@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetCustomFormatByIdOperationResponse is the result of GetCustomFormatById.
-type GetCustomFormatByIdOperationResponse struct {
+// GetCustomFormatByIdResponse is the result of GetCustomFormatById.
+//
+// Answer is the CustomFormatResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetCustomFormatByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *CustomFormatResource
+	Answer       *CustomFormatResource
+	*CustomFormatResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetCustomFormatByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the CustomFormatResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetCustomFormatByIdResponse) Record() (CustomFormatResource, error) {
+	if r.Answer == nil {
+		return CustomFormatResource{}, errors.New("GetCustomFormatById answered no CustomFormatResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetCustomFormatById calls GET /api/v3/customformat/{id}.
-func (c Client) GetCustomFormatById(ctx context.Context, id int) (result GetCustomFormatByIdOperationResponse, err error) {
+func (c Client) GetCustomFormatById(ctx context.Context, id int) (result GetCustomFormatByIdResponse, err error) {
+	result.CustomFormatResource = &CustomFormatResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetCustomFormatById",
 		Path:       fmt.Sprintf("/api/v3/customformat/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetCustomFormatById(ctx context.Context, id int) (result GetCust
 		return
 	}
 
-	var model CustomFormatResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer CustomFormatResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.CustomFormatResource = result.Answer
 
 	return
 }

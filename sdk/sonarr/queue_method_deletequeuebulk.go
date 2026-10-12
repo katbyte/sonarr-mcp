@@ -4,19 +4,20 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteQueueBulkOperationResponse is the result of DeleteQueueBulk.
-type DeleteQueueBulkOperationResponse struct {
+// DeleteQueueBulkResponse is the result of DeleteQueueBulk.
+type DeleteQueueBulkResponse struct {
 	HttpResponse *http.Response
 }
 
-// DeleteQueueBulkOperationOptions holds the query and header parameters of DeleteQueueBulk.
-type DeleteQueueBulkOperationOptions struct {
+// DeleteQueueBulkOptions holds the query and header parameters of DeleteQueueBulk.
+type DeleteQueueBulkOptions struct {
 	RemoveFromClient *bool
 	Blocklist        *bool
 	SkipRedownload   *bool
@@ -24,13 +25,13 @@ type DeleteQueueBulkOperationOptions struct {
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o DeleteQueueBulkOperationOptions) ToHeaders() *client.Headers {
+func (o DeleteQueueBulkOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o DeleteQueueBulkOperationOptions) ToQuery() *client.QueryParams {
+func (o DeleteQueueBulkOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.RemoveFromClient != nil {
 		out.Append("removeFromClient", strconv.FormatBool(*o.RemoveFromClient))
@@ -48,14 +49,24 @@ func (o DeleteQueueBulkOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // DeleteQueueBulk calls DELETE /api/v3/queue/bulk.
-func (c Client) DeleteQueueBulk(ctx context.Context, input QueueBulkResource, options DeleteQueueBulkOperationOptions) (result DeleteQueueBulkOperationResponse, err error) {
+func (c Client) DeleteQueueBulk(ctx context.Context, input QueueBulkResource, options ...DeleteQueueBulkOptions) (result DeleteQueueBulkResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("DeleteQueueBulk takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option DeleteQueueBulkOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodDelete,
-		OptionsObject: options,
+		Operation:     "DeleteQueueBulk",
+		OptionsObject: option,
 		Path:          "/api/v3/queue/bulk",
 	}
 

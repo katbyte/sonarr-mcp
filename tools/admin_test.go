@@ -47,6 +47,62 @@ func TestRestoreRestartAndShutdownWaitForConfirm(t *testing.T) {
 	}
 }
 
+// Season 0 is the specials, so a search of it says so: a season left out of the command would only be the specials because Sonarr reads none as 0.
+func TestASeasonSearchOfTheSpecialsNamesSeasonZero(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f, map[string]any{"id": 1, "title": "Firefly", "year": 2002, "tvdbId": 78874, "seasons": []any{map[string]any{"seasonNumber": 0, "monitored": true}, map[string]any{"seasonNumber": 1, "monitored": true}}})
+	f.answer(t, "GET /api/v3/qualityprofile", []any{})
+	f.answer(t, "GET /api/v3/tag", []any{})
+	f.answer(t, "GET /api/v3/queue/details", []any{})
+	f.answer(t, "GET /api/v3/queue", page())
+	f.answerStatus(t, "POST /api/v3/command", http.StatusCreated, map[string]any{"id": 9, "name": "SeasonSearch", "status": "queued"})
+
+	mustCall(t, session(t, f, Options{}), "season_search", map[string]any{"series": "Firefly", "season": 0, "wait_seconds": -1})
+
+	if sent := f.sent(http.MethodPost, "/api/v3/command"); len(sent) != 1 || !strings.Contains(sent[0], `"seasonNumber":0`) || !strings.Contains(sent[0], `"name":"SeasonSearch"`) {
+		t.Errorf("a search of season 0 sent %v, want the SeasonSearch command with seasonNumber 0", sent)
+	}
+}
+
+// A command a tool waits for ends finished, failed by Sonarr, or still running when the wait is over, and only the failure is an error; a check on
+// it that Sonarr refuses, or answers with something that is not the command, is an error of its own and never read as how the command went.
+func TestACommandWaitedForSaysHowItEnded(t *testing.T) {
+	t.Parallel()
+
+	backup := func(status int, command any) (map[string]any, string) {
+		f := newFakeServer(t)
+		f.answerStatus(t, "POST /api/v3/command", http.StatusCreated, map[string]any{"id": 9, "name": "Backup", "status": "queued"})
+		f.answerStatus(t, "GET /api/v3/command/9", status, command)
+		f.answer(t, "GET /api/v3/system/backup", []any{map[string]any{"id": 3, "name": "sonarr_backup.zip", "type": "manual"}})
+
+		return callTool(t, session(t, f, Options{}), "backup_create", map[string]any{"wait_seconds": 1})
+	}
+
+	out, errText := backup(http.StatusOK, map[string]any{"id": 9, "name": "Backup", "status": "completed"})
+	if errText != "" || text(asObject(out["command"])["status"]) != "completed" || out["backup"] == nil {
+		t.Errorf("a backup that finished = %v, %q", out, errText)
+	}
+
+	out, errText = backup(http.StatusOK, map[string]any{"id": 9, "name": "Backup", "status": "started"})
+	if errText != "" || text(asObject(out["command"])["status"]) != "started" || out["backup"] != nil {
+		t.Errorf("a backup still running when the wait ended = %v, %q; want it answered as it stands", out, errText)
+	}
+
+	if _, errText = backup(http.StatusOK, map[string]any{"id": 9, "name": "Backup", "status": "failed", "message": "the disk is full"}); !strings.Contains(errText, "Backup failed: the disk is full") || strings.Contains(errText, "checking") {
+		t.Errorf("a backup Sonarr failed = %q, want what Sonarr said and nothing about the check", errText)
+	}
+
+	if _, errText = backup(http.StatusBadRequest, map[string]any{"message": "no such command"}); !strings.Contains(errText, "checking Backup") {
+		t.Errorf("a check Sonarr refused = %q", errText)
+	}
+
+	if _, errText = backup(http.StatusOK, []any{}); !strings.Contains(errText, "checking Backup") {
+		t.Errorf("a check answered with something that is not the command = %q", errText)
+	}
+}
+
 // Sonarr takes a command out of its queue and cannot stop one that runs: a
 // command started, or finished, is refused before anything is sent, and one
 // that starts between the look and the call is refused the same way.

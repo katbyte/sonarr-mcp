@@ -14,16 +14,16 @@ import (
 
 // importCandidate is a file Sonarr could import, and how it reads it.
 type importCandidate struct {
-	Path         string   `json:"path"`
-	Size         string   `json:"size"`
-	Series       string   `json:"series,omitempty"        jsonschema:"the series Sonarr matched the file to; empty when it could not"`
-	SeriesID     int      `json:"series_id,omitempty"`
-	Episodes     string   `json:"episodes,omitempty"      jsonschema:"the episodes Sonarr matched it to; empty when it could not"`
-	Quality      string   `json:"quality"`
-	Languages    []string `json:"languages"`
-	ReleaseGroup string   `json:"release_group,omitempty"`
-	Rejections   []string `json:"rejections"              jsonschema:"why Sonarr would not import it on its own: unparsable, a sample, not an upgrade, already imported"`
-	Importable   bool     `json:"importable"              jsonschema:"Sonarr matched a series and episodes and has no permanent objection; anything else needs its series and episodes given to import_apply"`
+	Path         string          `json:"path"`
+	Size         string          `json:"size"`
+	Series       string          `json:"series,omitempty"        jsonschema:"the series Sonarr matched the file to; empty when it could not"`
+	SeriesID     sonarr.SeriesID `json:"series_id,omitempty"`
+	Episodes     string          `json:"episodes,omitempty"      jsonschema:"the episodes Sonarr matched it to; empty when it could not"`
+	Quality      string          `json:"quality"`
+	Languages    []string        `json:"languages"`
+	ReleaseGroup string          `json:"release_group,omitempty"`
+	Rejections   []string        `json:"rejections"              jsonschema:"why Sonarr would not import it on its own: unparsable, a sample, not an upgrade, already imported"`
+	Importable   bool            `json:"importable"              jsonschema:"Sonarr matched a series and episodes and has no permanent objection; anything else needs its series and episodes given to import_apply"`
 }
 
 func projectCandidate(m *sonarr.ManualImportResource) importCandidate {
@@ -64,7 +64,7 @@ func projectCandidate(m *sonarr.ManualImportResource) importCandidate {
 // there, tracked or not. So the tracked files of any series the folder is in
 // are left out here.
 func (r *registry) scanFolder(ctx context.Context, folder string) ([]sonarr.ManualImportResource, error) {
-	res, err := r.client.GetManualImport(ctx, sonarr.GetManualImportOperationOptions{Folder: folder, FilterExistingFiles: new(true)})
+	res, err := r.client.GetManualImport(ctx, sonarr.GetManualImportOptions{Folder: folder, FilterExistingFiles: new(true)})
 	if err != nil {
 		return nil, err
 	}
@@ -78,16 +78,16 @@ func (r *registry) scanFolder(ctx context.Context, folder string) ([]sonarr.Manu
 		if !inFolder(folder, s.Path) && !inFolder(s.Path, folder) {
 			continue
 		}
-		files, err := r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: new(s.Id)})
+		files, err := r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOptions{SeriesId: s.Id})
 		if err != nil {
 			return nil, err
 		}
-		for _, f := range files.Model {
+		for _, f := range files.Answer {
 			tracked[f.Path] = true
 		}
 	}
 
-	return slices.DeleteFunc(res.Model, func(m sonarr.ManualImportResource) bool { return tracked[m.Path] }), nil
+	return slices.DeleteFunc(res.Answer, func(m sonarr.ManualImportResource) bool { return tracked[m.Path] }), nil
 }
 
 func registerImportTools(r *registry) {
@@ -163,8 +163,8 @@ func registerImportTools(r *registry) {
 		var files []map[string]any
 		out := applyOut{}
 		type planned struct {
-			seriesID int
-			episodes []int
+			seriesID sonarr.SeriesID
+			episodes []sonarr.EpisodeID
 		}
 		var plans []planned
 		for _, f := range in.Files {
@@ -235,7 +235,8 @@ func registerImportTools(r *registry) {
 			plans = append(plans, planned{seriesID: series.Id, episodes: ids})
 		}
 
-		cmd, err := r.runCommand(ctx, "ManualImport", map[string]any{"files": files, "importMode": mode}, waitFor(in.Wait))
+		sent, err := r.client.ManualImport(ctx, sonarr.ManualImportCommand{Files: files, ImportMode: mode})
+		cmd, err := r.settleCommand(ctx, "ManualImport", waitFor(in.Wait), sent, err)
 		out.Command = cmd
 		if err != nil {
 			return nil, out, err

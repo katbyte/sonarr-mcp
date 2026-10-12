@@ -9,10 +9,10 @@ type UpdateResource struct {
 	FileName    string         `json:"fileName,omitempty"`
 	Hash        string         `json:"hash,omitempty"`
 	Id          int            `json:"id,omitempty"`
-	Installable *bool          `json:"installable,omitempty"`
-	Installed   *bool          `json:"installed,omitempty"`
+	Installable bool           `json:"installable"`
+	Installed   bool           `json:"installed"`
 	InstalledOn string         `json:"installedOn,omitempty"`
-	Latest      *bool          `json:"latest,omitempty"`
+	Latest      bool           `json:"latest"`
 	ReleaseDate string         `json:"releaseDate,omitempty"`
 	Url         string         `json:"url,omitempty"`
 	Version     string         `json:"version,omitempty"`

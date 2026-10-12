@@ -9,21 +9,26 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetImportListExclusionOperationResponse is the result of GetImportListExclusion.
-type GetImportListExclusionOperationResponse struct {
+// GetImportListExclusionResponse is the result of GetImportListExclusion.
+type GetImportListExclusionResponse struct {
 	HttpResponse *http.Response
-	Model        []ImportListExclusionResource
+	Answer       []ImportListExclusionResource
 }
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetImportListExclusionResponse) Answered() bool { return r.Answer != nil }
 
 // GetImportListExclusion calls GET /api/v3/importlistexclusion.
 //
 // Deprecated: the document marks this operation deprecated.
-func (c Client) GetImportListExclusion(ctx context.Context) (result GetImportListExclusionOperationResponse, err error) {
+func (c Client) GetImportListExclusion(ctx context.Context) (result GetImportListExclusionResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetImportListExclusion",
 		Path:       "/api/v3/importlistexclusion",
 	}
 
@@ -41,7 +46,7 @@ func (c Client) GetImportListExclusion(ctx context.Context) (result GetImportLis
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

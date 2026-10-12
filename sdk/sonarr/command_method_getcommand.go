@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetCommandOperationResponse is the result of GetCommand.
-type GetCommandOperationResponse struct {
+// GetCommandResponse is the result of GetCommand.
+type GetCommandResponse struct {
 	HttpResponse *http.Response
-	Model        []CommandResource
+	Answer       []CommandResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetCommandResponse) Answered() bool { return r.Answer != nil }
+
 // GetCommand calls GET /api/v3/command.
-func (c Client) GetCommand(ctx context.Context) (result GetCommandOperationResponse, err error) {
+func (c Client) GetCommand(ctx context.Context) (result GetCommandResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetCommand",
 		Path:       "/api/v3/command",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetCommand(ctx context.Context) (result GetCommandOperationRespo
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

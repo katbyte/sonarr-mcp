@@ -8,3 +8,9 @@ type IndexerFlagResource struct {
 	Name      string `json:"name,omitempty"`
 	NameLower string `json:"nameLower,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m IndexerFlagResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m IndexerFlagResource) GetId() int { return m.Id }

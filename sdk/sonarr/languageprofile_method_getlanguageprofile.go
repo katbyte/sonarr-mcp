@@ -9,21 +9,26 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetLanguageProfileOperationResponse is the result of GetLanguageProfile.
-type GetLanguageProfileOperationResponse struct {
+// GetLanguageProfileResponse is the result of GetLanguageProfile.
+type GetLanguageProfileResponse struct {
 	HttpResponse *http.Response
-	Model        []LanguageProfileResource
+	Answer       []LanguageProfileResource
 }
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetLanguageProfileResponse) Answered() bool { return r.Answer != nil }
 
 // GetLanguageProfile calls GET /api/v3/languageprofile.
 //
 // Deprecated: the document marks this operation deprecated.
-func (c Client) GetLanguageProfile(ctx context.Context) (result GetLanguageProfileOperationResponse, err error) {
+func (c Client) GetLanguageProfile(ctx context.Context) (result GetLanguageProfileResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetLanguageProfile",
 		Path:       "/api/v3/languageprofile",
 	}
 
@@ -41,7 +46,7 @@ func (c Client) GetLanguageProfile(ctx context.Context) (result GetLanguageProfi
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

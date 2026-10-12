@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetSystemBackupOperationResponse is the result of GetSystemBackup.
-type GetSystemBackupOperationResponse struct {
+// GetSystemBackupResponse is the result of GetSystemBackup.
+type GetSystemBackupResponse struct {
 	HttpResponse *http.Response
-	Model        []BackupResource
+	Answer       []BackupResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetSystemBackupResponse) Answered() bool { return r.Answer != nil }
+
 // GetSystemBackup calls GET /api/v3/system/backup.
-func (c Client) GetSystemBackup(ctx context.Context) (result GetSystemBackupOperationResponse, err error) {
+func (c Client) GetSystemBackup(ctx context.Context) (result GetSystemBackupResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetSystemBackup",
 		Path:       "/api/v3/system/backup",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetSystemBackup(ctx context.Context) (result GetSystemBackupOper
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

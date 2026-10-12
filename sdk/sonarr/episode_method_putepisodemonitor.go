@@ -4,31 +4,36 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutEpisodeMonitorOperationResponse is the result of PutEpisodeMonitor.
-type PutEpisodeMonitorOperationResponse struct {
+// PutEpisodeMonitorResponse is the result of PutEpisodeMonitor.
+type PutEpisodeMonitorResponse struct {
 	HttpResponse *http.Response
-	Model        []EpisodeResource
+	Answer       []EpisodeResource
 }
 
-// PutEpisodeMonitorOperationOptions holds the query and header parameters of PutEpisodeMonitor.
-type PutEpisodeMonitorOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutEpisodeMonitorResponse) Answered() bool { return r.Answer != nil }
+
+// PutEpisodeMonitorOptions holds the query and header parameters of PutEpisodeMonitor.
+type PutEpisodeMonitorOptions struct {
 	IncludeImages *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PutEpisodeMonitorOperationOptions) ToHeaders() *client.Headers {
+func (o PutEpisodeMonitorOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PutEpisodeMonitorOperationOptions) ToQuery() *client.QueryParams {
+func (o PutEpisodeMonitorOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.IncludeImages != nil {
 		out.Append("includeImages", strconv.FormatBool(*o.IncludeImages))
@@ -37,14 +42,24 @@ func (o PutEpisodeMonitorOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PutEpisodeMonitor calls PUT /api/v3/episode/monitor.
-func (c Client) PutEpisodeMonitor(ctx context.Context, input EpisodesMonitoredResource, options PutEpisodeMonitorOperationOptions) (result PutEpisodeMonitorOperationResponse, err error) {
+func (c Client) PutEpisodeMonitor(ctx context.Context, input EpisodesMonitoredResource, options ...PutEpisodeMonitorOptions) (result PutEpisodeMonitorResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PutEpisodeMonitor takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PutEpisodeMonitorOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod:    http.MethodPut,
-		OptionsObject: options,
+		Operation:     "PutEpisodeMonitor",
+		OptionsObject: option,
 		Path:          "/api/v3/episode/monitor",
 	}
 
@@ -66,7 +81,7 @@ func (c Client) PutEpisodeMonitor(ctx context.Context, input EpisodesMonitoredRe
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

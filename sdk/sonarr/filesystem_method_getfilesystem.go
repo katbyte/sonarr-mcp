@@ -5,33 +5,38 @@ package sonarr
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetFileSystemOperationResponse is the result of GetFileSystem.
-type GetFileSystemOperationResponse struct {
+// GetFileSystemResponse is the result of GetFileSystem.
+type GetFileSystemResponse struct {
 	HttpResponse *http.Response
-	Model        json.RawMessage
+	Answer       json.RawMessage
 }
 
-// GetFileSystemOperationOptions holds the query and header parameters of GetFileSystem.
-type GetFileSystemOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetFileSystemResponse) Answered() bool { return r.Answer != nil }
+
+// GetFileSystemOptions holds the query and header parameters of GetFileSystem.
+type GetFileSystemOptions struct {
 	Path                               string
 	IncludeFiles                       *bool
 	AllowFoldersWithoutTrailingSlashes *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetFileSystemOperationOptions) ToHeaders() *client.Headers {
+func (o GetFileSystemOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetFileSystemOperationOptions) ToQuery() *client.QueryParams {
+func (o GetFileSystemOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.Path != "" {
 		out.Append("path", o.Path)
@@ -46,13 +51,23 @@ func (o GetFileSystemOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetFileSystem calls GET /api/v3/filesystem.
-func (c Client) GetFileSystem(ctx context.Context, options GetFileSystemOperationOptions) (result GetFileSystemOperationResponse, err error) {
+func (c Client) GetFileSystem(ctx context.Context, options ...GetFileSystemOptions) (result GetFileSystemResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetFileSystem takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetFileSystemOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetFileSystem",
+		OptionsObject: option,
 		Path:          "/api/v3/filesystem",
 	}
 
@@ -70,7 +85,7 @@ func (c Client) GetFileSystem(ctx context.Context, options GetFileSystemOperatio
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

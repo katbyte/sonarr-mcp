@@ -17,8 +17,8 @@ type ReleaseResource struct {
 	DownloadClient               string                   `json:"downloadClient,omitempty"`
 	DownloadClientId             int                      `json:"downloadClientId,omitempty"`
 	DownloadUrl                  string                   `json:"downloadUrl,omitempty"`
-	EpisodeId                    int                      `json:"episodeId,omitempty"`
-	EpisodeIds                   []int                    `json:"episodeIds,omitzero"`
+	EpisodeId                    EpisodeID                `json:"episodeId,omitempty"`
+	EpisodeIds                   []EpisodeID              `json:"episodeIds,omitzero"`
 	EpisodeNumbers               []int                    `json:"episodeNumbers,omitzero"`
 	EpisodeRequested             *bool                    `json:"episodeRequested,omitempty"`
 	FullSeason                   *bool                    `json:"fullSeason,omitempty"`
@@ -41,7 +41,7 @@ type ReleaseResource struct {
 	MappedEpisodeInfo            []ReleaseEpisodeResource `json:"mappedEpisodeInfo,omitzero"`
 	MappedEpisodeNumbers         []int                    `json:"mappedEpisodeNumbers,omitzero"`
 	MappedSeasonNumber           int                      `json:"mappedSeasonNumber,omitempty"`
-	MappedSeriesId               int                      `json:"mappedSeriesId,omitempty"`
+	MappedSeriesId               SeriesID                 `json:"mappedSeriesId,omitempty"`
 	Protocol                     DownloadProtocol         `json:"protocol,omitempty"`
 	PublishDate                  string                   `json:"publishDate,omitempty"`
 	Quality                      *QualityModel            `json:"quality,omitempty"`
@@ -55,7 +55,7 @@ type ReleaseResource struct {
 	SceneSource                  *bool                    `json:"sceneSource,omitempty"`
 	SeasonNumber                 int                      `json:"seasonNumber,omitempty"`
 	Seeders                      int                      `json:"seeders,omitempty"`
-	SeriesId                     int                      `json:"seriesId,omitempty"`
+	SeriesId                     SeriesID                 `json:"seriesId,omitempty"`
 	SeriesTitle                  string                   `json:"seriesTitle,omitempty"`
 	ShouldOverride               *bool                    `json:"shouldOverride,omitempty"`
 	Size                         int64                    `json:"size,omitempty"`
@@ -64,5 +64,5 @@ type ReleaseResource struct {
 	TemporarilyRejected          *bool                    `json:"temporarilyRejected,omitempty"`
 	Title                        string                   `json:"title,omitempty"`
 	TvRageId                     int                      `json:"tvRageId,omitempty"`
-	TvdbId                       int                      `json:"tvdbId,omitempty"`
+	TvdbId                       TvdbID                   `json:"tvdbId,omitempty"`
 }

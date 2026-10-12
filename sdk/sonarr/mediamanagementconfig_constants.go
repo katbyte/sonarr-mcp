@@ -2,6 +2,8 @@
 
 package sonarr
 
+import "slices"
+
 // EpisodeTitleRequiredType is the "EpisodeTitleRequiredType" enum.
 type EpisodeTitleRequiredType string
 
@@ -19,6 +21,11 @@ func PossibleValuesForEpisodeTitleRequiredType() []string {
 		string(EpisodeTitleRequiredTypeBulkSeasonReleases),
 		string(EpisodeTitleRequiredTypeNever),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v EpisodeTitleRequiredType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForEpisodeTitleRequiredType(), string(v))
 }
 
 // FileDateType is the "FileDateType" enum.
@@ -40,6 +47,11 @@ func PossibleValuesForFileDateType() []string {
 	}
 }
 
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v FileDateType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForFileDateType(), string(v))
+}
+
 // ProperDownloadTypes is the "ProperDownloadTypes" enum.
 type ProperDownloadTypes string
 
@@ -59,6 +71,11 @@ func PossibleValuesForProperDownloadTypes() []string {
 	}
 }
 
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v ProperDownloadTypes) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForProperDownloadTypes(), string(v))
+}
+
 // RescanAfterRefreshType is the "RescanAfterRefreshType" enum.
 type RescanAfterRefreshType string
 
@@ -76,4 +93,9 @@ func PossibleValuesForRescanAfterRefreshType() []string {
 		string(RescanAfterRefreshTypeAfterManual),
 		string(RescanAfterRefreshTypeNever),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v RescanAfterRefreshType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForRescanAfterRefreshType(), string(v))
 }

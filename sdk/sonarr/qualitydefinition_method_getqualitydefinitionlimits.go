@@ -4,24 +4,48 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetQualityDefinitionLimitsOperationResponse is the result of GetQualityDefinitionLimits.
-type GetQualityDefinitionLimitsOperationResponse struct {
+// GetQualityDefinitionLimitsResponse is the result of GetQualityDefinitionLimits.
+//
+// Answer is the QualityDefinitionLimitsResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetQualityDefinitionLimitsResponse struct {
 	HttpResponse *http.Response
-	Model        *QualityDefinitionLimitsResource
+	Answer       *QualityDefinitionLimitsResource
+	*QualityDefinitionLimitsResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetQualityDefinitionLimitsResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the QualityDefinitionLimitsResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetQualityDefinitionLimitsResponse) Record() (QualityDefinitionLimitsResource, error) {
+	if r.Answer == nil {
+		return QualityDefinitionLimitsResource{}, errors.New("GetQualityDefinitionLimits answered no QualityDefinitionLimitsResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetQualityDefinitionLimits calls GET /api/v3/qualitydefinition/limits.
-func (c Client) GetQualityDefinitionLimits(ctx context.Context) (result GetQualityDefinitionLimitsOperationResponse, err error) {
+func (c Client) GetQualityDefinitionLimits(ctx context.Context) (result GetQualityDefinitionLimitsResponse, err error) {
+	result.QualityDefinitionLimitsResource = &QualityDefinitionLimitsResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetQualityDefinitionLimits",
 		Path:       "/api/v3/qualitydefinition/limits",
 	}
 
@@ -39,11 +63,12 @@ func (c Client) GetQualityDefinitionLimits(ctx context.Context) (result GetQuali
 		return
 	}
 
-	var model QualityDefinitionLimitsResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer QualityDefinitionLimitsResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.QualityDefinitionLimitsResource = result.Answer
 
 	return
 }

@@ -1,4 +1,4 @@
-// Package pandorest generates typed Go SDKs from vendored OpenAPI documents.
+// Package pandorest generates typed Go Services from vendored OpenAPI documents.
 // It is inspired by Pandora, the go-azure-sdk generator
 // (https://github.com/hashicorp/pandora), and keeps its pipeline, scaled down
 // to a handful of documents in one repository:
@@ -40,6 +40,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
+	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/katbyte/pandorest/config"
@@ -50,7 +53,7 @@ import (
 	"github.com/katbyte/pandorest/importer/workarounds"
 )
 
-// Config is what a repository generates its SDKs from.
+// Config is what a repository generates its Services from.
 type Config struct {
 	// Services are the APIs, in the order the commands process them.
 	Services []config.Service
@@ -64,11 +67,13 @@ var ErrChanges = errors.New("the definitions differ")
 
 const usage = `usage: pandorest <import|generate|diff|check|resolve> [flags]
 
-  import    read each service's highest-versioned spec into its definitions directory, applying the workarounds
+  import    read each service's spec into its definitions directory, applying the workarounds
   generate  write the SDK packages from those definitions
   diff      report what the specs change against the checked-in definitions
-  check     verify the definitions match the specs and the packages have every method
-  resolve   print each service's version, document and definitions (the highest version present)
+  check     verify the definitions match the specs and the packages have every method, and count the methods the repository's own files name
+  resolve   print each service's version, document and definitions
+
+a service is its highest version alone, or every version it vendors when its config says where each goes (Outputs)
 
 run "pandorest <command> -h" for a command's flags`
 
@@ -102,9 +107,15 @@ func Run(cfg Config, args []string, stdout, stderr io.Writer) error {
 	fs.SetOutput(stderr)
 	services := fs.String("service", "", "comma-separated services to process (default all: "+strings.Join(config.Names(cfg.Services), ", ")+")")
 	root := fs.String("root", ".", "repository root the config paths are relative to")
+	version := fs.String("version", "", "one version of a service generated per version (default all of them)")
 	quiet := fs.Bool("quiet", false, "do not log each workaround and warning")
 	var oldDir, newDir *string
-	var exitCode *bool
+	var exitCode, uncalled *bool
+	var callers *string
+	if cmd == cmdCheck {
+		uncalled = fs.Bool("uncalled", false, "list the generated methods no hand-written file names (tests do not count)")
+		callers = fs.String("callers", ".", "the directory whose hand-written files count as naming a method, tests left out, relative to the root (default the whole repository)")
+	}
 	if cmd == cmdDiff {
 		oldDir = fs.String("old", "", "definitions directory to compare from (default: the checked-in definitions)")
 		newDir = fs.String("new", "", "definitions directory to compare to (default: a fresh import of the spec)")
@@ -136,29 +147,25 @@ func Run(cfg Config, args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	changed := false
-	for _, svc := range selected {
-		svc, err = svc.In(*root).Resolve()
+	for _, selected := range selected {
+		versions, err := selected.In(*root).ResolveAll()
 		if err != nil {
 			return err
 		}
-		switch cmd {
-		case cmdImport:
-			err = importService(svc, cfg.Workarounds, log, stdout)
-		case cmdGenerate:
-			err = generateService(svc, stdout)
-		case cmdDiff:
-			var differs bool
-			differs, err = diffService(svc, cfg.Workarounds, log, stdout)
-			changed = changed || differs
-		case cmdCheck:
-			err = checkService(svc, cfg.Workarounds, log, stdout)
-		case cmdResolve:
-			_, _ = fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", svc.Name, svc.Version, svc.Spec, svc.Definitions)
-		default:
-			return fmt.Errorf("unknown command %q\n%s", cmd, usage)
+		if *version != "" {
+			versions = slices.DeleteFunc(versions, func(s config.Service) bool { return s.Version != *version })
+			if len(versions) == 0 {
+				return fmt.Errorf("%s: no version %s is vendored", selected.Name, *version)
+			}
 		}
-		if err != nil {
-			return err
+		for _, svc := range versions {
+			listing := io.Discard
+			if uncalled != nil && *uncalled {
+				listing = stdout
+			}
+			if err := runOne(cmd, svc, cfg, log, stdout, &changed, listing, callers); err != nil {
+				return err
+			}
 		}
 	}
 	if cmd == cmdDiff && changed && *exitCode {
@@ -166,6 +173,30 @@ func Run(cfg Config, args []string, stdout, stderr io.Writer) error {
 	}
 
 	return nil
+}
+
+// runOne runs one command on one service, resolved to one version.
+// listing is where check lists the methods no hand-written file names: stdout when asked, else nowhere.
+func runOne(cmd string, svc config.Service, cfg Config, log func(string), stdout io.Writer, changed *bool, listing io.Writer, callers *string) error {
+	var err error
+	switch cmd {
+	case cmdImport:
+		err = importService(svc, cfg.Workarounds, log, stdout)
+	case cmdGenerate:
+		err = generateService(svc, stdout)
+	case cmdDiff:
+		var differs bool
+		differs, err = diffService(svc, cfg.Workarounds, log, stdout)
+		*changed = *changed || differs
+	case cmdCheck:
+		err = checkService(svc, cfg.Workarounds, log, stdout, listing, *callers)
+	case cmdResolve:
+		_, _ = fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", svc.Name, svc.Version, svc.Spec, svc.Definitions)
+	default:
+		return fmt.Errorf("unknown command %q\n%s", cmd, usage)
+	}
+
+	return err
 }
 
 func importService(svc config.Service, all []workarounds.Workaround, log func(string), stdout io.Writer) error {
@@ -186,13 +217,40 @@ func generateService(svc config.Service, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	n, err := generator.Generate(defs, generator.Options{Dir: svc.Path(svc.Output), Definitions: svc.Definitions, Version: svc.Version, ClientImport: cmp.Or(svc.ClientImport, config.DefaultClient), Client: svc.Client, ClientService: svc.ClientService, Credential: svc.Credential, NewDoc: svc.NewDoc, Notes: svc.Notes})
+	importPath, err := importPath(svc)
+	if err != nil {
+		return err
+	}
+	n, err := generator.Generate(defs, generator.Options{Dir: svc.Path(svc.Output), Definitions: svc.Definitions, Version: svc.Version, ClientImport: cmp.Or(svc.ClientImport, config.DefaultClient), Client: svc.Client, ClientService: svc.ClientService, Credential: svc.Credential, NewDoc: svc.NewDoc, Notes: svc.Notes, Grouped: svc.Grouped, Packages: svc.Packages, ImportPath: importPath, InlineSingleOptions: svc.InlineSingleOptions, ClientPackage: svc.ClientPackage})
 	if err != nil {
 		return err
 	}
 	_, _ = fmt.Fprintf(stdout, "%s: %d files -> %s\n", svc.Name, n, svc.Path(svc.Output))
 
 	return nil
+}
+
+// importPath is the import path of a grouped service's Output, which its
+// packages import one another by: Output under the module path, from the
+// config (Module) or the repository's go.mod.
+func importPath(svc config.Service) (string, error) {
+	if !svc.Grouped {
+		return "", nil
+	}
+	if svc.Module != "" {
+		return path.Join(svc.Module, filepath.ToSlash(svc.Output)), nil
+	}
+	src, err := os.ReadFile(svc.Path("go.mod")) //nolint:gosec // the repository root, from the -root flag
+	if err != nil {
+		return "", fmt.Errorf("%s: the grouped layout needs the import path of %s, and neither the config (Module) nor go.mod says it: %w", svc.Name, svc.Output, err)
+	}
+	for line := range strings.SplitSeq(string(src), "\n") {
+		if module, ok := strings.CutPrefix(strings.TrimSpace(line), "module "); ok {
+			return path.Join(strings.TrimSpace(module), filepath.ToSlash(svc.Output)), nil
+		}
+	}
+
+	return "", fmt.Errorf("%s: the grouped layout needs the import path of %s, and go.mod names no module: set Module", svc.Name, svc.Output)
 }
 
 func diffService(svc config.Service, all []workarounds.Workaround, log func(string), stdout io.Writer) (bool, error) {
@@ -225,7 +283,7 @@ func diffDirs(oldDir, newDir string, stdout io.Writer) (bool, error) {
 	return !report.Empty(), nil
 }
 
-func checkService(svc config.Service, all []workarounds.Workaround, log func(string), stdout io.Writer) error {
+func checkService(svc config.Service, all []workarounds.Workaround, log func(string), stdout, listing io.Writer, callers string) error {
 	checkedIn, err := definitions.Load(svc.Path(svc.Definitions))
 	if err != nil {
 		return err
@@ -242,6 +300,20 @@ func checkService(svc config.Service, all []workarounds.Workaround, log func(str
 		return err
 	}
 	_, _ = fmt.Fprintf(stdout, "%s: %d operations, every one has a method in %s\n", svc.Name, n, svc.Path(svc.Output))
+
+	// what the repository's own code reaches, for a reader deciding what the live tests have not proven
+	uncalled, total, err := generator.Uncalled(checkedIn, svc.Path(callers), svc.Path(svc.Output))
+	if err != nil {
+		return err
+	}
+	where := "in the repository"
+	if callers != "." {
+		where = "under " + callers
+	}
+	_, _ = fmt.Fprintf(stdout, "%s: %d of %d methods are named by a hand-written file %s\n", svc.Name, total-len(uncalled), total, where)
+	if len(uncalled) > 0 {
+		_, _ = fmt.Fprintf(listing, "  never named: %s\n", strings.Join(uncalled, ", "))
+	}
 
 	return nil
 }

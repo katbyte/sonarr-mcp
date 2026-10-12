@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostReleaseOperationResponse is the result of PostRelease.
-type PostReleaseOperationResponse struct {
+// PostReleaseResponse is the result of PostRelease.
+//
+// Answer is the ReleaseResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PostReleaseResponse struct {
 	HttpResponse *http.Response
-	Model        *ReleaseResource
+	Answer       *ReleaseResource
+	*ReleaseResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostReleaseResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the ReleaseResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PostReleaseResponse) Record() (ReleaseResource, error) {
+	if r.Answer == nil {
+		return ReleaseResource{}, errors.New("PostRelease answered no ReleaseResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PostRelease calls POST /api/v3/release.
-func (c Client) PostRelease(ctx context.Context, input ReleaseResource) (result PostReleaseOperationResponse, err error) {
+func (c Client) PostRelease(ctx context.Context, input ReleaseResource) (result PostReleaseResponse, err error) {
+	result.ReleaseResource = &ReleaseResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostRelease",
 		Path:       "/api/v3/release",
 	}
 
@@ -44,11 +68,12 @@ func (c Client) PostRelease(ctx context.Context, input ReleaseResource) (result 
 		return
 	}
 
-	var model ReleaseResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer ReleaseResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.ReleaseResource = result.Answer
 
 	return
 }

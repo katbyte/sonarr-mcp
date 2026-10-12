@@ -11,6 +11,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 // Spec is an OpenAPI 3 document.
@@ -51,6 +52,21 @@ type Operation struct {
 	// the one its path or its operationId would make: how two operations
 	// that make the same name are told apart. No document carries it.
 	Name string `json:"-"`
+	// Commands is set by a workaround on an operation that queues a command named in its body, and says which commands there
+	// are and how a queued one is followed. No document carries it.
+	Commands *CommandSet `json:"-"`
+}
+
+// CommandSet is how a server that queues commands by name through one operation is followed: Get is the operation that answers a
+// queued command by its id ("GET /api/v3/command/{id}"), Status the field of its answer that says how far it is, Finished the
+// values that mean it is over and Failed those among them that mean it failed, and Commands the schema each command's body is, by
+// the command's name as the server takes it.
+type CommandSet struct {
+	Get      string
+	Status   string
+	Finished []string
+	Failed   []string
+	Commands map[string]string
 }
 
 // Parameter is a path, query or header parameter.
@@ -67,6 +83,10 @@ type Parameter struct {
 	// can say of its own: the importer keeps an added header named Accept,
 	// where it ignores a document's as OpenAPI says to.
 	Added bool `json:"-"`
+	// Field is the Go field a workaround chose for the parameter, when the
+	// name's own would clash with another parameter of the same name
+	// (a list added beside the string it joins); "" is the name's own.
+	Field string `json:"-"`
 }
 
 // Exploded reports whether an array parameter is sent as one key per value
@@ -152,24 +172,31 @@ type Response struct {
 
 // Schema is a JSON schema object, as far as the two specs use it.
 type Schema struct {
-	Ref         string             `json:"$ref"`
-	Type        string             `json:"type"`
-	Format      string             `json:"format"`
-	Description string             `json:"description"`
-	Nullable    bool               `json:"nullable"`
-	Enum        []json.RawMessage  `json:"enum"`
-	Properties  map[string]*Schema `json:"properties"`
+	Ref         string             `json:"$ref,omitempty"`
+	Type        string             `json:"type,omitempty"`
+	Format      string             `json:"format,omitempty"`
+	Description string             `json:"description,omitempty"`
+	Nullable    bool               `json:"nullable,omitempty"`
+	Enum        []json.RawMessage  `json:"enum,omitempty"`
+	Properties  map[string]*Schema `json:"properties,omitempty"`
 	// Required names the properties an object must carry.
-	Required             []string        `json:"required"`
-	Items                *Schema         `json:"items"`
-	AdditionalProperties json.RawMessage `json:"additionalProperties"`
-	AllOf                []*Schema       `json:"allOf"`
-	OneOf                []*Schema       `json:"oneOf"`
-	AnyOf                []*Schema       `json:"anyOf"`
+	Required             []string        `json:"required,omitempty"`
+	Items                *Schema         `json:"items,omitempty"`
+	AdditionalProperties json.RawMessage `json:"additionalProperties,omitempty"`
+	AllOf                []*Schema       `json:"allOf,omitempty"`
+	OneOf                []*Schema       `json:"oneOf,omitempty"`
+	AnyOf                []*Schema       `json:"anyOf,omitempty"`
 }
 
 // SchemaRefPrefix is how a `$ref` names a component schema.
 const SchemaRefPrefix = "#/components/schemas/"
+
+// FormatUnixSeconds and FormatUnixMillis are the formats a workaround gives an integer that is a date
+// (seconds or milliseconds since 1970), which no document declares.
+const (
+	FormatUnixSeconds = "unix-seconds"
+	FormatUnixMillis  = "unix-milliseconds"
+)
 
 // JSON schema type names.
 const (
@@ -311,4 +338,142 @@ func (o *Operation) Parameter(in, name string) *Parameter {
 // SortedKeys returns the keys of a map in sorted order, for deterministic output.
 func SortedKeys[V any](m map[string]V) []string {
 	return slices.Sorted(maps.Keys(m))
+}
+
+// EachSchema calls fn for every schema in the document: where is the operation it belongs to, as
+// "GET /path", or the component schema's name, and path where it sits, the property names down to
+// it joined by dots ("containerDetails.status"), a parameter's name, or "" for one that is not named.
+// A list adds nothing to the path: its items sit where it does. It covers the component schemas,
+// each operation's parameters, request body and answers, and everything nested in them.
+func (s *Spec) EachSchema(fn func(where, path string, schema *Schema)) {
+	var walk func(where, path string, schema *Schema)
+	walk = func(where, path string, schema *Schema) {
+		if schema == nil {
+			return
+		}
+		fn(where, path, schema)
+		for _, name := range SortedKeys(schema.Properties) {
+			walk(where, PathJoin(path, name), schema.Properties[name])
+		}
+		walk(where, path, schema.Items)
+		for _, list := range [][]*Schema{schema.AllOf, schema.OneOf, schema.AnyOf} {
+			for _, nested := range list {
+				walk(where, path, nested)
+			}
+		}
+		if additional, ok := schema.Additional(); ok {
+			// the value schema is decoded fresh each time, so what fn changed is written back
+			walk(where, path, additional)
+			if raw, err := json.Marshal(additional); err == nil && string(raw) != "{}" {
+				schema.AdditionalProperties = raw
+			}
+		}
+	}
+	for _, name := range SortedKeys(s.Components.Schemas) {
+		walk(name, "", s.Components.Schemas[name])
+	}
+	for _, path := range SortedKeys(s.Paths) {
+		item := s.Paths[path]
+		for method, op := range map[string]*Operation{"GET": item.Get, "POST": item.Post, "PUT": item.Put, "DELETE": item.Delete, "PATCH": item.Patch} {
+			if op == nil {
+				continue
+			}
+			where := method + " " + path
+			for _, p := range op.Parameters {
+				walk(where, p.Name, p.Schema)
+			}
+			if op.RequestBody != nil {
+				for _, mediaType := range SortedKeys(op.RequestBody.Content) {
+					walk(where, "", op.RequestBody.Content[mediaType].Schema)
+				}
+			}
+			for _, status := range SortedKeys(op.Responses) {
+				for _, mediaType := range SortedKeys(op.Responses[status].Content) {
+					walk(where, "", op.Responses[status].Content[mediaType].Schema)
+				}
+			}
+		}
+	}
+}
+
+// PathJoin is path with name under it: the name alone at the top.
+func PathJoin(path, name string) string {
+	if path == "" {
+		return name
+	}
+
+	return path + "." + name
+}
+
+// PathName is the last name of a path: the property's own.
+func PathName(path string) string {
+	if _, name, ok := strings.CutLast(path, "."); ok {
+		return name
+	}
+
+	return path
+}
+
+// Place is one place in a document as a workaround's In or Except names it: an
+// operation ("GET /api/stacks") or a component schema ("Container"), and an
+// optional path inside it, ".status" for the property at the top alone,
+// "containerDetails.status" for the one at that path.
+type Place struct {
+	Where, Path string
+	Top         bool
+}
+
+// PlaceOf reads a place as written: the place, then an optional path, a
+// leading dot marking the top.
+func PlaceOf(entry string) Place {
+	entry = strings.TrimSpace(entry)
+	i := strings.LastIndexByte(entry, ' ')
+	if i < 0 || strings.HasPrefix(entry[i+1:], "/") {
+		return Place{Where: entry}
+	}
+	p := Place{Where: entry[:i], Path: entry[i+1:]}
+	if strings.HasPrefix(p.Path, ".") {
+		p.Path, p.Top = p.Path[1:], true
+	}
+
+	return p
+}
+
+// Matches reports whether a schema at where and path is in the place.
+func (p Place) Matches(where, path string) bool {
+	switch {
+	case p.Where != where:
+		return false
+	case p.Path == "":
+		return true
+	default:
+		return path == p.Path
+	}
+}
+
+// Camel joins the alphanumeric pieces of s, upper-casing the first letter of
+// each piece and keeping the rest as spelled: "QueryResult_BaseItemDto" →
+// "QueryResultBaseItemDto", "master.m3u8" → "MasterM3u8", "user_usage_stats"
+// → "UserUsageStats", "GetFirstUser_2" → "GetFirstUser2". A leading digit gets
+// an "N" prefix so the result is always a valid identifier.
+func Camel(s string) string {
+	var b strings.Builder
+	upNext := true
+	for _, r := range s {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			upNext = true
+			continue
+		}
+		if upNext {
+			r = unicode.ToUpper(r)
+			upNext = false
+		}
+		b.WriteRune(r)
+	}
+	out := b.String()
+	if out != "" && unicode.IsDigit(rune(out[0])) {
+		out = "N" + out
+	}
+
+	return out
 }

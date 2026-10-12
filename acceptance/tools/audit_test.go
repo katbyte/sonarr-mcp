@@ -254,7 +254,7 @@ func TestAuditProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = api.DeleteReleaseProfileById(ctx, off.Model.Id) })
+	t.Cleanup(func() { _, _ = api.DeleteReleaseProfileById(ctx, off.Answer.Id) })
 
 	// and a tag that scopes a setting but no series scopes nothing
 	call(t, "tag_create", map[string]any{"label": scopingTag})
@@ -262,17 +262,17 @@ func TestAuditProfiles(t *testing.T) {
 	t.Cleanup(func() { _, _ = invoke("tag_delete", map[string]any{"label": scopingTag, "confirm": true}) })
 	tagID := acctest.Num(t, findRow(t, acctest.Rows(t, call(t, "tag_list", nil)["tags"], "tags"), "label", scopingTag)["id"], "id")
 	indexers, err := api.GetIndexer(ctx)
-	if err != nil || len(indexers.Model) == 0 {
+	if err != nil || len(indexers.Answer) == 0 {
 		t.Fatalf("reading the indexers: %v", err)
 	}
-	indexer := indexers.Model[0]
-	indexer.Tags = []int{tagID}
-	if _, err := api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOperationOptions{}); err != nil {
+	indexer := indexers.Answer[0]
+	indexer.Tags = []sonarr.TagID{sonarr.TagID(tagID)}
+	if _, err := api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
 		indexer.Tags = nil
-		_, _ = api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOperationOptions{})
+		_, _ = api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOptions{})
 	})
 
 	again := audit(t, "audit_profiles", nil)
@@ -287,7 +287,7 @@ func TestAuditProfiles(t *testing.T) {
 	// the fix the findings name: take the tag off the indexer and delete it,
 	// and the audit has nothing more to say about it
 	indexer.Tags = nil
-	if _, err := api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOperationOptions{}); err != nil {
+	if _, err := api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	call(t, "tag_delete", map[string]any{"label": scopingTag, "confirm": true})

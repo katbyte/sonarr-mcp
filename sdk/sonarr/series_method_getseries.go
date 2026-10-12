@@ -4,35 +4,40 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetSeriesOperationResponse is the result of GetSeries.
-type GetSeriesOperationResponse struct {
+// GetSeriesResponse is the result of GetSeries.
+type GetSeriesResponse struct {
 	HttpResponse *http.Response
-	Model        []SeriesResource
+	Answer       []SeriesResource
 }
 
-// GetSeriesOperationOptions holds the query and header parameters of GetSeries.
-type GetSeriesOperationOptions struct {
-	TvdbId              *int
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetSeriesResponse) Answered() bool { return r.Answer != nil }
+
+// GetSeriesOptions holds the query and header parameters of GetSeries.
+type GetSeriesOptions struct {
+	TvdbId              TvdbID
 	IncludeSeasonImages *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetSeriesOperationOptions) ToHeaders() *client.Headers {
+func (o GetSeriesOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetSeriesOperationOptions) ToQuery() *client.QueryParams {
+func (o GetSeriesOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
-	if o.TvdbId != nil {
-		out.Append("tvdbId", strconv.Itoa(*o.TvdbId))
+	if o.TvdbId != 0 {
+		out.Append("tvdbId", strconv.Itoa(int(o.TvdbId)))
 	}
 	if o.IncludeSeasonImages != nil {
 		out.Append("includeSeasonImages", strconv.FormatBool(*o.IncludeSeasonImages))
@@ -41,13 +46,23 @@ func (o GetSeriesOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetSeries calls GET /api/v3/series.
-func (c Client) GetSeries(ctx context.Context, options GetSeriesOperationOptions) (result GetSeriesOperationResponse, err error) {
+func (c Client) GetSeries(ctx context.Context, options ...GetSeriesOptions) (result GetSeriesResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetSeries takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetSeriesOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetSeries",
+		OptionsObject: option,
 		Path:          "/api/v3/series",
 	}
 
@@ -65,7 +80,7 @@ func (c Client) GetSeries(ctx context.Context, options GetSeriesOperationOptions
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

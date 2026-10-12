@@ -11,19 +11,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostIndexerActionByNameOperationResponse is the result of PostIndexerActionByName.
-type PostIndexerActionByNameOperationResponse struct {
+// PostIndexerActionByNameResponse is the result of PostIndexerActionByName.
+type PostIndexerActionByNameResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostIndexerActionByName calls POST /api/v3/indexer/action/{name}.
-func (c Client) PostIndexerActionByName(ctx context.Context, name string, input IndexerResource) (result PostIndexerActionByNameOperationResponse, err error) {
+func (c Client) PostIndexerActionByName(ctx context.Context, name string, input IndexerResource) (result PostIndexerActionByNameResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostIndexerActionByName",
 		Path:       fmt.Sprintf("/api/v3/indexer/action/%s", url.PathEscape(name)),
 	}
 

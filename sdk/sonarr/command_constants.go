@@ -2,6 +2,8 @@
 
 package sonarr
 
+import "slices"
+
 // CommandPriority is the "CommandPriority" enum.
 type CommandPriority string
 
@@ -21,6 +23,11 @@ func PossibleValuesForCommandPriority() []string {
 	}
 }
 
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v CommandPriority) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForCommandPriority(), string(v))
+}
+
 // CommandResult is the "CommandResult" enum.
 type CommandResult string
 
@@ -38,6 +45,11 @@ func PossibleValuesForCommandResult() []string {
 		string(CommandResultSuccessful),
 		string(CommandResultUnsuccessful),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v CommandResult) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForCommandResult(), string(v))
 }
 
 // CommandStatus is the "CommandStatus" enum.
@@ -67,6 +79,11 @@ func PossibleValuesForCommandStatus() []string {
 	}
 }
 
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v CommandStatus) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForCommandStatus(), string(v))
+}
+
 // CommandTrigger is the "CommandTrigger" enum.
 type CommandTrigger string
 
@@ -84,4 +101,9 @@ func PossibleValuesForCommandTrigger() []string {
 		string(CommandTriggerManual),
 		string(CommandTriggerScheduled),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v CommandTrigger) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForCommandTrigger(), string(v))
 }

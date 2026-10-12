@@ -4,31 +4,54 @@ package sonarr
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostImportListOperationResponse is the result of PostImportList.
-type PostImportListOperationResponse struct {
+// PostImportListResponse is the result of PostImportList.
+//
+// Answer is the ImportListResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PostImportListResponse struct {
 	HttpResponse *http.Response
-	Model        *ImportListResource
+	Answer       *ImportListResource
+	*ImportListResource
 }
 
-// PostImportListOperationOptions holds the query and header parameters of PostImportList.
-type PostImportListOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostImportListResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the ImportListResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PostImportListResponse) Record() (ImportListResource, error) {
+	if r.Answer == nil {
+		return ImportListResource{}, errors.New("PostImportList answered no ImportListResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// PostImportListOptions holds the query and header parameters of PostImportList.
+type PostImportListOptions struct {
 	ForceSave *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PostImportListOperationOptions) ToHeaders() *client.Headers {
+func (o PostImportListOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PostImportListOperationOptions) ToQuery() *client.QueryParams {
+func (o PostImportListOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.ForceSave != nil {
 		out.Append("forceSave", strconv.FormatBool(*o.ForceSave))
@@ -37,14 +60,25 @@ func (o PostImportListOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PostImportList calls POST /api/v3/importlist.
-func (c Client) PostImportList(ctx context.Context, input ImportListResource, options PostImportListOperationOptions) (result PostImportListOperationResponse, err error) {
+func (c Client) PostImportList(ctx context.Context, input ImportListResource, options ...PostImportListOptions) (result PostImportListResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PostImportList takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PostImportListOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.ImportListResource = &ImportListResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusCreated,
 		},
 		HTTPMethod:    http.MethodPost,
-		OptionsObject: options,
+		Operation:     "PostImportList",
+		OptionsObject: option,
 		Path:          "/api/v3/importlist",
 	}
 
@@ -66,11 +100,12 @@ func (c Client) PostImportList(ctx context.Context, input ImportListResource, op
 		return
 	}
 
-	var model ImportListResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer ImportListResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.ImportListResource = result.Answer
 
 	return
 }

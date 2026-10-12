@@ -4,6 +4,7 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -12,25 +13,46 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutSeriesByIdOperationResponse is the result of PutSeriesById.
-type PutSeriesByIdOperationResponse struct {
+// PutSeriesByIdResponse is the result of PutSeriesById.
+//
+// Answer is the SeriesResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutSeriesByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *SeriesResource
+	Answer       *SeriesResource
+	*SeriesResource
 }
 
-// PutSeriesByIdOperationOptions holds the query and header parameters of PutSeriesById.
-type PutSeriesByIdOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutSeriesByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the SeriesResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutSeriesByIdResponse) Record() (SeriesResource, error) {
+	if r.Answer == nil {
+		return SeriesResource{}, errors.New("PutSeriesById answered no SeriesResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// PutSeriesByIdOptions holds the query and header parameters of PutSeriesById.
+type PutSeriesByIdOptions struct {
 	MoveFiles *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PutSeriesByIdOperationOptions) ToHeaders() *client.Headers {
+func (o PutSeriesByIdOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PutSeriesByIdOperationOptions) ToQuery() *client.QueryParams {
+func (o PutSeriesByIdOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.MoveFiles != nil {
 		out.Append("moveFiles", strconv.FormatBool(*o.MoveFiles))
@@ -39,15 +61,26 @@ func (o PutSeriesByIdOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PutSeriesById calls PUT /api/v3/series/{id}.
-func (c Client) PutSeriesById(ctx context.Context, id string, input SeriesResource, options PutSeriesByIdOperationOptions) (result PutSeriesByIdOperationResponse, err error) {
+func (c Client) PutSeriesById(ctx context.Context, id SeriesID, input SeriesResource, options ...PutSeriesByIdOptions) (result PutSeriesByIdResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PutSeriesById takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PutSeriesByIdOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.SeriesResource = &SeriesResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod:    http.MethodPut,
-		OptionsObject: options,
-		Path:          fmt.Sprintf("/api/v3/series/%s", url.PathEscape(id)),
+		Operation:     "PutSeriesById",
+		OptionsObject: option,
+		Path:          fmt.Sprintf("/api/v3/series/%s", url.PathEscape(strconv.Itoa(int(id)))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -68,11 +101,12 @@ func (c Client) PutSeriesById(ctx context.Context, id string, input SeriesResour
 		return
 	}
 
-	var model SeriesResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer SeriesResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.SeriesResource = result.Answer
 
 	return
 }

@@ -51,10 +51,24 @@ func Apply(all []Workaround, service string, spec *openapi.Spec, log func(string
 		if w.Service() != service {
 			continue
 		}
-		if err := w.Apply(spec); err != nil {
+		var notes []string
+		var err error
+		if noting, ok := w.(interface {
+			ApplyNoting(*openapi.Spec, func(string)) error
+		}); ok {
+			// a default workaround says what it reached
+			err = noting.ApplyNoting(spec, func(n string) { notes = append(notes, n) })
+		} else {
+			err = w.Apply(spec)
+		}
+		if err != nil {
 			return nil, fmt.Errorf("%s: workaround %s no longer applies, so remove it: %w\n  (it was for: %s)", service, w.Name(), err, w.Bug())
 		}
-		log(fmt.Sprintf("%s: applied workaround %s", service, w.Name()))
+		line := fmt.Sprintf("%s: applied workaround %s", service, w.Name())
+		if len(notes) > 0 {
+			line += ": " + strings.Join(notes, ", ")
+		}
+		log(line)
 		applied = append(applied, w.Name())
 	}
 
@@ -69,16 +83,21 @@ func Apply(all []Workaround, service string, spec *openapi.Spec, log func(string
 // it would notice the bug being gone; and on a document that has lost the 200
 // responses it reads it returns rather than panics. Every problem found is in
 // the error, one to a line.
+//
+// Each workaround meets its document as the ones before it in the list have left it, in order, which is how Apply applies them:
+// a workaround may depend on a shape an earlier one declared (an enum on an answer the document said nothing of), so it is asked
+// whether it applies to that document, and whether applying it again to the same fails. The no-panic check is on the raw document.
 func Verify(all []Workaround, load func(service string) (*openapi.Spec, error)) error {
 	var problems []error
 	seen := map[string]bool{}
+	sofar := map[string]*openapi.Spec{}
 	for _, w := range all {
 		if seen[w.Name()] {
 			problems = append(problems, fmt.Errorf("two workarounds are named %s", w.Name()))
 		}
 		seen[w.Name()] = true
 
-		if err := verifyOne(w, load); err != nil {
+		if err := verifyOne(w, load, sofar); err != nil {
 			problems = append(problems, fmt.Errorf("%s: %w", w.Name(), err))
 		}
 	}
@@ -86,24 +105,30 @@ func Verify(all []Workaround, load func(service string) (*openapi.Spec, error)) 
 	return errors.Join(problems...)
 }
 
-// verifyOne checks one workaround against its service's document.
-func verifyOne(w Workaround, load func(service string) (*openapi.Spec, error)) error {
+// verifyOne checks one workaround against its service's document as the workarounds before it left it, in sofar, loading it the
+// first time.
+func verifyOne(w Workaround, load func(service string) (*openapi.Spec, error), sofar map[string]*openapi.Spec) error {
 	if w.Bug() == "" || !strings.HasPrefix(w.Name(), w.Service()+"-") {
 		return fmt.Errorf("its name or its bug %q does not describe it: a name starts with the service and a dash, and a bug is a sentence", w.Bug())
 	}
 
-	spec, err := load(w.Service())
-	if err != nil {
-		return fmt.Errorf("loading the %s document: %w", w.Service(), err)
+	spec := sofar[w.Service()]
+	if spec == nil {
+		loaded, err := load(w.Service())
+		if err != nil {
+			return fmt.Errorf("loading the %s document: %w", w.Service(), err)
+		}
+		spec = loaded
+		sofar[w.Service()] = spec
 	}
 	if err := w.Apply(spec); err != nil {
-		return fmt.Errorf("it does not apply to the vendored document, so the bug is not there or the workaround is written wrong: %w", err)
+		return fmt.Errorf("it does not apply to the vendored document as the workarounds before it leave it, so the bug is not there or the workaround is written wrong: %w", err)
 	}
 	if err := w.Apply(spec); err == nil {
 		return errors.New("applying it again succeeded, so it would not notice the bug being fixed")
 	}
 
-	spec, err = load(w.Service())
+	spec, err := load(w.Service())
 	if err != nil {
 		return fmt.Errorf("loading the %s document: %w", w.Service(), err)
 	}

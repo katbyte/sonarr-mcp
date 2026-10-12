@@ -19,9 +19,9 @@ package sonarr_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"slices"
-	"strconv"
 	"testing"
 
 	"github.com/katbyte/pandorest/client"
@@ -36,27 +36,27 @@ func TestReadSweep(t *testing.T) {
 
 	ff := seriesIDs[firefly.Title]
 	e1, e6, e7 := episode(ctx, t, ff, 1), episode(ctx, t, ff, 6), episode(ctx, t, ff, 7)
-	tasks := must(sc.GetSystemTask(ctx)).Model
-	logs := must(sc.GetLogFile(ctx)).Model
-	metadata := must(sc.GetMetadata(ctx)).Model
+	tasks := must(sc.GetSystemTask(ctx)).Answer
+	logs := must(sc.GetLogFile(ctx)).Answer
+	metadata := must(sc.GetMetadata(ctx)).Answer
 	if len(tasks) == 0 || len(logs) == 0 || len(metadata) == 0 || e1.EpisodeFileId == 0 {
 		t.Fatalf("the fixtures are incomplete: %d tasks, %d log files, %d metadata consumers, S01E01's file %d",
 			len(tasks), len(logs), len(metadata), e1.EpisodeFileId)
 	}
-	command := runCommand(ctx, t, "RefreshMonitoredDownloads", nil)
+	command := must(sc.RefreshMonitoredDownloadsAndWait(ctx, sonarr.RefreshMonitoredDownloadsCommand{}, commandWait))
 	// Sonarr runs its health checks on a schedule of its own, so the list is
 	// what the last run left: one is asked for now, so that what is swept is
 	// what Sonarr makes of itself at this moment
-	runCommand(ctx, t, "CheckHealth", nil)
+	runCommand(ctx, t, "CheckHealth")
 	made := sweepResources(ctx, t)
 	// a series with a history: the downloads tests, which run first, leave
 	// the only history a seeded Sonarr has
-	recent := must(sc.GetHistory(ctx, sonarr.GetHistoryOperationOptions{PageSize: new(1)})).Model.Records
+	recent := must(sc.GetHistory(ctx, sonarr.GetHistoryOptions{PageSize: new(1)})).Answer.Records
 	if len(recent) == 0 {
 		t.Fatal("the fixtures are incomplete: Sonarr has no history; the downloads tests make it, so run the whole suite")
 	}
 
-	id := strconv.Itoa
+	id := func(n any) string { return fmt.Sprint(n) }
 	// a path parameter is resolved by the segments before it and its name,
 	// the most of them first, then by its name alone
 	fixtures := map[string]string{
@@ -104,7 +104,7 @@ func TestReadSweep(t *testing.T) {
 		"config/indexer/id":        "1",
 	}
 
-	naming := must(sc.GetConfigNaming(ctx)).Model
+	naming := must(sc.GetConfigNaming(ctx)).Answer
 	cases := map[string]sweep.Case{
 		// the examples are the formats given applied to a sample episode, and
 		// Sonarr throws on a format left out
@@ -159,7 +159,8 @@ func TestReadSweep(t *testing.T) {
 
 // sweepMade is what the sweep makes to read back by id.
 type sweepMade struct {
-	tag, customFormat, customFilter, autoTagging, releaseProfile, remotePathMapping, exclusion, importList, notification int
+	tag                                                                                                             sonarr.TagID
+	customFormat, customFilter, autoTagging, releaseProfile, remotePathMapping, exclusion, importList, notification int
 }
 
 // sweepResources makes one of each resource Sonarr has none of by default,
@@ -173,26 +174,26 @@ func sweepResources(ctx context.Context, t *testing.T) sweepMade {
 	}
 	m.tag = newTag(ctx, t, "sdk-sweep")
 
-	x265 := formatSpec(t, must(sc.GetCustomFormatSchema(ctx)).Model, "ReleaseTitleSpecification", "x265", `\bx265\b`)
+	x265 := formatSpec(t, must(sc.GetCustomFormatSchema(ctx)).Answer, "ReleaseTitleSpecification", "x265", `\bx265\b`)
 	m.customFormat = must(sc.PostCustomFormat(ctx, sonarr.CustomFormatResource{
 		Name: "SDK Sweep", IncludeCustomFormatWhenRenaming: new(false), Specifications: []sonarr.CustomFormatSpecificationSchema{x265},
-	})).Model.Id
+	})).Answer.Id
 	cleanup(func(ctx context.Context) error { _, err := sc.DeleteCustomFormatById(ctx, m.customFormat); return err })
 
 	m.customFilter = must(sc.PostCustomFilter(ctx, sonarr.CustomFilterResource{
 		Type: "series", Label: "SDK Sweep", Filters: []map[string]any{{"key": "monitored", "value": []any{true}, "type": "equal"}},
-	})).Model.Id
+	})).Answer.Id
 	cleanup(func(ctx context.Context) error { _, err := sc.DeleteCustomFilterById(ctx, m.customFilter); return err })
 
-	genre := tagSpec(t, must(sc.GetAutoTaggingSchema(ctx)).Model, "GenreSpecification", "Anime", []string{"Anime"})
+	genre := tagSpec(t, must(sc.GetAutoTaggingSchema(ctx)).Answer, "GenreSpecification", "Anime", []string{"Anime"})
 	m.autoTagging = must(sc.PostAutoTagging(ctx, sonarr.AutoTaggingResource{
-		Name: "SDK Sweep", RemoveTagsAutomatically: new(false), Tags: []int{m.tag}, Specifications: []sonarr.AutoTaggingSpecificationSchema{genre},
-	})).Model.Id
+		Name: "SDK Sweep", RemoveTagsAutomatically: new(false), Tags: []sonarr.TagID{m.tag}, Specifications: []sonarr.AutoTaggingSpecificationSchema{genre},
+	})).Answer.Id
 	cleanup(func(ctx context.Context) error { _, err := sc.DeleteAutoTaggingById(ctx, m.autoTagging); return err })
 
 	m.releaseProfile = must(sc.PostReleaseProfile(ctx, sonarr.ReleaseProfileResource{
-		Name: "SDK Sweep", Enabled: new(true), Required: []string{"x265"}, Tags: []int{m.tag},
-	})).Model.Id
+		Name: "SDK Sweep", Enabled: new(true), Required: []string{"x265"}, Tags: []sonarr.TagID{m.tag},
+	})).Answer.Id
 	cleanup(func(ctx context.Context) error {
 		_, err := sc.DeleteReleaseProfileById(ctx, m.releaseProfile)
 		return err
@@ -200,13 +201,13 @@ func sweepResources(ctx context.Context, t *testing.T) sweepMade {
 
 	m.remotePathMapping = must(sc.PostRemotePathMapping(ctx, sonarr.RemotePathMappingResource{
 		Host: "sdk-sweep", RemotePath: "/remote/", LocalPath: "/downloads/",
-	})).Model.Id
+	})).Answer.Id
 	cleanup(func(ctx context.Context) error {
 		_, err := sc.DeleteRemotePathMappingById(ctx, m.remotePathMapping)
 		return err
 	})
 
-	m.exclusion = must(sc.PostImportListExclusion(ctx, sonarr.ImportListExclusionResource{TvdbId: 1, Title: "SDK Sweep"})).Model.Id
+	m.exclusion = must(sc.PostImportListExclusion(ctx, sonarr.ImportListExclusionResource{TvdbId: 1, Title: "SDK Sweep"})).Answer.Id
 	cleanup(func(ctx context.Context) error {
 		_, err := sc.DeleteImportListExclusionById(ctx, m.exclusion)
 		return err
@@ -216,14 +217,14 @@ func sweepResources(ctx context.Context, t *testing.T) sweepMade {
 
 	// a notification with no events is not tested when it is saved, so it
 	// can point anywhere
-	schemas := must(sc.GetNotificationSchema(ctx)).Model
+	schemas := must(sc.GetNotificationSchema(ctx)).Answer
 	i := slices.IndexFunc(schemas, func(s sonarr.NotificationResource) bool { return s.Implementation == "Webhook" })
 	if i < 0 {
 		t.Fatal("sonarr has no Webhook notification schema")
 	}
 	n := schemas[i]
 	n.Name, n.Fields = "SDK Sweep", fields(n.Fields, map[string]any{"url": "http://localhost:9/sweep", "method": 1})
-	m.notification = must(sc.PostNotification(ctx, n, sonarr.PostNotificationOperationOptions{})).Model.Id
+	m.notification = must(sc.PostNotification(ctx, n, sonarr.PostNotificationOptions{})).Answer.Id
 	cleanup(func(ctx context.Context) error { _, err := sc.DeleteNotificationById(ctx, m.notification); return err })
 
 	return m

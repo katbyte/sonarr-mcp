@@ -10,3 +10,9 @@ type QualityProfileQualityItemResource struct {
 	Name    string                              `json:"name,omitempty"`
 	Quality *Quality                            `json:"quality,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m QualityProfileQualityItemResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m QualityProfileQualityItemResource) GetId() int { return m.Id }

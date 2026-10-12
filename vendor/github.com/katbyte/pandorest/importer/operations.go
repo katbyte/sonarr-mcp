@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"cmp"
 	"fmt"
 	"go/token"
 	"net/http"
@@ -52,15 +53,72 @@ func (im *importer) importOperations() map[string]*definitions.Group {
 				im.fail(fmt.Sprintf("%s: makes the method %s, which %s makes too: give one of them a name of its own with a workaround (the operation's Name), or take one out", where, o.Name, prev))
 			}
 			names[o.Name] = where
+			// a command the operation queues is an operation of its own, with the same request fixed to the command's name
+			commands := im.commandOperations(where, &o, op)
 			g.Operations = append(g.Operations, o)
+			for _, c := range commands {
+				if prev, ok := names[c.Name]; ok {
+					im.fail(fmt.Sprintf("%s: the command %s makes the method %s, which %s makes too", where, c.Command, c.Name, prev))
+				}
+				names[c.Name] = where + " " + c.Command
+				g.Operations = append(g.Operations, c)
+			}
 		}
 	}
 
 	for _, g := range groups {
 		slices.SortFunc(g.Operations, func(a, b definitions.Operation) int { return strings.Compare(a.Name, b.Name) })
 	}
+	im.resolveCommandGets(groups)
 
 	return groups
+}
+
+// commandOperations are the operations a command set makes beside the one that queues: one per command, sending the command's own
+// schema as the body and answering as the queueing operation does. The set's Get is held as its key until every operation is named.
+func (im *importer) commandOperations(where string, o *definitions.Operation, op *openapi.Operation) []definitions.Operation {
+	if op.Commands == nil {
+		return nil
+	}
+	set := op.Commands
+	o.Commands = &definitions.CommandSet{Get: set.Get, Status: set.Status, Finished: set.Finished, Failed: set.Failed}
+	var out []definitions.Operation
+	for _, name := range openapi.SortedKeys(set.Commands) {
+		c := definitions.Operation{Name: name, Method: o.Method, Path: o.Path, Description: "Queues the " + name + " command.", Response: o.Response, ExpectedStatusCodes: o.ExpectedStatusCodes, Command: name}
+		c.Request = &definitions.Body{ContentType: "application/json", Type: reference(typeName(set.Commands[name]))}
+		im.claimName(c.Name, where+" command "+name)
+		out = append(out, c)
+	}
+
+	return out
+}
+
+// resolveCommandGets turns each command set's Get from the key of the operation that answers a queued command into that
+// operation's Go name, failing for one that is not there or takes no id in its path.
+func (im *importer) resolveCommandGets(groups map[string]*definitions.Group) {
+	byKey := map[string]*definitions.Operation{}
+	for _, g := range groups {
+		for i := range g.Operations {
+			byKey[g.Operations[i].Key()] = &g.Operations[i]
+		}
+	}
+	for _, g := range groups {
+		for i := range g.Operations {
+			set := g.Operations[i].Commands
+			if set == nil {
+				continue
+			}
+			get := byKey[set.Get]
+			switch {
+			case get == nil:
+				im.fail(fmt.Sprintf("%s: the commands' Get %s is not an operation of the document", g.Operations[i].Key(), set.Get))
+			case len(get.PathParameters) != 1:
+				im.fail(fmt.Sprintf("%s: the commands' Get %s takes %d path parameters, not the command's id alone", g.Operations[i].Key(), set.Get, len(get.PathParameters)))
+			default:
+				set.Get = get.Name
+			}
+		}
+	}
 }
 
 // groupName returns the operation's tag and the group it names.
@@ -74,7 +132,7 @@ func (im *importer) groupName(where string, op *openapi.Operation) (tag, name st
 		im.warn(fmt.Sprintf("%s: has tags %v; grouped under the first", where, op.Tags))
 	}
 	tag = op.Tags[0]
-	name = camel(strings.TrimSuffix(tag, im.cfg.TagSuffix))
+	name = openapi.Camel(strings.TrimSuffix(tag, im.cfg.TagSuffix))
 	if name == "" || name == definitions.CommonGroup {
 		im.fail(fmt.Sprintf("%s: tag %q cannot be a group name", where, tag))
 	}
@@ -100,7 +158,7 @@ func (im *importer) operation(method, path string, op *openapi.Operation) defini
 	case op.OperationID == "":
 		im.fail(fmt.Sprintf("%s %s: has no operationId to name its method after", method, path))
 	default:
-		want = camel(op.OperationID)
+		want = openapi.Camel(op.OperationID)
 	}
 
 	description := cleanText(op.Summary)
@@ -155,7 +213,7 @@ func (im *importer) operation(method, path string, op *openapi.Operation) defini
 		default:
 			continue
 		}
-		field := fieldName(prm.Name)
+		field := cmp.Or(prm.Field, fieldName(prm.Name))
 		if prev, ok := fields[field]; ok {
 			im.warn(fmt.Sprintf("%s %s: parameters %q and %q are both field %s; %q skipped", method, path, prev, prm.Name, field, prm.Name))
 			continue
@@ -203,15 +261,12 @@ func (im *importer) pathParamType(s *openapi.Schema) definitions.TypeRef {
 	}
 	switch s.Type {
 	case openapi.TypeInteger:
-		if s.Format == "int64" {
-			return definitions.TypeRef{Type: definitions.Integer64}
-		}
-		return definitions.TypeRef{Type: definitions.Integer}
+		return integerType(s)
 	case openapi.TypeNumber:
 		return definitions.TypeRef{Type: definitions.Double}
 	}
 
-	return definitions.TypeRef{Type: definitions.String}
+	return im.stringType(s)
 }
 
 func (im *importer) optionType(s *openapi.Schema) definitions.TypeRef {
@@ -229,13 +284,12 @@ func (im *importer) optionType(s *openapi.Schema) definitions.TypeRef {
 		return str
 	}
 	switch s.Type {
+	case openapi.TypeString:
+		return im.stringType(s)
 	case openapi.TypeBoolean:
 		return definitions.TypeRef{Type: definitions.Boolean}
 	case openapi.TypeInteger:
-		if s.Format == "int64" {
-			return definitions.TypeRef{Type: definitions.Integer64}
-		}
-		return definitions.TypeRef{Type: definitions.Integer}
+		return integerType(s)
 	case openapi.TypeNumber:
 		return definitions.TypeRef{Type: definitions.Double}
 	case openapi.TypeArray:
@@ -258,27 +312,18 @@ func (im *importer) optionType(s *openapi.Schema) definitions.TypeRef {
 	return str
 }
 
-// jsonMedia reports whether a media type carries JSON. Jellyfin lists
-// text/json, application/*+json and profile variants; Emby pairs every JSON
-// body with an application/xml twin.
-func jsonMedia(ct string) bool { return openapi.JSONMedia(ct) }
-
+// xmlMedia reports whether a media type is XML: Emby pairs every JSON body
+// with an application/xml twin, which is not a file.
 func xmlMedia(ct string) bool {
 	ct = strings.ToLower(ct)
 	return ct == "application/xml" || ct == "text/xml"
-}
-
-// pickJSON returns the JSON media type to name in the definitions: plain
-// application/json when listed, else the first JSON type.
-func pickJSON(content map[string]*openapi.MediaType) (string, bool) {
-	return openapi.PickJSON(content)
 }
 
 func (im *importer) requestBody(method, path, owner string, rb *openapi.RequestBody) *definitions.Body {
 	if rb == nil || len(rb.Content) == 0 {
 		return nil
 	}
-	if ct, ok := pickJSON(rb.Content); ok {
+	if ct, ok := openapi.PickJSON(rb.Content); ok {
 		s := rb.Content[ct].Schema
 		switch {
 		case s == nil:
@@ -311,10 +356,10 @@ func (im *importer) responseBody(method, path, owner string, op *openapi.Operati
 		if len(resp.Content) == 0 {
 			continue
 		}
-		jsonType, hasJSON := pickJSON(resp.Content)
+		jsonType, hasJSON := openapi.PickJSON(resp.Content)
 		other := ""
 		for _, ct := range openapi.SortedKeys(resp.Content) {
-			if !jsonMedia(ct) && !xmlMedia(ct) && other == "" {
+			if !openapi.JSONMedia(ct) && !xmlMedia(ct) && other == "" {
 				other = ct
 			}
 		}
@@ -387,7 +432,7 @@ func (im *importer) responseType(s *openapi.Schema, owner string) definitions.Ty
 		}
 	}
 
-	return im.typeRef(s, owner, "Response")
+	return im.typeRef(s, owner, "Answer")
 }
 
 // expectedStatusCodes are the statuses the generated method treats as an
@@ -432,7 +477,7 @@ func (im *importer) sameAnswer(resp *openapi.Response, success *definitions.Body
 	if resp == nil || success == nil || success.Type.Type == definitions.RawFile {
 		return false
 	}
-	ct, ok := pickJSON(resp.Content)
+	ct, ok := openapi.PickJSON(resp.Content)
 	if !ok {
 		return false
 	}
@@ -440,16 +485,37 @@ func (im *importer) sameAnswer(resp *openapi.Response, success *definitions.Body
 	return im.responseType(resp.Content[ct].Schema, owner).Equal(success.Type)
 }
 
-// markPageable flags the list operations: the GETs that take the two paging
-// parameters the service's config names and answer a model with its two
-// paging properties (Emby's StartIndex and Limit, Items and
-// TotalRecordCount; Sonarr's page and pageSize, records and totalRecords). A
-// service with no paging configured has none.
+// markPageable flags the list operations: the GETs that take the paging
+// parameters one of the service's paging shapes names and answer a model
+// with its paging properties (Emby's StartIndex and Limit, Items and
+// TotalRecordCount; Sonarr's page and pageSize, records and totalRecords).
+// The shapes are tried in order, and an operation that takes a shape's Start
+// and matches none is named in the log with why, which is how a service's
+// next shape is found. A service with no paging configured has none.
 func (im *importer) markPageable(o *definitions.Operation) {
-	paging := im.cfg.Paging
-	if paging == nil || o.Method != http.MethodGet || o.Response == nil || o.Response.Type.Type != definitions.Reference {
+	if im.cfg.Paging == nil || o.Method != http.MethodGet {
 		return
 	}
+	var reasons []string
+	for _, paging := range append([]config.Paging{*im.cfg.Paging}, im.cfg.Pagings...) {
+		pageable, reason := im.pageable(o, &paging)
+		if pageable != nil {
+			o.Pageable = pageable
+
+			return
+		}
+		if reason != "" {
+			reasons = append(reasons, reason)
+		}
+	}
+	if len(reasons) > 0 {
+		im.warn(fmt.Sprintf("%s %s takes a paging parameter and gets no Complete method: %s", o.Method, o.Path, strings.Join(reasons, "; ")))
+	}
+}
+
+// pageable is how o pages by one shape, or why it does not: empty when it
+// does not take the shape's Start at all, which is no list of this shape.
+func (im *importer) pageable(o *definitions.Operation, paging *config.Paging) (pageable *definitions.Pageable, reason string) {
 	var start, limit string
 	for _, opt := range o.Options {
 		if opt.In != definitions.InQuery || opt.Type.Type != definitions.Integer {
@@ -458,33 +524,49 @@ func (im *importer) markPageable(o *definitions.Operation) {
 		switch {
 		case strings.EqualFold(opt.Name, paging.Start):
 			start = opt.Field
-		case strings.EqualFold(opt.Name, paging.Limit):
+		case paging.Limit != "" && strings.EqualFold(opt.Name, paging.Limit):
 			limit = opt.Field
 		}
 	}
-	model := im.models[o.Response.Type.ReferenceName]
-	if start == "" || limit == "" || model == nil {
-		return
+	if start == "" {
+		return nil, ""
 	}
+	if paging.Limit != "" && limit == "" {
+		return nil, fmt.Sprintf("it takes %s but not %s", paging.Start, paging.Limit)
+	}
+	if o.Response == nil || o.Response.Type.Type != definitions.Reference || im.models[o.Response.Type.ReferenceName] == nil {
+		return nil, fmt.Sprintf("it takes %s but answers no object", paging.Start)
+	}
+	model := im.models[o.Response.Type.ReferenceName]
 	var items, total *definitions.Field
+	lists := 0
 	for i := range model.Fields {
 		f := &model.Fields[i]
 		switch {
-		case strings.EqualFold(f.JSONName, paging.Items) && f.Type.Type == definitions.List && f.Type.NestedItem != nil:
+		case f.Type.Type == definitions.List && f.Type.NestedItem != nil && (paging.Items == "" || strings.EqualFold(f.JSONName, paging.Items)):
 			items = f
+			lists++
 		case strings.EqualFold(f.JSONName, paging.Total) && f.Type.Type == definitions.Integer:
 			total = f
 		}
 	}
-	if items == nil || total == nil {
-		return
+	switch {
+	case paging.Items != "" && items == nil:
+		return nil, fmt.Sprintf("it takes %s but its answer %s has no list %s", paging.Start, model.Name, paging.Items)
+	case items == nil:
+		return nil, fmt.Sprintf("it takes %s but its answer %s has no list", paging.Start, model.Name)
+	case paging.Items == "" && lists > 1:
+		return nil, fmt.Sprintf("it takes %s but its answer %s has %d lists, so Items must name one", paging.Start, model.Name, lists)
+	case total == nil:
+		return nil, fmt.Sprintf("it takes %s but its answer %s has no %s", paging.Start, model.Name, paging.Total)
 	}
-	o.Pageable = &definitions.Pageable{
+
+	return &definitions.Pageable{
 		StartIndexOption: start,
 		LimitOption:      limit,
 		ByPage:           paging.ByPage,
 		ItemsField:       items.Name,
 		TotalField:       total.Name,
 		ItemType:         *items.Type.NestedItem,
-	}
+	}, ""
 }

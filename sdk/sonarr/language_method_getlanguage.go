@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetLanguageOperationResponse is the result of GetLanguage.
-type GetLanguageOperationResponse struct {
+// GetLanguageResponse is the result of GetLanguage.
+type GetLanguageResponse struct {
 	HttpResponse *http.Response
-	Model        []LanguageResource
+	Answer       []LanguageResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetLanguageResponse) Answered() bool { return r.Answer != nil }
+
 // GetLanguage calls GET /api/v3/language.
-func (c Client) GetLanguage(ctx context.Context) (result GetLanguageOperationResponse, err error) {
+func (c Client) GetLanguage(ctx context.Context) (result GetLanguageResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetLanguage",
 		Path:       "/api/v3/language",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetLanguage(ctx context.Context) (result GetLanguageOperationRes
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

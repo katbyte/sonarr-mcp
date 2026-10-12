@@ -7,24 +7,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetSeriesByIdFolderOperationResponse is the result of GetSeriesByIdFolder.
-type GetSeriesByIdFolderOperationResponse struct {
+// GetSeriesByIdFolderResponse is the result of GetSeriesByIdFolder.
+type GetSeriesByIdFolderResponse struct {
 	HttpResponse *http.Response
-	Model        json.RawMessage
+	Answer       json.RawMessage
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetSeriesByIdFolderResponse) Answered() bool { return r.Answer != nil }
+
 // GetSeriesByIdFolder calls GET /api/v3/series/{id}/folder.
-func (c Client) GetSeriesByIdFolder(ctx context.Context, id int) (result GetSeriesByIdFolderOperationResponse, err error) {
+func (c Client) GetSeriesByIdFolder(ctx context.Context, id SeriesID) (result GetSeriesByIdFolderResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
-		Path:       fmt.Sprintf("/api/v3/series/%d/folder", id),
+		Operation:  "GetSeriesByIdFolder",
+		Path:       fmt.Sprintf("/api/v3/series/%s/folder", url.PathEscape(strconv.Itoa(int(id)))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -41,7 +48,7 @@ func (c Client) GetSeriesByIdFolder(ctx context.Context, id int) (result GetSeri
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

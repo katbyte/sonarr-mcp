@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetRemotePathMappingByIdOperationResponse is the result of GetRemotePathMappingById.
-type GetRemotePathMappingByIdOperationResponse struct {
+// GetRemotePathMappingByIdResponse is the result of GetRemotePathMappingById.
+//
+// Answer is the RemotePathMappingResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetRemotePathMappingByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *RemotePathMappingResource
+	Answer       *RemotePathMappingResource
+	*RemotePathMappingResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetRemotePathMappingByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the RemotePathMappingResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetRemotePathMappingByIdResponse) Record() (RemotePathMappingResource, error) {
+	if r.Answer == nil {
+		return RemotePathMappingResource{}, errors.New("GetRemotePathMappingById answered no RemotePathMappingResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetRemotePathMappingById calls GET /api/v3/remotepathmapping/{id}.
-func (c Client) GetRemotePathMappingById(ctx context.Context, id int) (result GetRemotePathMappingByIdOperationResponse, err error) {
+func (c Client) GetRemotePathMappingById(ctx context.Context, id int) (result GetRemotePathMappingByIdResponse, err error) {
+	result.RemotePathMappingResource = &RemotePathMappingResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetRemotePathMappingById",
 		Path:       fmt.Sprintf("/api/v3/remotepathmapping/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetRemotePathMappingById(ctx context.Context, id int) (result Ge
 		return
 	}
 
-	var model RemotePathMappingResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer RemotePathMappingResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.RemotePathMappingResource = result.Answer
 
 	return
 }

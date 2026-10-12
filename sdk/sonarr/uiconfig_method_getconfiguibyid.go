@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetConfigUiByIdOperationResponse is the result of GetConfigUiById.
-type GetConfigUiByIdOperationResponse struct {
+// GetConfigUiByIdResponse is the result of GetConfigUiById.
+//
+// Answer is the UiConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetConfigUiByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *UiConfigResource
+	Answer       *UiConfigResource
+	*UiConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetConfigUiByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the UiConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetConfigUiByIdResponse) Record() (UiConfigResource, error) {
+	if r.Answer == nil {
+		return UiConfigResource{}, errors.New("GetConfigUiById answered no UiConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetConfigUiById calls GET /api/v3/config/ui/{id}.
-func (c Client) GetConfigUiById(ctx context.Context, id int) (result GetConfigUiByIdOperationResponse, err error) {
+func (c Client) GetConfigUiById(ctx context.Context, id int) (result GetConfigUiByIdResponse, err error) {
+	result.UiConfigResource = &UiConfigResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetConfigUiById",
 		Path:       fmt.Sprintf("/api/v3/config/ui/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetConfigUiById(ctx context.Context, id int) (result GetConfigUi
 		return
 	}
 
-	var model UiConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer UiConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.UiConfigResource = result.Answer
 
 	return
 }

@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteNotificationByIdOperationResponse is the result of DeleteNotificationById.
-type DeleteNotificationByIdOperationResponse struct {
+// DeleteNotificationByIdResponse is the result of DeleteNotificationById.
+type DeleteNotificationByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteNotificationById calls DELETE /api/v3/notification/{id}.
-func (c Client) DeleteNotificationById(ctx context.Context, id int) (result DeleteNotificationByIdOperationResponse, err error) {
+func (c Client) DeleteNotificationById(ctx context.Context, id int) (result DeleteNotificationByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteNotificationById",
 		Path:       fmt.Sprintf("/api/v3/notification/%d", id),
 	}
 

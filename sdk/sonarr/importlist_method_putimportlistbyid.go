@@ -4,6 +4,7 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,25 +12,46 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutImportListByIdOperationResponse is the result of PutImportListById.
-type PutImportListByIdOperationResponse struct {
+// PutImportListByIdResponse is the result of PutImportListById.
+//
+// Answer is the ImportListResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutImportListByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *ImportListResource
+	Answer       *ImportListResource
+	*ImportListResource
 }
 
-// PutImportListByIdOperationOptions holds the query and header parameters of PutImportListById.
-type PutImportListByIdOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutImportListByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the ImportListResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutImportListByIdResponse) Record() (ImportListResource, error) {
+	if r.Answer == nil {
+		return ImportListResource{}, errors.New("PutImportListById answered no ImportListResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// PutImportListByIdOptions holds the query and header parameters of PutImportListById.
+type PutImportListByIdOptions struct {
 	ForceSave *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PutImportListByIdOperationOptions) ToHeaders() *client.Headers {
+func (o PutImportListByIdOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PutImportListByIdOperationOptions) ToQuery() *client.QueryParams {
+func (o PutImportListByIdOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.ForceSave != nil {
 		out.Append("forceSave", strconv.FormatBool(*o.ForceSave))
@@ -38,14 +60,25 @@ func (o PutImportListByIdOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PutImportListById calls PUT /api/v3/importlist/{id}.
-func (c Client) PutImportListById(ctx context.Context, id int, input ImportListResource, options PutImportListByIdOperationOptions) (result PutImportListByIdOperationResponse, err error) {
+func (c Client) PutImportListById(ctx context.Context, id int, input ImportListResource, options ...PutImportListByIdOptions) (result PutImportListByIdResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PutImportListById takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PutImportListByIdOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.ImportListResource = &ImportListResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod:    http.MethodPut,
-		OptionsObject: options,
+		Operation:     "PutImportListById",
+		OptionsObject: option,
 		Path:          fmt.Sprintf("/api/v3/importlist/%d", id),
 	}
 
@@ -67,11 +100,12 @@ func (c Client) PutImportListById(ctx context.Context, id int, input ImportListR
 		return
 	}
 
-	var model ImportListResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer ImportListResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.ImportListResource = result.Answer
 
 	return
 }

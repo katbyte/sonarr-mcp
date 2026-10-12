@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetRootFolderOperationResponse is the result of GetRootFolder.
-type GetRootFolderOperationResponse struct {
+// GetRootFolderResponse is the result of GetRootFolder.
+type GetRootFolderResponse struct {
 	HttpResponse *http.Response
-	Model        []RootFolderResource
+	Answer       []RootFolderResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetRootFolderResponse) Answered() bool { return r.Answer != nil }
+
 // GetRootFolder calls GET /api/v3/rootfolder.
-func (c Client) GetRootFolder(ctx context.Context) (result GetRootFolderOperationResponse, err error) {
+func (c Client) GetRootFolder(ctx context.Context) (result GetRootFolderResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetRootFolder",
 		Path:       "/api/v3/rootfolder",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetRootFolder(ctx context.Context) (result GetRootFolderOperatio
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

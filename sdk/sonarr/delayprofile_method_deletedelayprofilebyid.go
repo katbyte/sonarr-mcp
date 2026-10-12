@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteDelayProfileByIdOperationResponse is the result of DeleteDelayProfileById.
-type DeleteDelayProfileByIdOperationResponse struct {
+// DeleteDelayProfileByIdResponse is the result of DeleteDelayProfileById.
+type DeleteDelayProfileByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteDelayProfileById calls DELETE /api/v3/delayprofile/{id}.
-func (c Client) DeleteDelayProfileById(ctx context.Context, id int) (result DeleteDelayProfileByIdOperationResponse, err error) {
+func (c Client) DeleteDelayProfileById(ctx context.Context, id int) (result DeleteDelayProfileByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteDelayProfileById",
 		Path:       fmt.Sprintf("/api/v3/delayprofile/%d", id),
 	}
 

@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetRemotePathMappingOperationResponse is the result of GetRemotePathMapping.
-type GetRemotePathMappingOperationResponse struct {
+// GetRemotePathMappingResponse is the result of GetRemotePathMapping.
+type GetRemotePathMappingResponse struct {
 	HttpResponse *http.Response
-	Model        []RemotePathMappingResource
+	Answer       []RemotePathMappingResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetRemotePathMappingResponse) Answered() bool { return r.Answer != nil }
+
 // GetRemotePathMapping calls GET /api/v3/remotepathmapping.
-func (c Client) GetRemotePathMapping(ctx context.Context) (result GetRemotePathMappingOperationResponse, err error) {
+func (c Client) GetRemotePathMapping(ctx context.Context) (result GetRemotePathMappingResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetRemotePathMapping",
 		Path:       "/api/v3/remotepathmapping",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetRemotePathMapping(ctx context.Context) (result GetRemotePathM
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

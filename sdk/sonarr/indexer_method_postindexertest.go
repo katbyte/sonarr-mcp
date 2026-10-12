@@ -4,30 +4,31 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostIndexerTestOperationResponse is the result of PostIndexerTest.
-type PostIndexerTestOperationResponse struct {
+// PostIndexerTestResponse is the result of PostIndexerTest.
+type PostIndexerTestResponse struct {
 	HttpResponse *http.Response
 }
 
-// PostIndexerTestOperationOptions holds the query and header parameters of PostIndexerTest.
-type PostIndexerTestOperationOptions struct {
+// PostIndexerTestOptions holds the query and header parameters of PostIndexerTest.
+type PostIndexerTestOptions struct {
 	ForceTest *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PostIndexerTestOperationOptions) ToHeaders() *client.Headers {
+func (o PostIndexerTestOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PostIndexerTestOperationOptions) ToQuery() *client.QueryParams {
+func (o PostIndexerTestOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.ForceTest != nil {
 		out.Append("forceTest", strconv.FormatBool(*o.ForceTest))
@@ -36,14 +37,24 @@ func (o PostIndexerTestOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PostIndexerTest calls POST /api/v3/indexer/test.
-func (c Client) PostIndexerTest(ctx context.Context, input IndexerResource, options PostIndexerTestOperationOptions) (result PostIndexerTestOperationResponse, err error) {
+func (c Client) PostIndexerTest(ctx context.Context, input IndexerResource, options ...PostIndexerTestOptions) (result PostIndexerTestResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PostIndexerTest takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PostIndexerTestOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodPost,
-		OptionsObject: options,
+		Operation:     "PostIndexerTest",
+		OptionsObject: option,
 		Path:          "/api/v3/indexer/test",
 	}
 

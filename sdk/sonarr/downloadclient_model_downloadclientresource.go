@@ -18,5 +18,11 @@ type DownloadClientResource struct {
 	Protocol                 DownloadProtocol         `json:"protocol,omitempty"`
 	RemoveCompletedDownloads *bool                    `json:"removeCompletedDownloads,omitempty"`
 	RemoveFailedDownloads    *bool                    `json:"removeFailedDownloads,omitempty"`
-	Tags                     []int                    `json:"tags,omitzero"`
+	Tags                     []TagID                  `json:"tags,omitzero"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m DownloadClientResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m DownloadClientResource) GetId() int { return m.Id }

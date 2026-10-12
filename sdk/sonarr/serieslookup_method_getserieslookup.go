@@ -4,30 +4,35 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetSeriesLookupOperationResponse is the result of GetSeriesLookup.
-type GetSeriesLookupOperationResponse struct {
+// GetSeriesLookupResponse is the result of GetSeriesLookup.
+type GetSeriesLookupResponse struct {
 	HttpResponse *http.Response
-	Model        []SeriesResource
+	Answer       []SeriesResource
 }
 
-// GetSeriesLookupOperationOptions holds the query and header parameters of GetSeriesLookup.
-type GetSeriesLookupOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetSeriesLookupResponse) Answered() bool { return r.Answer != nil }
+
+// GetSeriesLookupOptions holds the query and header parameters of GetSeriesLookup.
+type GetSeriesLookupOptions struct {
 	Term string
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetSeriesLookupOperationOptions) ToHeaders() *client.Headers {
+func (o GetSeriesLookupOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetSeriesLookupOperationOptions) ToQuery() *client.QueryParams {
+func (o GetSeriesLookupOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.Term != "" {
 		out.Append("term", o.Term)
@@ -36,13 +41,23 @@ func (o GetSeriesLookupOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetSeriesLookup calls GET /api/v3/series/lookup.
-func (c Client) GetSeriesLookup(ctx context.Context, options GetSeriesLookupOperationOptions) (result GetSeriesLookupOperationResponse, err error) {
+func (c Client) GetSeriesLookup(ctx context.Context, options ...GetSeriesLookupOptions) (result GetSeriesLookupResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetSeriesLookup takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetSeriesLookupOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetSeriesLookup",
+		OptionsObject: option,
 		Path:          "/api/v3/series/lookup",
 	}
 
@@ -60,7 +75,7 @@ func (c Client) GetSeriesLookup(ctx context.Context, options GetSeriesLookupOper
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

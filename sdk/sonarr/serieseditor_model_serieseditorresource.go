@@ -10,10 +10,10 @@ type SeriesEditorResource struct {
 	MonitorNewItems        NewItemMonitorTypes `json:"monitorNewItems,omitempty"`
 	Monitored              *bool               `json:"monitored,omitempty"`
 	MoveFiles              *bool               `json:"moveFiles,omitempty"`
-	QualityProfileId       int                 `json:"qualityProfileId,omitempty"`
+	QualityProfileId       QualityProfileID    `json:"qualityProfileId,omitempty"`
 	RootFolderPath         string              `json:"rootFolderPath,omitempty"`
 	SeasonFolder           *bool               `json:"seasonFolder,omitempty"`
-	SeriesIds              []int               `json:"seriesIds,omitzero"`
+	SeriesIds              []SeriesID          `json:"seriesIds,omitzero"`
 	SeriesType             SeriesTypes         `json:"seriesType,omitempty"`
-	Tags                   []int               `json:"tags,omitzero"`
+	Tags                   []TagID             `json:"tags,omitzero"`
 }

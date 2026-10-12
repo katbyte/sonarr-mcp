@@ -6,12 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/katbyte/go-kt/mcp/acctest"
-	"github.com/katbyte/sonarr-mcp/lib/testenv"
 )
 
 func TestFileList(t *testing.T) {
@@ -129,13 +127,16 @@ func TestFileDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kept := testenv.Answered(media.Model)
-	on := kept
-	on.AutoUnmonitorPreviouslyDownloadedEpisodes = new(true)
-	if _, err := api.PutConfigMediaManagementById(ctx, strconv.Itoa(on.Id), on); err != nil {
+	kept, err := media.Record()
+	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = api.PutConfigMediaManagementById(ctx, strconv.Itoa(kept.Id), kept) })
+	on := kept
+	on.AutoUnmonitorPreviouslyDownloadedEpisodes = true
+	if _, err := api.PutConfigMediaManagementById(ctx, on.Id, on); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = api.PutConfigMediaManagementById(ctx, kept.Id, kept) })
 	if err := fakeVideo(p, 57, "1920x1080"); err != nil {
 		t.Fatal(err)
 	}

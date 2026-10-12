@@ -3,8 +3,8 @@
 // The harness: .scripts/testenv.sh creates the container and exports
 // SONARR_SERVER, SONARR_TOKEN and SONARR_TEST_*; runSuite starts the provider
 // proxy and the fakes, then the container (lib/testenv), builds the SDK client
-// with a transport that records every request, seeds the library, runs the
-// suite, and checks every operation was called.
+// so it records every request, seeds the library, runs the suite, and checks
+// every operation was called.
 //
 // What is deliberately not exercised, and why, is in notCalled (coverage.go
 // of this package): the operations that restart or stop Sonarr, restore a
@@ -16,7 +16,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -37,7 +36,7 @@ import (
 // it once seeded.
 type seriesFixture struct {
 	Title  string
-	TvdbID int
+	TvdbID sonarr.TvdbID
 	// Folder is its folder under /tv; "" for a series added with no files.
 	Folder string
 	// Files is how many episode files Sonarr should import from the folder.
@@ -69,7 +68,7 @@ var everySeries = []seriesFixture{firefly, chernobyl, cowboyBebop, severance, br
 func tvdbIDs(series []seriesFixture) []int {
 	ids := make([]int, 0, len(series))
 	for _, s := range series {
-		ids = append(ids, s.TvdbID)
+		ids = append(ids, int(s.TvdbID))
 	}
 
 	return ids
@@ -79,8 +78,7 @@ func tvdbIDs(series []seriesFixture) []int {
 const profileName = "HD-1080p"
 
 var (
-	sc  *sonarr.Client
-	rec *recorder
+	sc *sonarr.Client
 
 	proxy *testenv.Proxy
 	fakes *testenv.Fakes
@@ -89,9 +87,9 @@ var (
 	sab     *sabnzbd.Server
 
 	// what the seed made, for the tests to find
-	seriesIDs      = map[string]int{}
+	seriesIDs      = map[string]sonarr.SeriesID{}
 	rootFolderID   int
-	profileID      int
+	profileID      sonarr.QualityProfileID
 	indexerID      int
 	downloadClient int
 )
@@ -143,28 +141,19 @@ func runSuite(m *testing.M) int {
 	// every operation must have been called by something above, or be
 	// named in notCalled. Only a whole-suite run can say that.
 	if f := flag.Lookup("test.run"); f == nil || f.Value.String() == "" {
-		c, err := operationCoverage()
+		problems, total, err := uncovered()
 		switch {
 		case err != nil:
 			fmt.Fprintln(os.Stderr, "\noperation coverage:", err)
 			code = 1
-		case len(c.missing) > 0 || len(c.stale) > 0:
-			if len(c.missing) > 0 {
-				fmt.Fprintf(os.Stderr, "\n%d operation(s) are never called by this suite:\n", len(c.missing))
-				for _, name := range c.missing {
-					fmt.Fprintln(os.Stderr, "  "+name)
-				}
-				fmt.Fprintln(os.Stderr, "call it from a test, or name it in notCalled with the reason")
-			}
-			if len(c.stale) > 0 {
-				fmt.Fprintf(os.Stderr, "\n%d operation(s) in notCalled are called after all; take them out:\n", len(c.stale))
-				for _, name := range c.stale {
-					fmt.Fprintln(os.Stderr, "  "+name)
-				}
+		case len(problems) > 0:
+			fmt.Fprintf(os.Stderr, "\noperation coverage: %d to put right, in the tests or in notCalled:\n", len(problems))
+			for _, problem := range problems {
+				fmt.Fprintln(os.Stderr, "  "+problem)
 			}
 			code = 1
 		default:
-			fmt.Fprintf(os.Stderr, "\noperation coverage: %d of %d operations called; the other %d are in notCalled\n", c.called, c.total, c.total-c.called)
+			fmt.Fprintf(os.Stderr, "\noperation coverage: %d of %d operations called; the other %d are in notCalled\n", total-len(notCalled), total, len(notCalled))
 		}
 	}
 
@@ -186,14 +175,13 @@ func startSonarr(ctx context.Context) error {
 		return err
 	}
 
-	// the recorder goes underneath the client's own retries and redirect
-	// rule, which a client put in their place would throw away
-	rec = &recorder{base: http.DefaultTransport}
-	c, err := sonarr.New(testenv.Server(), testenv.Token(), client.WithTransport(rec))
+	c, err := sonarr.New(testenv.Server(), testenv.Token(), client.WithCalls(&calls))
 	if err != nil {
 		return err
 	}
 	sc = c
+	// a command's wait looks every two seconds unless told otherwise, and the suite waits for many that end at once
+	sonarr.CommandPoll = 500 * time.Millisecond
 
 	var last error
 	for range 90 {
@@ -274,34 +262,29 @@ func poll(timeout time.Duration, f func() bool) bool {
 	}
 }
 
-// runCommand queues a command with its own fields and waits for it to
-// finish, failing the test when it does not complete.
-func runCommand(ctx context.Context, t *testing.T, name string, fields map[string]any) *sonarr.CommandResource {
+// commandWait is how long a test waits for a command it queued.
+const commandWait = 2 * time.Minute
+
+// runCommand queues by name a command the client has no method of its own for, and waits for it to finish, failing the test when it does not
+// complete. A command with a method is queued and waited for by its AndWait form.
+func runCommand(ctx context.Context, t *testing.T, name string) *sonarr.CommandResource {
 	t.Helper()
 
-	cmd, err := queueCommand(ctx, name, fields)
+	cmd, err := queueCommand(ctx, name)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !poll(2*time.Minute, func() bool {
-		cmd = must(sc.GetCommandById(ctx, cmd.Id)).Model
-		return cmd.Status != sonarr.CommandStatusQueued && cmd.Status != sonarr.CommandStatusStarted
-	}) {
-		t.Fatalf("%s never finished: %+v", name, cmd)
-	}
-	if cmd.Status != sonarr.CommandStatusCompleted {
-		t.Fatalf("%s %s: %s %s", name, cmd.Status, cmd.Message, cmd.Exception)
+	done, err := sc.WaitForCommand(ctx, cmd.Id, commandWait)
+	if err != nil {
+		t.Fatalf("%s: %v", name, err)
 	}
 
-	return cmd
+	return done.Answer
 }
 
-// queueCommand posts a command: its name and its own fields, at the top level
-// of the body, where CommandController reads them.
-func queueCommand(ctx context.Context, name string, fields map[string]any) (*sonarr.CommandResource, error) {
-	body := map[string]any{"name": name}
-	maps.Copy(body, fields)
-	raw, err := jsonRaw(body)
+// queueCommand posts a command by its name alone, the plain way.
+func queueCommand(ctx context.Context, name string) (*sonarr.CommandResource, error) {
+	raw, err := jsonRaw(map[string]string{"name": name})
 	if err != nil {
 		return nil, err
 	}
@@ -310,22 +293,22 @@ func queueCommand(ctx context.Context, name string, fields map[string]any) (*son
 		return nil, fmt.Errorf("%s: %w", name, err)
 	}
 
-	return res.Model, nil
+	return res.Answer, nil
 }
 
 // lookupSeries asks Sonarr, and through it SkyHook, for a show by its tvdb
 // id.
-func lookupSeries(ctx context.Context, tvdb int) (sonarr.SeriesResource, error) {
-	res, err := sc.GetSeriesLookup(ctx, sonarr.GetSeriesLookupOperationOptions{Term: "tvdb:" + strconv.Itoa(tvdb)})
+func lookupSeries(ctx context.Context, tvdb sonarr.TvdbID) (sonarr.SeriesResource, error) {
+	res, err := sc.GetSeriesLookup(ctx, sonarr.GetSeriesLookupOptions{Term: "tvdb:" + strconv.Itoa(int(tvdb))})
 	if err != nil {
 		return sonarr.SeriesResource{}, err
 	}
-	i := slices.IndexFunc(res.Model, func(s sonarr.SeriesResource) bool { return s.TvdbId == tvdb })
+	i := slices.IndexFunc(res.Answer, func(s sonarr.SeriesResource) bool { return s.TvdbId == tvdb })
 	if i < 0 {
-		return sonarr.SeriesResource{}, fmt.Errorf("the lookup for tvdb:%d found %d shows, none of them it", tvdb, len(res.Model))
+		return sonarr.SeriesResource{}, fmt.Errorf("the lookup for tvdb:%d found %d shows, none of them it", tvdb, len(res.Answer))
 	}
 
-	return res.Model[i], nil
+	return res.Answer[i], nil
 }
 
 // forAdding readies a looked-up show to be added: where it goes, its
@@ -354,37 +337,37 @@ func seed(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	i := slices.IndexFunc(profiles.Model, func(p sonarr.QualityProfileResource) bool { return p.Name == profileName })
+	i := slices.IndexFunc(profiles.Answer, func(p sonarr.QualityProfileResource) bool { return p.Name == profileName })
 	if i < 0 {
 		return fmt.Errorf("no %s quality profile", profileName)
 	}
-	profileID = profiles.Model[i].Id
+	profileID = profiles.Answer[i].Id
 
 	roots, err := sc.GetRootFolder(ctx)
 	if err != nil {
 		return err
 	}
-	if j := slices.IndexFunc(roots.Model, func(r sonarr.RootFolderResource) bool { return r.Path == "/tv" }); j >= 0 {
-		rootFolderID = roots.Model[j].Id
+	if j := slices.IndexFunc(roots.Answer, func(r sonarr.RootFolderResource) bool { return r.Path == "/tv" }); j >= 0 {
+		rootFolderID = roots.Answer[j].Id
 	} else {
 		made, postErr := sc.PostRootFolder(ctx, sonarr.RootFolderResource{Path: "/tv"})
 		if postErr != nil {
 			return postErr
 		}
-		rootFolderID = made.Model.Id
+		rootFolderID = made.Answer.Id
 	}
 
 	if err := seedDownloads(ctx); err != nil {
 		return err
 	}
 
-	existing, err := sc.GetSeries(ctx, sonarr.GetSeriesOperationOptions{})
+	existing, err := sc.GetSeries(ctx, sonarr.GetSeriesOptions{})
 	if err != nil {
 		return err
 	}
-	have := map[int]int{}
-	for i := range existing.Model {
-		have[existing.Model[i].TvdbId] = existing.Model[i].Id
+	have := map[sonarr.TvdbID]sonarr.SeriesID{}
+	for i := range existing.Answer {
+		have[existing.Answer[i].TvdbId] = existing.Answer[i].Id
 	}
 	var imports []sonarr.SeriesResource
 	for _, f := range seeded {
@@ -417,11 +400,11 @@ func seed(ctx context.Context) error {
 	for _, f := range append(slices.Clone(seeded), breakingBad) {
 		var s sonarr.SeriesResource
 		if !poll(2*time.Minute, func() bool {
-			all, err := sc.GetSeries(ctx, sonarr.GetSeriesOperationOptions{TvdbId: new(f.TvdbID)})
-			if err != nil || len(all.Model) != 1 {
+			all, err := sc.GetSeries(ctx, sonarr.GetSeriesOptions{TvdbId: f.TvdbID})
+			if err != nil || len(all.Answer) != 1 {
 				return false
 			}
-			s = all.Model[0]
+			s = all.Answer[0]
 			return s.Statistics != nil && s.Statistics.TotalEpisodeCount > 0 && (have[f.TvdbID] != 0 || s.Statistics.EpisodeFileCount == f.Files)
 		}) {
 			return fmt.Errorf("%s never settled on %d files: %+v", f.Title, f.Files, s.Statistics)
@@ -445,7 +428,7 @@ func waitIdle(ctx context.Context) error {
 			return false
 		}
 		busy = busy[:0]
-		for _, c := range res.Model {
+		for _, c := range res.Answer {
 			if c.Status == sonarr.CommandStatusQueued || c.Status == sonarr.CommandStatusStarted {
 				busy = append(busy, c.Name)
 			}
@@ -466,9 +449,9 @@ func seedDownloads(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	body := testenv.Answered(cfg.Model)
-	body.AutoRedownloadFailed, body.AutoRedownloadFailedFromInteractiveSearch = new(false), new(false)
-	if _, err := sc.PutConfigDownloadClientById(ctx, strconv.Itoa(body.Id), body); err != nil {
+	body := must(cfg.Record())
+	body.AutoRedownloadFailed, body.AutoRedownloadFailedFromInteractiveSearch = false, false
+	if _, err := sc.PutConfigDownloadClientById(ctx, body.Id, body); err != nil {
 		return fmt.Errorf("download client settings: %w", err)
 	}
 
@@ -477,14 +460,14 @@ func seedDownloads(ctx context.Context) error {
 		return err
 	}
 	var idx sonarr.IndexerResource
-	if i := slices.IndexFunc(indexers.Model, func(x sonarr.IndexerResource) bool { return x.Name == sdkIndexer }); i >= 0 {
-		idx = indexers.Model[i]
+	if i := slices.IndexFunc(indexers.Answer, func(x sonarr.IndexerResource) bool { return x.Name == sdkIndexer }); i >= 0 {
+		idx = indexers.Answer[i]
 	} else {
-		made, postErr := sc.PostIndexer(ctx, newIndexer(ctx, sdkIndexer), sonarr.PostIndexerOperationOptions{})
+		made, postErr := sc.PostIndexer(ctx, newIndexer(ctx, sdkIndexer), sonarr.PostIndexerOptions{})
 		if postErr != nil {
 			return fmt.Errorf("adding the fake indexer: %w", postErr)
 		}
-		idx = testenv.Answered(made.Model)
+		idx = must(made.Record())
 	}
 	indexerID = idx.Id
 
@@ -493,24 +476,24 @@ func seedDownloads(ctx context.Context) error {
 		return err
 	}
 	var dc sonarr.DownloadClientResource
-	if i := slices.IndexFunc(clients.Model, func(x sonarr.DownloadClientResource) bool { return x.Name == sdkClient }); i >= 0 {
-		dc = clients.Model[i]
+	if i := slices.IndexFunc(clients.Answer, func(x sonarr.DownloadClientResource) bool { return x.Name == sdkClient }); i >= 0 {
+		dc = clients.Answer[i]
 	} else {
-		made, err := sc.PostDownloadClient(ctx, newDownloadClient(ctx, sdkClient), sonarr.PostDownloadClientOperationOptions{})
+		made, err := sc.PostDownloadClient(ctx, newDownloadClient(ctx, sdkClient), sonarr.PostDownloadClientOptions{})
 		if err != nil {
 			return fmt.Errorf("adding the fake download client: %w", err)
 		}
-		dc = testenv.Answered(made.Model)
+		dc = must(made.Record())
 	}
 	downloadClient = dc.Id
 
 	// a container left up between runs has tried the fakes while they were
 	// down, and holds back a provider that failed until a test of it passes
 	// (IndexerFactory.Test and DownloadClientFactory.Test record either)
-	if _, err := sc.PostIndexerTest(ctx, idx, sonarr.PostIndexerTestOperationOptions{}); err != nil {
+	if _, err := sc.PostIndexerTest(ctx, idx, sonarr.PostIndexerTestOptions{}); err != nil {
 		return fmt.Errorf("testing the fake indexer: %w", err)
 	}
-	if _, err := sc.PostDownloadClientTest(ctx, dc, sonarr.PostDownloadClientTestOperationOptions{}); err != nil {
+	if _, err := sc.PostDownloadClientTest(ctx, dc, sonarr.PostDownloadClientTestOptions{}); err != nil {
 		return fmt.Errorf("testing the fake download client: %w", err)
 	}
 
@@ -525,7 +508,7 @@ const (
 
 // newIndexer is a Newznab indexer at the fake, from Sonarr's own schema.
 func newIndexer(ctx context.Context, name string) sonarr.IndexerResource {
-	schemas := must(sc.GetIndexerSchema(ctx)).Model
+	schemas := must(sc.GetIndexerSchema(ctx)).Answer
 	i := slices.IndexFunc(schemas, func(s sonarr.IndexerResource) bool { return s.Implementation == "Newznab" })
 	if i < 0 {
 		panic("sonarr has no Newznab indexer schema")
@@ -542,7 +525,7 @@ func newIndexer(ctx context.Context, name string) sonarr.IndexerResource {
 // newDownloadClient is a SABnzbd client at the fake, from Sonarr's own
 // schema.
 func newDownloadClient(ctx context.Context, name string) sonarr.DownloadClientResource {
-	schemas := must(sc.GetDownloadClientSchema(ctx)).Model
+	schemas := must(sc.GetDownloadClientSchema(ctx)).Answer
 	i := slices.IndexFunc(schemas, func(s sonarr.DownloadClientResource) bool { return s.Implementation == "Sabnzbd" })
 	if i < 0 {
 		panic("sonarr has no Sabnzbd download client schema")
@@ -588,17 +571,17 @@ func seriesByTitle(ctx context.Context, t *testing.T, title string) sonarr.Serie
 		t.Fatalf("%s was not seeded", title)
 	}
 
-	return *must(sc.GetSeriesById(ctx, id, sonarr.GetSeriesByIdOperationOptions{})).Model
+	return *must(sc.GetSeriesById(ctx, id, sonarr.GetSeriesByIdOptions{})).Answer
 }
 
 // episodesOf reads a series' episodes, with their files.
-func episodesOf(ctx context.Context, seriesID int) []sonarr.EpisodeResource {
-	return must(sc.GetEpisode(ctx, sonarr.GetEpisodeOperationOptions{SeriesId: new(seriesID), IncludeEpisodeFile: new(true)})).Model
+func episodesOf(ctx context.Context, seriesID sonarr.SeriesID) []sonarr.EpisodeResource {
+	return must(sc.GetEpisode(ctx, sonarr.GetEpisodeOptions{SeriesId: seriesID, IncludeEpisodeFile: new(true)})).Answer
 }
 
 // episode finds an episode of a series' first season, where every fixture's
 // files and releases are.
-func episode(ctx context.Context, t *testing.T, seriesID, number int) sonarr.EpisodeResource {
+func episode(ctx context.Context, t *testing.T, seriesID sonarr.SeriesID, number int) sonarr.EpisodeResource {
 	t.Helper()
 
 	for _, e := range episodesOf(ctx, seriesID) {

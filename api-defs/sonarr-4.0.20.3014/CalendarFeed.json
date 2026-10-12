@@ -28,8 +28,13 @@
           "Field": "Tags",
           "In": "Query",
           "Type": {
-            "Type": "String"
-          }
+            "Type": "List",
+            "NestedItem": {
+              "Type": "ID",
+              "ReferenceName": "TagID"
+            }
+          },
+          "CommaSeparated": true
         },
         {
           "Name": "unmonitored",

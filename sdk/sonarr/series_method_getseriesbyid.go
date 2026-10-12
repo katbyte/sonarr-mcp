@@ -4,32 +4,55 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetSeriesByIdOperationResponse is the result of GetSeriesById.
-type GetSeriesByIdOperationResponse struct {
+// GetSeriesByIdResponse is the result of GetSeriesById.
+//
+// Answer is the SeriesResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetSeriesByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *SeriesResource
+	Answer       *SeriesResource
+	*SeriesResource
 }
 
-// GetSeriesByIdOperationOptions holds the query and header parameters of GetSeriesById.
-type GetSeriesByIdOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetSeriesByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the SeriesResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetSeriesByIdResponse) Record() (SeriesResource, error) {
+	if r.Answer == nil {
+		return SeriesResource{}, errors.New("GetSeriesById answered no SeriesResource")
+	}
+
+	return *r.Answer, nil
+}
+
+// GetSeriesByIdOptions holds the query and header parameters of GetSeriesById.
+type GetSeriesByIdOptions struct {
 	IncludeSeasonImages *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetSeriesByIdOperationOptions) ToHeaders() *client.Headers {
+func (o GetSeriesByIdOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetSeriesByIdOperationOptions) ToQuery() *client.QueryParams {
+func (o GetSeriesByIdOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.IncludeSeasonImages != nil {
 		out.Append("includeSeasonImages", strconv.FormatBool(*o.IncludeSeasonImages))
@@ -38,14 +61,25 @@ func (o GetSeriesByIdOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetSeriesById calls GET /api/v3/series/{id}.
-func (c Client) GetSeriesById(ctx context.Context, id int, options GetSeriesByIdOperationOptions) (result GetSeriesByIdOperationResponse, err error) {
+func (c Client) GetSeriesById(ctx context.Context, id SeriesID, options ...GetSeriesByIdOptions) (result GetSeriesByIdResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetSeriesById takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetSeriesByIdOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
+	result.SeriesResource = &SeriesResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
-		Path:          fmt.Sprintf("/api/v3/series/%d", id),
+		Operation:     "GetSeriesById",
+		OptionsObject: option,
+		Path:          fmt.Sprintf("/api/v3/series/%s", url.PathEscape(strconv.Itoa(int(id)))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -62,11 +96,12 @@ func (c Client) GetSeriesById(ctx context.Context, id int, options GetSeriesById
 		return
 	}
 
-	var model SeriesResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer SeriesResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.SeriesResource = result.Answer
 
 	return
 }

@@ -7,7 +7,7 @@ type EpisodeFileResource struct {
 	CustomFormatScore   int                    `json:"customFormatScore,omitempty"`
 	CustomFormats       []CustomFormatResource `json:"customFormats,omitzero"`
 	DateAdded           string                 `json:"dateAdded,omitempty"`
-	Id                  int                    `json:"id,omitempty"`
+	Id                  EpisodeFileID          `json:"id,omitempty"`
 	IndexerFlags        int                    `json:"indexerFlags,omitempty"`
 	Languages           []Language             `json:"languages,omitzero"`
 	MediaInfo           *MediaInfoResource     `json:"mediaInfo,omitempty"`
@@ -19,6 +19,6 @@ type EpisodeFileResource struct {
 	ReleaseType         ReleaseType            `json:"releaseType,omitempty"`
 	SceneName           string                 `json:"sceneName,omitempty"`
 	SeasonNumber        int                    `json:"seasonNumber,omitempty"`
-	SeriesId            int                    `json:"seriesId,omitempty"`
+	SeriesId            SeriesID               `json:"seriesId,omitempty"`
 	Size                int64                  `json:"size,omitempty"`
 }

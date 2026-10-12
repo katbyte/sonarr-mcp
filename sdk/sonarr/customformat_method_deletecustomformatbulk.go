@@ -9,19 +9,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteCustomFormatBulkOperationResponse is the result of DeleteCustomFormatBulk.
-type DeleteCustomFormatBulkOperationResponse struct {
+// DeleteCustomFormatBulkResponse is the result of DeleteCustomFormatBulk.
+type DeleteCustomFormatBulkResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteCustomFormatBulk calls DELETE /api/v3/customformat/bulk.
-func (c Client) DeleteCustomFormatBulk(ctx context.Context, input CustomFormatBulkResource) (result DeleteCustomFormatBulkOperationResponse, err error) {
+func (c Client) DeleteCustomFormatBulk(ctx context.Context, input CustomFormatBulkResource) (result DeleteCustomFormatBulkResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteCustomFormatBulk",
 		Path:       "/api/v3/customformat/bulk",
 	}
 

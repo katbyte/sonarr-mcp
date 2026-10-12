@@ -12,6 +12,7 @@ extend-exclude = [
   ".idea/",
   ".tools/bin/",  # gitignored built tools
   ".tools/venv/", # gitignored python venv
+  ".tools/npm/",  # gitignored markdownlint-cli2 install
   "**/go.sum",    # hashes
 ]
 

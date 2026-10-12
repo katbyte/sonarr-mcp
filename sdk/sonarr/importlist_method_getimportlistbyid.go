@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetImportListByIdOperationResponse is the result of GetImportListById.
-type GetImportListByIdOperationResponse struct {
+// GetImportListByIdResponse is the result of GetImportListById.
+//
+// Answer is the ImportListResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetImportListByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *ImportListResource
+	Answer       *ImportListResource
+	*ImportListResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetImportListByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the ImportListResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetImportListByIdResponse) Record() (ImportListResource, error) {
+	if r.Answer == nil {
+		return ImportListResource{}, errors.New("GetImportListById answered no ImportListResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetImportListById calls GET /api/v3/importlist/{id}.
-func (c Client) GetImportListById(ctx context.Context, id int) (result GetImportListByIdOperationResponse, err error) {
+func (c Client) GetImportListById(ctx context.Context, id int) (result GetImportListByIdResponse, err error) {
+	result.ImportListResource = &ImportListResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetImportListById",
 		Path:       fmt.Sprintf("/api/v3/importlist/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetImportListById(ctx context.Context, id int) (result GetImport
 		return
 	}
 
-	var model ImportListResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer ImportListResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.ImportListResource = result.Answer
 
 	return
 }

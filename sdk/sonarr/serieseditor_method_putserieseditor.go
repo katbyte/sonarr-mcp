@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutSeriesEditorOperationResponse is the result of PutSeriesEditor.
-type PutSeriesEditorOperationResponse struct {
+// PutSeriesEditorResponse is the result of PutSeriesEditor.
+type PutSeriesEditorResponse struct {
 	HttpResponse *http.Response
-	Model        []SeriesResource
+	Answer       []SeriesResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutSeriesEditorResponse) Answered() bool { return r.Answer != nil }
+
 // PutSeriesEditor calls PUT /api/v3/series/editor.
-func (c Client) PutSeriesEditor(ctx context.Context, input SeriesEditorResource) (result PutSeriesEditorOperationResponse, err error) {
+func (c Client) PutSeriesEditor(ctx context.Context, input SeriesEditorResource) (result PutSeriesEditorResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
+		Operation:  "PutSeriesEditor",
 		Path:       "/api/v3/series/editor",
 	}
 
@@ -44,7 +49,7 @@ func (c Client) PutSeriesEditor(ctx context.Context, input SeriesEditorResource)
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

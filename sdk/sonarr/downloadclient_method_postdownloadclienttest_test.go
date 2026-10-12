@@ -14,7 +14,7 @@ func TestOperationPostDownloadClientTest(t *testing.T) {
 	t.Parallel()
 
 	c, s := newOperationServer(t, 200, "", "")
-	result, err := c.PostDownloadClientTest(t.Context(), DownloadClientResource{}, PostDownloadClientTestOperationOptions{
+	result, err := c.PostDownloadClientTest(t.Context(), DownloadClientResource{}, PostDownloadClientTestOptions{
 		ForceTest: new(true),
 	})
 	if err != nil {
@@ -29,16 +29,28 @@ func TestOperationPostDownloadClientTest(t *testing.T) {
 	if !json.Valid([]byte(body)) {
 		t.Errorf("body = %q, want JSON", body)
 	}
+	if body != "{}" {
+		t.Errorf("an empty record sent %q, want %q: a field never set went out", body, "{}")
+	}
 	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 
 	// a status the operation does not document is an error, with the response
 	c, _ = newOperationServer(t, 418, "text/plain", "no")
-	result, err = c.PostDownloadClientTest(t.Context(), DownloadClientResource{}, PostDownloadClientTestOperationOptions{
+	result, err = c.PostDownloadClientTest(t.Context(), DownloadClientResource{}, PostDownloadClientTestOptions{
 		ForceTest: new(true),
 	})
 	if client.StatusCode(err) != 418 || result.HttpResponse == nil {
 		t.Errorf("an undocumented status = %v, %+v", err, result.HttpResponse)
+	}
+
+	// the options may be left out, and two are refused before any request
+	c, s = newOperationServer(t, 200, "", "")
+	if _, err = c.PostDownloadClientTest(t.Context(), DownloadClientResource{}); err != nil {
+		t.Errorf("without options = %v", err)
+	}
+	if _, err = c.PostDownloadClientTest(t.Context(), DownloadClientResource{}, PostDownloadClientTestOptions{}, PostDownloadClientTestOptions{}); err == nil || len(s.requests) != 1 {
+		t.Errorf("two options structs = %v, %d requests", err, len(s.requests))
 	}
 }

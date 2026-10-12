@@ -4,34 +4,9 @@ import (
 	"go/token"
 	"strings"
 	"unicode"
+
+	"github.com/katbyte/pandorest/openapi"
 )
-
-// camel joins the alphanumeric pieces of s, upper-casing the first letter of
-// each piece and keeping the rest as spelled: "QueryResult_BaseItemDto" →
-// "QueryResultBaseItemDto", "master.m3u8" → "MasterM3u8", "user_usage_stats"
-// → "UserUsageStats", "GetFirstUser_2" → "GetFirstUser2". A leading digit gets
-// an "N" prefix so the result is always a valid identifier.
-func camel(s string) string {
-	var b strings.Builder
-	upNext := true
-	for _, r := range s {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
-			upNext = true
-			continue
-		}
-		if upNext {
-			r = unicode.ToUpper(r)
-			upNext = false
-		}
-		b.WriteRune(r)
-	}
-	out := b.String()
-	if out != "" && unicode.IsDigit(rune(out[0])) {
-		out = "N" + out
-	}
-
-	return out
-}
 
 // lowerFirst lower-cases the first rune of an identifier.
 func lowerFirst(s string) string {
@@ -45,11 +20,11 @@ func lowerFirst(s string) string {
 }
 
 // typeName is the Go type name for a component schema.
-func typeName(schemaName string) string { return camel(schemaName) }
+func typeName(schemaName string) string { return openapi.Camel(schemaName) }
 
 // fieldName is the Go field name for a property or option. Names are kept as
 // the spec spells them (Id, ImdbId, Url) so they read like the API docs.
-func fieldName(prop string) string { return camel(prop) }
+func fieldName(prop string) string { return openapi.Camel(prop) }
 
 // reservedArgs are identifiers a generated method already uses (its locals,
 // the packages it imports), plus Go keywords' neighbours among the
@@ -67,7 +42,7 @@ var reservedArgs = func() map[string]bool {
 
 // argName is the Go parameter name for a path parameter.
 func argName(param string) string {
-	n := lowerFirst(camel(param))
+	n := lowerFirst(openapi.Camel(param))
 	if n == "" {
 		return "arg"
 	}
@@ -89,7 +64,7 @@ func pathMethodName(method, path, prefix string, words map[string]string) string
 		path = strings.TrimPrefix(path, prefix)
 	}
 	var b strings.Builder
-	b.WriteString(camel(strings.ToLower(method)))
+	b.WriteString(openapi.Camel(strings.ToLower(method)))
 	for seg := range strings.SplitSeq(strings.Trim(path, "/"), "/") {
 		for _, piece := range splitTemplate(seg) {
 			if piece.param {
@@ -99,7 +74,7 @@ func pathMethodName(method, path, prefix string, words map[string]string) string
 				b.WriteString(w)
 				continue
 			}
-			b.WriteString(camel(piece.text))
+			b.WriteString(openapi.Camel(piece.text))
 		}
 	}
 

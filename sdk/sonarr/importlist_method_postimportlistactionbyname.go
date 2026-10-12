@@ -11,19 +11,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostImportListActionByNameOperationResponse is the result of PostImportListActionByName.
-type PostImportListActionByNameOperationResponse struct {
+// PostImportListActionByNameResponse is the result of PostImportListActionByName.
+type PostImportListActionByNameResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostImportListActionByName calls POST /api/v3/importlist/action/{name}.
-func (c Client) PostImportListActionByName(ctx context.Context, name string, input ImportListResource) (result PostImportListActionByNameOperationResponse, err error) {
+func (c Client) PostImportListActionByName(ctx context.Context, name string, input ImportListResource) (result PostImportListActionByNameResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostImportListActionByName",
 		Path:       fmt.Sprintf("/api/v3/importlist/action/%s", url.PathEscape(name)),
 	}
 

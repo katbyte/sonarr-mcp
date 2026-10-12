@@ -4,24 +4,48 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetConfigImportListOperationResponse is the result of GetConfigImportList.
-type GetConfigImportListOperationResponse struct {
+// GetConfigImportListResponse is the result of GetConfigImportList.
+//
+// Answer is the ImportListConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetConfigImportListResponse struct {
 	HttpResponse *http.Response
-	Model        *ImportListConfigResource
+	Answer       *ImportListConfigResource
+	*ImportListConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetConfigImportListResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the ImportListConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetConfigImportListResponse) Record() (ImportListConfigResource, error) {
+	if r.Answer == nil {
+		return ImportListConfigResource{}, errors.New("GetConfigImportList answered no ImportListConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetConfigImportList calls GET /api/v3/config/importlist.
-func (c Client) GetConfigImportList(ctx context.Context) (result GetConfigImportListOperationResponse, err error) {
+func (c Client) GetConfigImportList(ctx context.Context) (result GetConfigImportListResponse, err error) {
+	result.ImportListConfigResource = &ImportListConfigResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetConfigImportList",
 		Path:       "/api/v3/config/importlist",
 	}
 
@@ -39,11 +63,12 @@ func (c Client) GetConfigImportList(ctx context.Context) (result GetConfigImport
 		return
 	}
 
-	var model ImportListConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer ImportListConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.ImportListConfigResource = result.Answer
 
 	return
 }

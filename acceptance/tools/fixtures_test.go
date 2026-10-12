@@ -206,9 +206,12 @@ func setRenaming(on bool) error {
 	if err != nil {
 		return err
 	}
-	body := testenv.Answered(naming.Model)
-	body.RenameEpisodes = new(on)
-	_, err = api.PutConfigNamingById(ctx, strconv.Itoa(body.Id), body)
+	body, err := naming.Record()
+	if err != nil {
+		return err
+	}
+	body.RenameEpisodes = on
+	_, err = api.PutConfigNamingById(ctx, body.Id, body)
 
 	return err
 }
@@ -221,10 +224,13 @@ func seedDownloads() error {
 	if err != nil {
 		return err
 	}
-	body := testenv.Answered(cfg.Model)
-	body.AutoRedownloadFailed = new(false)
-	body.AutoRedownloadFailedFromInteractiveSearch = new(false)
-	if _, err := api.PutConfigDownloadClientById(ctx, strconv.Itoa(body.Id), body); err != nil {
+	body, err := cfg.Record()
+	if err != nil {
+		return err
+	}
+	body.AutoRedownloadFailed = false
+	body.AutoRedownloadFailedFromInteractiveSearch = false
+	if _, err := api.PutConfigDownloadClientById(ctx, body.Id, body); err != nil {
 		return fmt.Errorf("download client settings: %w", err)
 	}
 
@@ -235,11 +241,11 @@ func seedDownloads() error {
 	if err != nil {
 		return err
 	}
-	i := slices.IndexFunc(schemas.Model, func(s sonarr.IndexerResource) bool { return s.Implementation == "Newznab" })
+	i := slices.IndexFunc(schemas.Answer, func(s sonarr.IndexerResource) bool { return s.Implementation == "Newznab" })
 	if i < 0 {
 		return errors.New("sonarr has no Newznab indexer schema")
 	}
-	idx := schemas.Model[i]
+	idx := schemas.Answer[i]
 	// RSS off: Sonarr's scheduled RSS sync would otherwise grab releases for
 	// every missing episode the catalogue covers, whenever it happened to
 	// run, and the queue would never hold only what a test put there
@@ -247,7 +253,7 @@ func seedDownloads() error {
 	idx.Fields = providerFields(idx.Fields, map[string]any{
 		"baseUrl": indexer.URL(), "apiPath": "/api", "apiKey": testenv.FakeKey, "categories": []int{5030, 5040, 5045},
 	})
-	if _, err := api.PostIndexer(ctx, idx, sonarr.PostIndexerOperationOptions{}); err != nil {
+	if _, err := api.PostIndexer(ctx, idx, sonarr.PostIndexerOptions{}); err != nil {
 		return fmt.Errorf("adding the fake indexer: %w", err)
 	}
 
@@ -255,16 +261,16 @@ func seedDownloads() error {
 	if err != nil {
 		return err
 	}
-	j := slices.IndexFunc(clients.Model, func(s sonarr.DownloadClientResource) bool { return s.Implementation == "Sabnzbd" })
+	j := slices.IndexFunc(clients.Answer, func(s sonarr.DownloadClientResource) bool { return s.Implementation == "Sabnzbd" })
 	if j < 0 {
 		return errors.New("sonarr has no Sabnzbd download client schema")
 	}
-	dc := clients.Model[j]
+	dc := clients.Answer[j]
 	dc.Name, dc.Enable = fakeClientName, new(true)
 	dc.Fields = providerFields(dc.Fields, map[string]any{
 		"host": sab.Host(), "port": sab.Port(), "apiKey": testenv.FakeKey, "tvCategory": sab.Category(), "useSsl": false, "urlBase": "",
 	})
-	if _, err := api.PostDownloadClient(ctx, dc, sonarr.PostDownloadClientOperationOptions{}); err != nil {
+	if _, err := api.PostDownloadClient(ctx, dc, sonarr.PostDownloadClientOptions{}); err != nil {
 		return fmt.Errorf("adding the fake download client: %w", err)
 	}
 
@@ -286,7 +292,7 @@ func removeFakeProviders() error {
 	if err != nil {
 		return err
 	}
-	for _, i := range indexers.Model {
+	for _, i := range indexers.Answer {
 		if i.Name == fakeIndexerName || i.Name == brokenIndexerName {
 			if _, err := api.DeleteIndexerById(ctx, i.Id); err != nil {
 				return err
@@ -297,7 +303,7 @@ func removeFakeProviders() error {
 	if err != nil {
 		return err
 	}
-	for _, c := range clients.Model {
+	for _, c := range clients.Answer {
 		if c.Name == fakeClientName {
 			if _, err := api.DeleteDownloadClientById(ctx, c.Id); err != nil {
 				return err
@@ -342,7 +348,7 @@ func waitIdle() error {
 			return err
 		}
 		busy = busy[:0]
-		for _, c := range res.Model {
+		for _, c := range res.Answer {
 			if c.Status == sonarr.CommandStatusQueued || c.Status == sonarr.CommandStatusStarted {
 				busy = append(busy, c.Name)
 			}

@@ -8,11 +8,11 @@ type QueueResource struct {
 	CustomFormatScore                   int                            `json:"customFormatScore,omitempty"`
 	CustomFormats                       []CustomFormatResource         `json:"customFormats,omitzero"`
 	DownloadClient                      string                         `json:"downloadClient,omitempty"`
-	DownloadClientHasPostImportCategory *bool                          `json:"downloadClientHasPostImportCategory,omitempty"`
+	DownloadClientHasPostImportCategory bool                           `json:"downloadClientHasPostImportCategory"`
 	DownloadId                          string                         `json:"downloadId,omitempty"`
 	Episode                             *EpisodeResource               `json:"episode,omitempty"`
-	EpisodeHasFile                      *bool                          `json:"episodeHasFile,omitempty"`
-	EpisodeId                           int                            `json:"episodeId,omitempty"`
+	EpisodeHasFile                      bool                           `json:"episodeHasFile"`
+	EpisodeId                           EpisodeID                      `json:"episodeId,omitempty"`
 	ErrorMessage                        string                         `json:"errorMessage,omitempty"`
 	EstimatedCompletionTime             string                         `json:"estimatedCompletionTime,omitempty"`
 	Id                                  int                            `json:"id,omitempty"`
@@ -23,7 +23,7 @@ type QueueResource struct {
 	Quality                             *QualityModel                  `json:"quality,omitempty"`
 	SeasonNumber                        int                            `json:"seasonNumber,omitempty"`
 	Series                              *SeriesResource                `json:"series,omitempty"`
-	SeriesId                            int                            `json:"seriesId,omitempty"`
+	SeriesId                            SeriesID                       `json:"seriesId,omitempty"`
 	Size                                float64                        `json:"size,omitempty"`
 	Sizeleft                            float64                        `json:"sizeleft,omitempty"`
 	Status                              QueueStatus                    `json:"status,omitempty"`

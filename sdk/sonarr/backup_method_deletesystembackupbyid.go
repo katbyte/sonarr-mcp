@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteSystemBackupByIdOperationResponse is the result of DeleteSystemBackupById.
-type DeleteSystemBackupByIdOperationResponse struct {
+// DeleteSystemBackupByIdResponse is the result of DeleteSystemBackupById.
+type DeleteSystemBackupByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteSystemBackupById calls DELETE /api/v3/system/backup/{id}.
-func (c Client) DeleteSystemBackupById(ctx context.Context, id int) (result DeleteSystemBackupByIdOperationResponse, err error) {
+func (c Client) DeleteSystemBackupById(ctx context.Context, id int) (result DeleteSystemBackupByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteSystemBackupById",
 		Path:       fmt.Sprintf("/api/v3/system/backup/%d", id),
 	}
 

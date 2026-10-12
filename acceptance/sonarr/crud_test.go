@@ -13,7 +13,6 @@ import (
 	"errors"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -46,12 +45,12 @@ func goneFromCache(t *testing.T, what string, err error) {
 }
 
 // newTag makes a tag for a test, deleted when the test ends.
-func newTag(ctx context.Context, t *testing.T, label string) int {
+func newTag(ctx context.Context, t *testing.T, label string) sonarr.TagID {
 	t.Helper()
 
 	res := must(sc.PostTag(ctx, sonarr.TagResource{Label: label}))
 	status(t, res.HttpResponse, http.StatusCreated)
-	id := res.Model.Id
+	id := res.Answer.Id
 	t.Cleanup(func() { _, _ = sc.DeleteTagById(context.WithoutCancel(ctx), id) })
 
 	return id
@@ -62,40 +61,40 @@ func TestTags(t *testing.T) {
 
 	res := must(sc.PostTag(ctx, sonarr.TagResource{Label: "SDK-Tag"}))
 	status(t, res.HttpResponse, http.StatusCreated)
-	tag := testenv.Answered(res.Model)
+	tag := must(res.Record())
 	// Sonarr stores labels lower case
 	if tag.Id == 0 || tag.Label != "sdk-tag" {
 		t.Fatalf("PostTag = %+v", tag)
 	}
-	if got := must(sc.GetTagById(ctx, tag.Id)).Model; got.Label != "sdk-tag" {
+	if got := must(sc.GetTagById(ctx, tag.Id)).Answer; got.Label != "sdk-tag" {
 		t.Errorf("GetTagById = %+v", got)
 	}
 
 	tag.Label = "sdk-tag-renamed"
-	upd := must(sc.PutTagById(ctx, strconv.Itoa(tag.Id), tag))
+	upd := must(sc.PutTagById(ctx, tag.Id, tag))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if upd.Model.Label != "sdk-tag-renamed" {
-		t.Errorf("PutTagById = %+v", upd.Model)
+	if upd.Answer.Label != "sdk-tag-renamed" {
+		t.Errorf("PutTagById = %+v", upd.Answer)
 	}
-	if !slices.ContainsFunc(must(sc.GetTag(ctx)).Model, func(x sonarr.TagResource) bool { return x.Id == tag.Id && x.Label == "sdk-tag-renamed" }) {
+	if !slices.ContainsFunc(must(sc.GetTag(ctx)).Answer, func(x sonarr.TagResource) bool { return x.Id == tag.Id && x.Label == "sdk-tag-renamed" }) {
 		t.Error("GetTag does not list the renamed tag")
 	}
 
 	// the details say what carries a tag: here, nothing yet, then a series
-	detail := must(sc.GetTagDetailById(ctx, tag.Id)).Model
+	detail := must(sc.GetTagDetailById(ctx, tag.Id)).Answer
 	if detail.Label != "sdk-tag-renamed" || len(detail.SeriesIds) != 0 {
 		t.Errorf("GetTagDetailById = %+v", detail)
 	}
 	s := seriesByTitle(ctx, t, severance.Title)
 	s.Tags = append(slices.Clone(s.Tags), tag.Id)
-	must(sc.PutSeriesById(ctx, strconv.Itoa(s.Id), s, sonarr.PutSeriesByIdOperationOptions{}))
-	details := must(sc.GetTagDetail(ctx)).Model
+	must(sc.PutSeriesById(ctx, s.Id, s, sonarr.PutSeriesByIdOptions{}))
+	details := must(sc.GetTagDetail(ctx)).Answer
 	i := slices.IndexFunc(details, func(d sonarr.TagDetailsResource) bool { return d.Id == tag.Id })
 	if i < 0 || !slices.Contains(details[i].SeriesIds, s.Id) {
 		t.Errorf("GetTagDetail = %+v, want the tag on %s", details, s.Title)
 	}
-	s.Tags = slices.DeleteFunc(s.Tags, func(id int) bool { return id == tag.Id })
-	must(sc.PutSeriesById(ctx, strconv.Itoa(s.Id), s, sonarr.PutSeriesByIdOperationOptions{}))
+	s.Tags = slices.DeleteFunc(s.Tags, func(id sonarr.TagID) bool { return id == tag.Id })
+	must(sc.PutSeriesById(ctx, s.Id, s, sonarr.PutSeriesByIdOptions{}))
 
 	status(t, must(sc.DeleteTagById(ctx, tag.Id)).HttpResponse, http.StatusOK)
 	_, err := sc.GetTagById(ctx, tag.Id)
@@ -109,16 +108,16 @@ func TestRootFolders(t *testing.T) {
 	mkdirAll(t, testenv.DataDir(), "downloads", "sdk-root")
 	res := must(sc.PostRootFolder(ctx, sonarr.RootFolderResource{Path: "/downloads/sdk-root"}))
 	status(t, res.HttpResponse, http.StatusCreated)
-	id := res.Model.Id
-	if res.Model.Path != "/downloads/sdk-root" || res.Model.Accessible == nil || !*res.Model.Accessible || res.Model.FreeSpace <= 0 {
-		t.Errorf("PostRootFolder = %+v", res.Model)
+	id := res.Answer.Id
+	if res.Answer.Path != "/downloads/sdk-root" || res.Answer.Accessible == nil || !*res.Answer.Accessible || res.Answer.FreeSpace <= 0 {
+		t.Errorf("PostRootFolder = %+v", res.Answer)
 	}
-	if got := must(sc.GetRootFolderById(ctx, id)).Model; got.Path != "/downloads/sdk-root" {
+	if got := must(sc.GetRootFolderById(ctx, id)).Answer; got.Path != "/downloads/sdk-root" {
 		t.Errorf("GetRootFolderById = %+v", got)
 	}
 
 	// the library's root lists the folder no series lives in
-	tv := must(sc.GetRootFolderById(ctx, rootFolderID)).Model
+	tv := must(sc.GetRootFolderById(ctx, rootFolderID)).Answer
 	if !slices.ContainsFunc(tv.UnmappedFolders, func(u sonarr.UnmappedFolder) bool {
 		return u.Name == theExpanse.Folder && u.Path == "/tv/"+theExpanse.Folder
 	}) {
@@ -140,7 +139,7 @@ func TestQualityProfiles(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	// a new profile starts from the schema: every quality, none allowed
-	schema := *must(sc.GetQualityProfileSchema(ctx)).Model
+	schema := *must(sc.GetQualityProfileSchema(ctx)).Answer
 	if len(schema.Items) == 0 {
 		t.Fatalf("GetQualityProfileSchema = %+v", schema)
 	}
@@ -161,20 +160,20 @@ func TestQualityProfiles(t *testing.T) {
 	schema.Name, schema.UpgradeAllowed = "SDK Profile", new(true)
 	res := must(sc.PostQualityProfile(ctx, schema))
 	status(t, res.HttpResponse, http.StatusCreated)
-	profile := testenv.Answered(res.Model)
+	profile := must(res.Record())
 	t.Cleanup(func() { _, _ = sc.DeleteQualityProfileById(context.WithoutCancel(ctx), profile.Id) })
 	if profile.Id == 0 || profile.Name != "SDK Profile" || !boolValue(profile.UpgradeAllowed) {
 		t.Fatalf("PostQualityProfile = %+v", profile)
 	}
 
 	profile.Name, profile.UpgradeAllowed = "SDK Profile Renamed", new(false)
-	upd := must(sc.PutQualityProfileById(ctx, strconv.Itoa(profile.Id), profile))
+	upd := must(sc.PutQualityProfileById(ctx, profile.Id, profile))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	got := must(sc.GetQualityProfileById(ctx, profile.Id)).Model
+	got := must(sc.GetQualityProfileById(ctx, profile.Id)).Answer
 	if got.Name != "SDK Profile Renamed" || got.UpgradeAllowed == nil || *got.UpgradeAllowed {
 		t.Errorf("GetQualityProfileById after the update = %+v", got)
 	}
-	if !slices.ContainsFunc(must(sc.GetQualityProfile(ctx)).Model, func(p sonarr.QualityProfileResource) bool { return p.Id == profile.Id }) {
+	if !slices.ContainsFunc(must(sc.GetQualityProfile(ctx)).Answer, func(p sonarr.QualityProfileResource) bool { return p.Id == profile.Id }) {
 		t.Error("GetQualityProfile does not list the new profile")
 	}
 
@@ -192,7 +191,7 @@ func TestQualityProfiles(t *testing.T) {
 func TestQualityDefinitions(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	defs := must(sc.GetQualityDefinition(ctx)).Model
+	defs := must(sc.GetQualityDefinition(ctx)).Answer
 	i := slices.IndexFunc(defs, func(d sonarr.QualityDefinitionResource) bool {
 		return d.Quality != nil && d.Quality.Name == "HDTV-720p"
 	})
@@ -203,20 +202,20 @@ func TestQualityDefinitions(t *testing.T) {
 	if def.Id == 0 || def.Title == "" || def.Weight == 0 || def.MaxSize == 0 {
 		t.Errorf("the HDTV-720p definition did not decode: %+v", def)
 	}
-	if got := must(sc.GetQualityDefinitionById(ctx, def.Id)).Model; got.Title != def.Title {
+	if got := must(sc.GetQualityDefinitionById(ctx, def.Id)).Answer; got.Title != def.Title {
 		t.Errorf("GetQualityDefinitionById = %+v", got)
 	}
-	limits := must(sc.GetQualityDefinitionLimits(ctx)).Model
+	limits := must(sc.GetQualityDefinitionLimits(ctx)).Answer
 	if limits.Max <= limits.Min {
 		t.Errorf("GetQualityDefinitionLimits = %+v", limits)
 	}
 
 	original := def.Title
 	def.Title = "SDK 720p"
-	upd := must(sc.PutQualityDefinitionById(ctx, strconv.Itoa(def.Id), def))
+	upd := must(sc.PutQualityDefinitionById(ctx, def.Id, def))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if upd.Model.Title != "SDK 720p" {
-		t.Errorf("PutQualityDefinitionById = %+v", upd.Model)
+	if upd.Answer.Title != "SDK 720p" {
+		t.Errorf("PutQualityDefinitionById = %+v", upd.Answer)
 	}
 
 	// the bulk update answers every definition - but as Sonarr cached them:
@@ -225,12 +224,12 @@ func TestQualityDefinitions(t *testing.T) {
 	def.Title = original
 	many := must(sc.PutQualityDefinitionUpdate(ctx, []sonarr.QualityDefinitionResource{def}))
 	status(t, many.HttpResponse, http.StatusAccepted)
-	if len(many.Model) != len(defs) || !slices.ContainsFunc(many.Model, func(d sonarr.QualityDefinitionResource) bool { return d.Id == def.Id }) {
-		t.Errorf("PutQualityDefinitionUpdate = %d definitions, want all %d", len(many.Model), len(defs))
+	if len(many.Answer) != len(defs) || !slices.ContainsFunc(many.Answer, func(d sonarr.QualityDefinitionResource) bool { return d.Id == def.Id }) {
+		t.Errorf("PutQualityDefinitionUpdate = %d definitions, want all %d", len(many.Answer), len(defs))
 	}
 	// an update of one clears the cache, and puts the title back for certain
-	must(sc.PutQualityDefinitionById(ctx, strconv.Itoa(def.Id), def))
-	if got := must(sc.GetQualityDefinitionById(ctx, def.Id)).Model; got.Title != original {
+	must(sc.PutQualityDefinitionById(ctx, def.Id, def))
+	if got := must(sc.GetQualityDefinitionById(ctx, def.Id)).Answer; got.Title != original {
 		t.Errorf("the definition's title is %q after restoring it, want %q", got.Title, original)
 	}
 }
@@ -267,16 +266,16 @@ func tagSpec(t *testing.T, schema []sonarr.AutoTaggingSpecificationSchema, imple
 func TestCustomFormats(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	schema := must(sc.GetCustomFormatSchema(ctx)).Model
+	schema := must(sc.GetCustomFormatSchema(ctx)).Answer
 	x265 := formatSpec(t, schema, "ReleaseTitleSpecification", "x265", `\b(x265|HEVC)\b`)
 	create := func(name string) sonarr.CustomFormatResource {
 		res := must(sc.PostCustomFormat(ctx, sonarr.CustomFormatResource{
 			Name: name, IncludeCustomFormatWhenRenaming: new(false), Specifications: []sonarr.CustomFormatSpecificationSchema{x265},
 		}))
 		status(t, res.HttpResponse, http.StatusCreated)
-		id := res.Model.Id
+		id := res.Answer.Id
 		t.Cleanup(func() { _, _ = sc.DeleteCustomFormatById(context.WithoutCancel(ctx), id) })
-		return testenv.Answered(res.Model)
+		return must(res.Record())
 	}
 
 	cf := create("SDK x265")
@@ -284,12 +283,12 @@ func TestCustomFormats(t *testing.T) {
 		t.Fatalf("PostCustomFormat = %+v", cf)
 	}
 	cf.Name = "SDK HEVC"
-	upd := must(sc.PutCustomFormatById(ctx, strconv.Itoa(cf.Id), cf))
+	upd := must(sc.PutCustomFormatById(ctx, cf.Id, cf))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if got := must(sc.GetCustomFormatById(ctx, cf.Id)).Model; got.Name != "SDK HEVC" {
+	if got := must(sc.GetCustomFormatById(ctx, cf.Id)).Answer; got.Name != "SDK HEVC" {
 		t.Errorf("GetCustomFormatById after the update = %+v", got)
 	}
-	if !slices.ContainsFunc(must(sc.GetCustomFormat(ctx)).Model, func(x sonarr.CustomFormatResource) bool { return x.Id == cf.Id }) {
+	if !slices.ContainsFunc(must(sc.GetCustomFormat(ctx)).Answer, func(x sonarr.CustomFormatResource) bool { return x.Id == cf.Id }) {
 		t.Error("GetCustomFormat does not list the new format")
 	}
 
@@ -297,10 +296,10 @@ func TestCustomFormats(t *testing.T) {
 	other := create("SDK AV1")
 	bulk := must(sc.PutCustomFormatBulk(ctx, sonarr.CustomFormatBulkResource{Ids: []int{cf.Id, other.Id}, IncludeCustomFormatWhenRenaming: new(true)}))
 	status(t, bulk.HttpResponse, http.StatusAccepted)
-	if len(bulk.Model) != 2 || !slices.ContainsFunc(bulk.Model, func(x sonarr.CustomFormatResource) bool {
+	if len(bulk.Answer) != 2 || !slices.ContainsFunc(bulk.Answer, func(x sonarr.CustomFormatResource) bool {
 		return x.Id == other.Id && x.IncludeCustomFormatWhenRenaming != nil && *x.IncludeCustomFormatWhenRenaming
 	}) {
-		t.Errorf("PutCustomFormatBulk = %+v", bulk.Model)
+		t.Errorf("PutCustomFormatBulk = %+v", bulk.Answer)
 	}
 
 	status(t, must(sc.DeleteCustomFormatById(ctx, cf.Id)).HttpResponse, http.StatusOK)
@@ -315,7 +314,7 @@ func TestDelayProfiles(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	// the default profile, with no tags, is always last
-	defaults := must(sc.GetDelayProfile(ctx)).Model
+	defaults := must(sc.GetDelayProfile(ctx)).Answer
 	if len(defaults) == 0 {
 		t.Fatal("GetDelayProfile listed no default profile")
 	}
@@ -325,12 +324,12 @@ func TestDelayProfiles(t *testing.T) {
 		tag := newTag(ctx, t, label)
 		res := must(sc.PostDelayProfile(ctx, sonarr.DelayProfileResource{
 			EnableUsenet: new(true), EnableTorrent: new(true), PreferredProtocol: sonarr.DownloadProtocolUsenet,
-			UsenetDelay: 30, TorrentDelay: 60, BypassIfHighestQuality: new(true), Tags: []int{tag},
+			UsenetDelay: 30, TorrentDelay: 60, BypassIfHighestQuality: new(true), Tags: []sonarr.TagID{tag},
 		}))
 		status(t, res.HttpResponse, http.StatusCreated)
-		id := res.Model.Id
+		id := res.Answer.Id
 		t.Cleanup(func() { _, _ = sc.DeleteDelayProfileById(context.WithoutCancel(ctx), id) })
-		return testenv.Answered(res.Model)
+		return must(res.Record())
 	}
 	a, b := create("sdk-delay-a"), create("sdk-delay-b")
 	if a.Id == 0 || a.UsenetDelay != 30 || a.TorrentDelay != 60 || a.Order == 0 {
@@ -338,19 +337,19 @@ func TestDelayProfiles(t *testing.T) {
 	}
 
 	a.UsenetDelay = 90
-	upd := must(sc.PutDelayProfileById(ctx, strconv.Itoa(a.Id), a))
+	upd := must(sc.PutDelayProfileById(ctx, a.Id, a))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if got := must(sc.GetDelayProfileById(ctx, a.Id)).Model; got.UsenetDelay != 90 {
+	if got := must(sc.GetDelayProfileById(ctx, a.Id)).Answer; got.UsenetDelay != 90 {
 		t.Errorf("GetDelayProfileById after the update = %+v", got)
 	}
 
 	// moving a after b answers the whole ordered list, a now below b
-	order := must(sc.PutDelayProfileReorderById(ctx, a.Id, sonarr.PutDelayProfileReorderByIdOperationOptions{After: new(b.Id)}))
+	order := must(sc.PutDelayProfileReorderById(ctx, a.Id, sonarr.PutDelayProfileReorderByIdOptions{After: new(b.Id)}))
 	status(t, order.HttpResponse, http.StatusOK)
-	ia := slices.IndexFunc(order.Model, func(p sonarr.DelayProfileResource) bool { return p.Id == a.Id })
-	ib := slices.IndexFunc(order.Model, func(p sonarr.DelayProfileResource) bool { return p.Id == b.Id })
-	if ia < 0 || ib < 0 || order.Model[ia].Order <= order.Model[ib].Order {
-		t.Errorf("PutDelayProfileReorderById = %+v, want %d after %d", order.Model, a.Id, b.Id)
+	ia := slices.IndexFunc(order.Answer, func(p sonarr.DelayProfileResource) bool { return p.Id == a.Id })
+	ib := slices.IndexFunc(order.Answer, func(p sonarr.DelayProfileResource) bool { return p.Id == b.Id })
+	if ia < 0 || ib < 0 || order.Answer[ia].Order <= order.Answer[ib].Order {
+		t.Errorf("PutDelayProfileReorderById = %+v, want %d after %d", order.Answer, a.Id, b.Id)
 	}
 
 	status(t, must(sc.DeleteDelayProfileById(ctx, a.Id)).HttpResponse, http.StatusOK)
@@ -365,7 +364,7 @@ func TestReleaseProfiles(t *testing.T) {
 		Name: "SDK Release Profile", Enabled: new(true), Required: []string{"proper"}, Ignored: []string{"cam", "telesync"},
 	}))
 	status(t, res.HttpResponse, http.StatusCreated)
-	rp := testenv.Answered(res.Model)
+	rp := must(res.Record())
 	t.Cleanup(func() { _, _ = sc.DeleteReleaseProfileById(context.WithoutCancel(ctx), rp.Id) })
 	if rp.Id == 0 || rp.Name != "SDK Release Profile" {
 		t.Fatalf("PostReleaseProfile = %+v", rp)
@@ -376,12 +375,12 @@ func TestReleaseProfiles(t *testing.T) {
 	}
 
 	rp.Enabled = new(false)
-	upd := must(sc.PutReleaseProfileById(ctx, strconv.Itoa(rp.Id), rp))
+	upd := must(sc.PutReleaseProfileById(ctx, rp.Id, rp))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if got := must(sc.GetReleaseProfileById(ctx, rp.Id)).Model; got.Enabled == nil || *got.Enabled {
+	if got := must(sc.GetReleaseProfileById(ctx, rp.Id)).Answer; got.Enabled == nil || *got.Enabled {
 		t.Errorf("GetReleaseProfileById after disabling = %+v", got)
 	}
-	if !slices.ContainsFunc(must(sc.GetReleaseProfile(ctx)).Model, func(x sonarr.ReleaseProfileResource) bool { return x.Id == rp.Id }) {
+	if !slices.ContainsFunc(must(sc.GetReleaseProfile(ctx)).Answer, func(x sonarr.ReleaseProfileResource) bool { return x.Id == rp.Id }) {
 		t.Error("GetReleaseProfile does not list the new profile")
 	}
 
@@ -395,19 +394,19 @@ func TestRemotePathMappings(t *testing.T) {
 
 	res := must(sc.PostRemotePathMapping(ctx, sonarr.RemotePathMappingResource{Host: "sdk-host", RemotePath: "/remote/tv/", LocalPath: "/downloads/"}))
 	status(t, res.HttpResponse, http.StatusCreated)
-	m := testenv.Answered(res.Model)
+	m := must(res.Record())
 	t.Cleanup(func() { _, _ = sc.DeleteRemotePathMappingById(context.WithoutCancel(ctx), m.Id) })
 	if m.Id == 0 || m.Host != "sdk-host" || m.LocalPath != "/downloads/" {
 		t.Fatalf("PostRemotePathMapping = %+v", m)
 	}
 
 	m.RemotePath = "/remote/series/"
-	upd := must(sc.PutRemotePathMappingById(ctx, strconv.Itoa(m.Id), m))
+	upd := must(sc.PutRemotePathMappingById(ctx, m.Id, m))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if got := must(sc.GetRemotePathMappingById(ctx, m.Id)).Model; got.RemotePath != "/remote/series/" {
+	if got := must(sc.GetRemotePathMappingById(ctx, m.Id)).Answer; got.RemotePath != "/remote/series/" {
 		t.Errorf("GetRemotePathMappingById after the update = %+v", got)
 	}
-	if !slices.ContainsFunc(must(sc.GetRemotePathMapping(ctx)).Model, func(x sonarr.RemotePathMappingResource) bool { return x.Id == m.Id }) {
+	if !slices.ContainsFunc(must(sc.GetRemotePathMapping(ctx)).Answer, func(x sonarr.RemotePathMappingResource) bool { return x.Id == m.Id }) {
 		t.Error("GetRemotePathMapping does not list the new mapping")
 	}
 
@@ -419,12 +418,12 @@ func TestRemotePathMappings(t *testing.T) {
 func TestImportListExclusions(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	create := func(tvdb int, title string) sonarr.ImportListExclusionResource {
+	create := func(tvdb sonarr.TvdbID, title string) sonarr.ImportListExclusionResource {
 		res := must(sc.PostImportListExclusion(ctx, sonarr.ImportListExclusionResource{TvdbId: tvdb, Title: title}))
 		status(t, res.HttpResponse, http.StatusCreated)
-		id := res.Model.Id
+		id := res.Answer.Id
 		t.Cleanup(func() { _, _ = sc.DeleteImportListExclusionById(context.WithoutCancel(ctx), id) })
-		return testenv.Answered(res.Model)
+		return must(res.Record())
 	}
 	ex := create(74205, "Band of Brothers")
 	if ex.Id == 0 || ex.TvdbId != 74205 {
@@ -432,18 +431,18 @@ func TestImportListExclusions(t *testing.T) {
 	}
 
 	ex.Title = "Band of Brothers (2001)"
-	upd := must(sc.PutImportListExclusionById(ctx, strconv.Itoa(ex.Id), ex))
+	upd := must(sc.PutImportListExclusionById(ctx, ex.Id, ex))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if got := must(sc.GetImportListExclusionById(ctx, ex.Id)).Model; got.Title != "Band of Brothers (2001)" {
+	if got := must(sc.GetImportListExclusionById(ctx, ex.Id)).Answer; got.Title != "Band of Brothers (2001)" {
 		t.Errorf("GetImportListExclusionById after the update = %+v", got)
 	}
 	// the whole list is deprecated for the paged one, and still served
-	all := must(sc.GetImportListExclusion(ctx)).Model //nolint:staticcheck // the suite proves the deprecated operation still answers
+	all := must(sc.GetImportListExclusion(ctx)).Answer //nolint:staticcheck // the suite proves the deprecated operation still answers
 	if !slices.ContainsFunc(all, func(x sonarr.ImportListExclusionResource) bool { return x.Id == ex.Id }) {
 		t.Error("GetImportListExclusion does not list the new exclusion")
 	}
 	other := create(78107, "The Office")
-	paged := must(sc.GetImportListExclusionPagedComplete(ctx, sonarr.GetImportListExclusionPagedOperationOptions{PageSize: new(1)}))
+	paged := must(sc.GetImportListExclusionPagedComplete(ctx, sonarr.GetImportListExclusionPagedOptions{PageSize: new(1)}))
 	if len(paged.Items) < 2 || !slices.ContainsFunc(paged.Items, func(x sonarr.ImportListExclusionResource) bool { return x.Id == other.Id }) {
 		t.Errorf("GetImportListExclusionPagedComplete over pages of one = %+v", paged.Items)
 	}
@@ -463,19 +462,19 @@ func TestCustomFilters(t *testing.T) {
 		Type: "series", Label: "SDK Filter", Filters: []map[string]any{{"key": "monitored", "value": []any{true}, "type": "equal"}},
 	}))
 	status(t, res.HttpResponse, http.StatusCreated)
-	f := testenv.Answered(res.Model)
+	f := must(res.Record())
 	t.Cleanup(func() { _, _ = sc.DeleteCustomFilterById(context.WithoutCancel(ctx), f.Id) })
 	if f.Id == 0 || f.Label != "SDK Filter" || len(f.Filters) != 1 || f.Filters[0]["key"] != "monitored" {
 		t.Fatalf("PostCustomFilter = %+v", f)
 	}
 
 	f.Label = "SDK Filter Renamed"
-	upd := must(sc.PutCustomFilterById(ctx, strconv.Itoa(f.Id), f))
+	upd := must(sc.PutCustomFilterById(ctx, f.Id, f))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if got := must(sc.GetCustomFilterById(ctx, f.Id)).Model; got.Label != "SDK Filter Renamed" {
+	if got := must(sc.GetCustomFilterById(ctx, f.Id)).Answer; got.Label != "SDK Filter Renamed" {
 		t.Errorf("GetCustomFilterById after the update = %+v", got)
 	}
-	if !slices.ContainsFunc(must(sc.GetCustomFilter(ctx)).Model, func(x sonarr.CustomFilterResource) bool { return x.Id == f.Id }) {
+	if !slices.ContainsFunc(must(sc.GetCustomFilter(ctx)).Answer, func(x sonarr.CustomFilterResource) bool { return x.Id == f.Id }) {
 		t.Error("GetCustomFilter does not list the new filter")
 	}
 
@@ -488,25 +487,25 @@ func TestAutoTagging(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	tag := newTag(ctx, t, "sdk-anime")
-	schema := must(sc.GetAutoTaggingSchema(ctx)).Model
+	schema := must(sc.GetAutoTaggingSchema(ctx)).Answer
 	genre := tagSpec(t, schema, "GenreSpecification", "Anime", []string{"Anime"})
 	res := must(sc.PostAutoTagging(ctx, sonarr.AutoTaggingResource{
-		Name: "SDK Anime", RemoveTagsAutomatically: new(false), Tags: []int{tag}, Specifications: []sonarr.AutoTaggingSpecificationSchema{genre},
+		Name: "SDK Anime", RemoveTagsAutomatically: new(false), Tags: []sonarr.TagID{tag}, Specifications: []sonarr.AutoTaggingSpecificationSchema{genre},
 	}))
 	status(t, res.HttpResponse, http.StatusCreated)
-	at := testenv.Answered(res.Model)
+	at := must(res.Record())
 	t.Cleanup(func() { _, _ = sc.DeleteAutoTaggingById(context.WithoutCancel(ctx), at.Id) })
 	if at.Id == 0 || at.Name != "SDK Anime" || len(at.Specifications) != 1 || !slices.Contains(at.Tags, tag) {
 		t.Fatalf("PostAutoTagging = %+v", at)
 	}
 
 	at.RemoveTagsAutomatically = new(true)
-	upd := must(sc.PutAutoTaggingById(ctx, strconv.Itoa(at.Id), at))
+	upd := must(sc.PutAutoTaggingById(ctx, at.Id, at))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	if got := must(sc.GetAutoTaggingById(ctx, at.Id)).Model; got.RemoveTagsAutomatically == nil || !*got.RemoveTagsAutomatically {
+	if got := must(sc.GetAutoTaggingById(ctx, at.Id)).Answer; got.RemoveTagsAutomatically == nil || !*got.RemoveTagsAutomatically {
 		t.Errorf("GetAutoTaggingById after the update = %+v", got)
 	}
-	if !slices.ContainsFunc(must(sc.GetAutoTagging(ctx)).Model, func(x sonarr.AutoTaggingResource) bool { return x.Id == at.Id }) {
+	if !slices.ContainsFunc(must(sc.GetAutoTagging(ctx)).Answer, func(x sonarr.AutoTaggingResource) bool { return x.Id == at.Id }) {
 		t.Error("GetAutoTagging does not list the new rule")
 	}
 
@@ -523,25 +522,25 @@ func TestAutoTagging(t *testing.T) {
 func TestLanguageProfiles(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	list := must(sc.GetLanguageProfile(ctx)).Model
+	list := must(sc.GetLanguageProfile(ctx)).Answer
 	if len(list) != 1 || list[0].Name == "" {
 		t.Fatalf("GetLanguageProfile = %+v", list)
 	}
-	one := *must(sc.GetLanguageProfileById(ctx, list[0].Id)).Model
+	one := *must(sc.GetLanguageProfileById(ctx, list[0].Id)).Answer
 	if one.Id != list[0].Id || one.Cutoff == nil {
 		t.Errorf("GetLanguageProfileById = %+v", one)
 	}
-	if schema := must(sc.GetLanguageProfileSchema(ctx)).Model; schema == nil || schema.Name == "" {
+	if schema := must(sc.GetLanguageProfileSchema(ctx)).Answer; schema == nil || schema.Name == "" {
 		t.Errorf("GetLanguageProfileSchema = %+v", schema)
 	}
 
 	res := must(sc.PostLanguageProfile(ctx, one))
 	status(t, res.HttpResponse, http.StatusAccepted)
-	upd := must(sc.PutLanguageProfileById(ctx, strconv.Itoa(one.Id), one))
+	upd := must(sc.PutLanguageProfileById(ctx, one.Id, one))
 	status(t, upd.HttpResponse, http.StatusAccepted)
 	status(t, must(sc.DeleteLanguageProfileById(ctx, one.Id)).HttpResponse, http.StatusOK)
 	// and the profile is still there, since none of that did anything
-	if len(must(sc.GetLanguageProfile(ctx)).Model) != 1 {
+	if len(must(sc.GetLanguageProfile(ctx)).Answer) != 1 {
 		t.Error("the deprecated profile routes changed something")
 	}
 }

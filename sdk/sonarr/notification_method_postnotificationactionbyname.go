@@ -11,19 +11,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostNotificationActionByNameOperationResponse is the result of PostNotificationActionByName.
-type PostNotificationActionByNameOperationResponse struct {
+// PostNotificationActionByNameResponse is the result of PostNotificationActionByName.
+type PostNotificationActionByNameResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostNotificationActionByName calls POST /api/v3/notification/action/{name}.
-func (c Client) PostNotificationActionByName(ctx context.Context, name string, input NotificationResource) (result PostNotificationActionByNameOperationResponse, err error) {
+func (c Client) PostNotificationActionByName(ctx context.Context, name string, input NotificationResource) (result PostNotificationActionByNameResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostNotificationActionByName",
 		Path:       fmt.Sprintf("/api/v3/notification/action/%s", url.PathEscape(name)),
 	}
 

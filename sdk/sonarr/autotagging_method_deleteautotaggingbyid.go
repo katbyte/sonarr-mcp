@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteAutoTaggingByIdOperationResponse is the result of DeleteAutoTaggingById.
-type DeleteAutoTaggingByIdOperationResponse struct {
+// DeleteAutoTaggingByIdResponse is the result of DeleteAutoTaggingById.
+type DeleteAutoTaggingByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteAutoTaggingById calls DELETE /api/v3/autotagging/{id}.
-func (c Client) DeleteAutoTaggingById(ctx context.Context, id int) (result DeleteAutoTaggingByIdOperationResponse, err error) {
+func (c Client) DeleteAutoTaggingById(ctx context.Context, id int) (result DeleteAutoTaggingByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteAutoTaggingById",
 		Path:       fmt.Sprintf("/api/v3/autotagging/%d", id),
 	}
 

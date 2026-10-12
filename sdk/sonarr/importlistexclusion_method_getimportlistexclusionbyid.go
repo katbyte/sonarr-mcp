@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetImportListExclusionByIdOperationResponse is the result of GetImportListExclusionById.
-type GetImportListExclusionByIdOperationResponse struct {
+// GetImportListExclusionByIdResponse is the result of GetImportListExclusionById.
+//
+// Answer is the ImportListExclusionResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetImportListExclusionByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *ImportListExclusionResource
+	Answer       *ImportListExclusionResource
+	*ImportListExclusionResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetImportListExclusionByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the ImportListExclusionResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetImportListExclusionByIdResponse) Record() (ImportListExclusionResource, error) {
+	if r.Answer == nil {
+		return ImportListExclusionResource{}, errors.New("GetImportListExclusionById answered no ImportListExclusionResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetImportListExclusionById calls GET /api/v3/importlistexclusion/{id}.
-func (c Client) GetImportListExclusionById(ctx context.Context, id int) (result GetImportListExclusionByIdOperationResponse, err error) {
+func (c Client) GetImportListExclusionById(ctx context.Context, id int) (result GetImportListExclusionByIdResponse, err error) {
+	result.ImportListExclusionResource = &ImportListExclusionResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetImportListExclusionById",
 		Path:       fmt.Sprintf("/api/v3/importlistexclusion/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetImportListExclusionById(ctx context.Context, id int) (result 
 		return
 	}
 
-	var model ImportListExclusionResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer ImportListExclusionResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.ImportListExclusionResource = result.Answer
 
 	return
 }

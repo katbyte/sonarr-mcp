@@ -2,6 +2,8 @@
 
 package sonarr
 
+import "slices"
+
 // ImportListType is the "ImportListType" enum.
 type ImportListType string
 
@@ -25,4 +27,9 @@ func PossibleValuesForImportListType() []string {
 		string(ImportListTypeOther),
 		string(ImportListTypeAdvanced),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v ImportListType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForImportListType(), string(v))
 }

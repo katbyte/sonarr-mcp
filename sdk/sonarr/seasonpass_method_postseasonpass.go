@@ -9,19 +9,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostSeasonPassOperationResponse is the result of PostSeasonPass.
-type PostSeasonPassOperationResponse struct {
+// PostSeasonPassResponse is the result of PostSeasonPass.
+type PostSeasonPassResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostSeasonPass calls POST /api/v3/seasonpass.
-func (c Client) PostSeasonPass(ctx context.Context, input SeasonPassResource) (result PostSeasonPassOperationResponse, err error) {
+func (c Client) PostSeasonPass(ctx context.Context, input SeasonPassResource) (result PostSeasonPassResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostSeasonPass",
 		Path:       "/api/v3/seasonpass",
 	}
 

@@ -4,30 +4,31 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostDownloadClientTestOperationResponse is the result of PostDownloadClientTest.
-type PostDownloadClientTestOperationResponse struct {
+// PostDownloadClientTestResponse is the result of PostDownloadClientTest.
+type PostDownloadClientTestResponse struct {
 	HttpResponse *http.Response
 }
 
-// PostDownloadClientTestOperationOptions holds the query and header parameters of PostDownloadClientTest.
-type PostDownloadClientTestOperationOptions struct {
+// PostDownloadClientTestOptions holds the query and header parameters of PostDownloadClientTest.
+type PostDownloadClientTestOptions struct {
 	ForceTest *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PostDownloadClientTestOperationOptions) ToHeaders() *client.Headers {
+func (o PostDownloadClientTestOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PostDownloadClientTestOperationOptions) ToQuery() *client.QueryParams {
+func (o PostDownloadClientTestOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.ForceTest != nil {
 		out.Append("forceTest", strconv.FormatBool(*o.ForceTest))
@@ -36,14 +37,24 @@ func (o PostDownloadClientTestOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PostDownloadClientTest calls POST /api/v3/downloadclient/test.
-func (c Client) PostDownloadClientTest(ctx context.Context, input DownloadClientResource, options PostDownloadClientTestOperationOptions) (result PostDownloadClientTestOperationResponse, err error) {
+func (c Client) PostDownloadClientTest(ctx context.Context, input DownloadClientResource, options ...PostDownloadClientTestOptions) (result PostDownloadClientTestResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PostDownloadClientTest takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PostDownloadClientTestOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodPost,
-		OptionsObject: options,
+		Operation:     "PostDownloadClientTest",
+		OptionsObject: option,
 		Path:          "/api/v3/downloadclient/test",
 	}
 

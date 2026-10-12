@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteCustomFormatByIdOperationResponse is the result of DeleteCustomFormatById.
-type DeleteCustomFormatByIdOperationResponse struct {
+// DeleteCustomFormatByIdResponse is the result of DeleteCustomFormatById.
+type DeleteCustomFormatByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteCustomFormatById calls DELETE /api/v3/customformat/{id}.
-func (c Client) DeleteCustomFormatById(ctx context.Context, id int) (result DeleteCustomFormatByIdOperationResponse, err error) {
+func (c Client) DeleteCustomFormatById(ctx context.Context, id int) (result DeleteCustomFormatByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteCustomFormatById",
 		Path:       fmt.Sprintf("/api/v3/customformat/%d", id),
 	}
 

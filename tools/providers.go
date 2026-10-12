@@ -50,7 +50,7 @@ type testRow struct {
 func testResults(results []sonarr.ProviderTestAllResult, names map[int]string) []testRow {
 	out := make([]testRow, 0, len(results))
 	for _, res := range results {
-		row := testRow{Name: names[res.Id], OK: boolv(res.IsValid)}
+		row := testRow{Name: names[res.Id], OK: res.IsValid}
 		if row.Name == "" {
 			row.Name = fmt.Sprintf("id %d", res.Id)
 		}
@@ -118,7 +118,7 @@ func registerProviderTools(r *registry) {
 		if err != nil {
 			return nil, indexersOut{}, err
 		}
-		indexers, paged := pageRows(res.Model, in)
+		indexers, paged := pageRows(res.Answer, in)
 		out := indexersOut{pageOut: paged, Indexers: make([]indexerRow, 0, len(indexers))}
 		for _, i := range indexers {
 			out.Indexers = append(out.Indexers, indexerRow{
@@ -146,7 +146,7 @@ func registerProviderTools(r *registry) {
 			return nil, testOut{}, err
 		}
 		names := map[int]string{}
-		for _, i := range res.Model {
+		for _, i := range res.Answer {
 			names[i.Id] = i.Name
 		}
 		if in.Name == "" {
@@ -156,14 +156,14 @@ func registerProviderTools(r *registry) {
 			if testErr != nil {
 				return nil, testOut{}, testErr
 			}
-			return nil, testOut{Results: testResults(all.Model, names)}, nil
+			return nil, testOut{Results: testResults(all.Answer, names)}, nil
 		}
-		i := slices.IndexFunc(res.Model, func(x sonarr.IndexerResource) bool { return strings.EqualFold(x.Name, in.Name) })
+		i := slices.IndexFunc(res.Answer, func(x sonarr.IndexerResource) bool { return strings.EqualFold(x.Name, in.Name) })
 		if i < 0 {
 			return nil, testOut{}, fmt.Errorf("no indexer %q (have: %s)", in.Name, strings.Join(mapValues(names), ", "))
 		}
-		_, err = sc.PostIndexerTest(ctx, res.Model[i], sonarr.PostIndexerTestOperationOptions{ForceTest: new(true)})
-		row, err := testOne(res.Model[i].Name, err)
+		_, err = sc.PostIndexerTest(ctx, res.Answer[i], sonarr.PostIndexerTestOptions{ForceTest: new(true)})
+		row, err := testOne(res.Answer[i].Name, err)
 
 		return nil, testOut{Results: []testRow{row}}, err
 	})
@@ -196,7 +196,7 @@ func registerProviderTools(r *registry) {
 		if err != nil {
 			return nil, clientsOut{}, err
 		}
-		clients, paged := pageRows(res.Model, in)
+		clients, paged := pageRows(res.Answer, in)
 		out := clientsOut{pageOut: paged, Clients: make([]clientRow, 0, len(clients))}
 		for _, c := range clients {
 			out.Clients = append(out.Clients, clientRow{
@@ -218,7 +218,7 @@ func registerProviderTools(r *registry) {
 			return nil, testOut{}, err
 		}
 		names := map[int]string{}
-		for _, c := range res.Model {
+		for _, c := range res.Answer {
 			names[c.Id] = c.Name
 		}
 		if in.Name == "" {
@@ -228,14 +228,14 @@ func registerProviderTools(r *registry) {
 			if testErr != nil {
 				return nil, testOut{}, testErr
 			}
-			return nil, testOut{Results: testResults(all.Model, names)}, nil
+			return nil, testOut{Results: testResults(all.Answer, names)}, nil
 		}
-		i := slices.IndexFunc(res.Model, func(x sonarr.DownloadClientResource) bool { return strings.EqualFold(x.Name, in.Name) })
+		i := slices.IndexFunc(res.Answer, func(x sonarr.DownloadClientResource) bool { return strings.EqualFold(x.Name, in.Name) })
 		if i < 0 {
 			return nil, testOut{}, fmt.Errorf("no download client %q (have: %s)", in.Name, strings.Join(mapValues(names), ", "))
 		}
-		_, err = sc.PostDownloadClientTest(ctx, res.Model[i], sonarr.PostDownloadClientTestOperationOptions{ForceTest: new(true)})
-		row, err := testOne(res.Model[i].Name, err)
+		_, err = sc.PostDownloadClientTest(ctx, res.Answer[i], sonarr.PostDownloadClientTestOptions{ForceTest: new(true)})
+		row, err := testOne(res.Answer[i].Name, err)
 
 		return nil, testOut{Results: []testRow{row}}, err
 	})

@@ -4,10 +4,10 @@ package sonarr
 
 // ImportListBulkResource is the "ImportListBulkResource" schema.
 type ImportListBulkResource struct {
-	ApplyTags          ApplyTags `json:"applyTags,omitempty"`
-	EnableAutomaticAdd *bool     `json:"enableAutomaticAdd,omitempty"`
-	Ids                []int     `json:"ids,omitzero"`
-	QualityProfileId   int       `json:"qualityProfileId,omitempty"`
-	RootFolderPath     string    `json:"rootFolderPath,omitempty"`
-	Tags               []int     `json:"tags,omitzero"`
+	ApplyTags          ApplyTags        `json:"applyTags,omitempty"`
+	EnableAutomaticAdd *bool            `json:"enableAutomaticAdd,omitempty"`
+	Ids                []int            `json:"ids,omitzero"`
+	QualityProfileId   QualityProfileID `json:"qualityProfileId,omitempty"`
+	RootFolderPath     string           `json:"rootFolderPath,omitempty"`
+	Tags               []TagID          `json:"tags,omitzero"`
 }

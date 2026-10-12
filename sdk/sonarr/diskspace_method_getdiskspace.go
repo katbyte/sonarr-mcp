@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetDiskSpaceOperationResponse is the result of GetDiskSpace.
-type GetDiskSpaceOperationResponse struct {
+// GetDiskSpaceResponse is the result of GetDiskSpace.
+type GetDiskSpaceResponse struct {
 	HttpResponse *http.Response
-	Model        []DiskSpaceResource
+	Answer       []DiskSpaceResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetDiskSpaceResponse) Answered() bool { return r.Answer != nil }
+
 // GetDiskSpace calls GET /api/v3/diskspace.
-func (c Client) GetDiskSpace(ctx context.Context) (result GetDiskSpaceOperationResponse, err error) {
+func (c Client) GetDiskSpace(ctx context.Context) (result GetDiskSpaceResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetDiskSpace",
 		Path:       "/api/v3/diskspace",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetDiskSpace(ctx context.Context) (result GetDiskSpaceOperationR
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

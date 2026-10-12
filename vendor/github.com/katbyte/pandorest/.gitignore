@@ -3,6 +3,7 @@
 .idea/
 .tools/bin/
 .tools/venv/
+.tools/npm/
 *.test
 *.out
 .coverage/

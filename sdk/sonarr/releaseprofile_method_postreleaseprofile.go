@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostReleaseProfileOperationResponse is the result of PostReleaseProfile.
-type PostReleaseProfileOperationResponse struct {
+// PostReleaseProfileResponse is the result of PostReleaseProfile.
+//
+// Answer is the ReleaseProfileResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PostReleaseProfileResponse struct {
 	HttpResponse *http.Response
-	Model        *ReleaseProfileResource
+	Answer       *ReleaseProfileResource
+	*ReleaseProfileResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostReleaseProfileResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the ReleaseProfileResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PostReleaseProfileResponse) Record() (ReleaseProfileResource, error) {
+	if r.Answer == nil {
+		return ReleaseProfileResource{}, errors.New("PostReleaseProfile answered no ReleaseProfileResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PostReleaseProfile calls POST /api/v3/releaseprofile.
-func (c Client) PostReleaseProfile(ctx context.Context, input ReleaseProfileResource) (result PostReleaseProfileOperationResponse, err error) {
+func (c Client) PostReleaseProfile(ctx context.Context, input ReleaseProfileResource) (result PostReleaseProfileResponse, err error) {
+	result.ReleaseProfileResource = &ReleaseProfileResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusCreated,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostReleaseProfile",
 		Path:       "/api/v3/releaseprofile",
 	}
 
@@ -44,11 +68,12 @@ func (c Client) PostReleaseProfile(ctx context.Context, input ReleaseProfileReso
 		return
 	}
 
-	var model ReleaseProfileResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer ReleaseProfileResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.ReleaseProfileResource = result.Answer
 
 	return
 }

@@ -4,30 +4,31 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostMetadataTestOperationResponse is the result of PostMetadataTest.
-type PostMetadataTestOperationResponse struct {
+// PostMetadataTestResponse is the result of PostMetadataTest.
+type PostMetadataTestResponse struct {
 	HttpResponse *http.Response
 }
 
-// PostMetadataTestOperationOptions holds the query and header parameters of PostMetadataTest.
-type PostMetadataTestOperationOptions struct {
+// PostMetadataTestOptions holds the query and header parameters of PostMetadataTest.
+type PostMetadataTestOptions struct {
 	ForceTest *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PostMetadataTestOperationOptions) ToHeaders() *client.Headers {
+func (o PostMetadataTestOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PostMetadataTestOperationOptions) ToQuery() *client.QueryParams {
+func (o PostMetadataTestOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.ForceTest != nil {
 		out.Append("forceTest", strconv.FormatBool(*o.ForceTest))
@@ -36,14 +37,24 @@ func (o PostMetadataTestOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PostMetadataTest calls POST /api/v3/metadata/test.
-func (c Client) PostMetadataTest(ctx context.Context, input MetadataResource, options PostMetadataTestOperationOptions) (result PostMetadataTestOperationResponse, err error) {
+func (c Client) PostMetadataTest(ctx context.Context, input MetadataResource, options ...PostMetadataTestOptions) (result PostMetadataTestResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PostMetadataTest takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PostMetadataTestOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodPost,
-		OptionsObject: options,
+		Operation:     "PostMetadataTest",
+		OptionsObject: option,
 		Path:          "/api/v3/metadata/test",
 	}
 

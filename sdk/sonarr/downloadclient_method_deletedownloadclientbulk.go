@@ -9,19 +9,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteDownloadClientBulkOperationResponse is the result of DeleteDownloadClientBulk.
-type DeleteDownloadClientBulkOperationResponse struct {
+// DeleteDownloadClientBulkResponse is the result of DeleteDownloadClientBulk.
+type DeleteDownloadClientBulkResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteDownloadClientBulk calls DELETE /api/v3/downloadclient/bulk.
-func (c Client) DeleteDownloadClientBulk(ctx context.Context, input DownloadClientBulkResource) (result DeleteDownloadClientBulkOperationResponse, err error) {
+func (c Client) DeleteDownloadClientBulk(ctx context.Context, input DownloadClientBulkResource) (result DeleteDownloadClientBulkResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteDownloadClientBulk",
 		Path:       "/api/v3/downloadclient/bulk",
 	}
 

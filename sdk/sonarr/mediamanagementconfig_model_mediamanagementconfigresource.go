@@ -4,25 +4,25 @@ package sonarr
 
 // MediaManagementConfigResource is the "MediaManagementConfigResource" schema.
 type MediaManagementConfigResource struct {
-	AutoUnmonitorPreviouslyDownloadedEpisodes *bool                    `json:"autoUnmonitorPreviouslyDownloadedEpisodes,omitempty"`
+	AutoUnmonitorPreviouslyDownloadedEpisodes bool                     `json:"autoUnmonitorPreviouslyDownloadedEpisodes"`
 	ChmodFolder                               string                   `json:"chmodFolder"`
 	ChownGroup                                string                   `json:"chownGroup"`
-	CopyUsingHardlinks                        *bool                    `json:"copyUsingHardlinks,omitempty"`
-	CreateEmptySeriesFolders                  *bool                    `json:"createEmptySeriesFolders,omitempty"`
-	DeleteEmptyFolders                        *bool                    `json:"deleteEmptyFolders,omitempty"`
+	CopyUsingHardlinks                        bool                     `json:"copyUsingHardlinks"`
+	CreateEmptySeriesFolders                  bool                     `json:"createEmptySeriesFolders"`
+	DeleteEmptyFolders                        bool                     `json:"deleteEmptyFolders"`
 	DownloadPropersAndRepacks                 ProperDownloadTypes      `json:"downloadPropersAndRepacks,omitempty"`
-	EnableMediaInfo                           *bool                    `json:"enableMediaInfo,omitempty"`
+	EnableMediaInfo                           bool                     `json:"enableMediaInfo"`
 	EpisodeTitleRequired                      EpisodeTitleRequiredType `json:"episodeTitleRequired,omitempty"`
 	ExtraFileExtensions                       string                   `json:"extraFileExtensions"`
 	FileDate                                  FileDateType             `json:"fileDate,omitempty"`
 	Id                                        int                      `json:"id"`
-	ImportExtraFiles                          *bool                    `json:"importExtraFiles,omitempty"`
+	ImportExtraFiles                          bool                     `json:"importExtraFiles"`
 	MinimumFreeSpaceWhenImporting             int                      `json:"minimumFreeSpaceWhenImporting"`
 	RecycleBin                                string                   `json:"recycleBin"`
 	RecycleBinCleanupDays                     int                      `json:"recycleBinCleanupDays"`
 	RescanAfterRefresh                        RescanAfterRefreshType   `json:"rescanAfterRefresh,omitempty"`
 	ScriptImportPath                          string                   `json:"scriptImportPath"`
-	SetPermissionsLinux                       *bool                    `json:"setPermissionsLinux,omitempty"`
-	SkipFreeSpaceCheckWhenImporting           *bool                    `json:"skipFreeSpaceCheckWhenImporting,omitempty"`
-	UseScriptImport                           *bool                    `json:"useScriptImport,omitempty"`
+	SetPermissionsLinux                       bool                     `json:"setPermissionsLinux"`
+	SkipFreeSpaceCheckWhenImporting           bool                     `json:"skipFreeSpaceCheckWhenImporting"`
+	UseScriptImport                           bool                     `json:"useScriptImport"`
 }

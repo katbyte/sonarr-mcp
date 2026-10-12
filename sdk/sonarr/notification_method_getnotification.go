@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetNotificationOperationResponse is the result of GetNotification.
-type GetNotificationOperationResponse struct {
+// GetNotificationResponse is the result of GetNotification.
+type GetNotificationResponse struct {
 	HttpResponse *http.Response
-	Model        []NotificationResource
+	Answer       []NotificationResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetNotificationResponse) Answered() bool { return r.Answer != nil }
+
 // GetNotification calls GET /api/v3/notification.
-func (c Client) GetNotification(ctx context.Context) (result GetNotificationOperationResponse, err error) {
+func (c Client) GetNotification(ctx context.Context) (result GetNotificationResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetNotification",
 		Path:       "/api/v3/notification",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetNotification(ctx context.Context) (result GetNotificationOper
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

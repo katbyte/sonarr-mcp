@@ -311,16 +311,6 @@ func WaitHTTP(url string) error {
 	return last
 }
 
-// Answered is the record a call answered with. A call that worked always carries one, so an answer without it is a fault in the client and stops the
-// run, rather than let a suite go on with an empty record and write that back.
-func Answered[T any](record *T) T {
-	if record == nil {
-		panic("the call answered with no record")
-	}
-
-	return *record
-}
-
 // StartContainer starts the container .scripts/testenv.sh created, now that
 // the proxy and the fakes are listening, and proves from inside it that
 // Sonarr can reach each of them. One it cannot reach fails every lookup,

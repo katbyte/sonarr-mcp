@@ -4,40 +4,45 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetQueueDetailsOperationResponse is the result of GetQueueDetails.
-type GetQueueDetailsOperationResponse struct {
+// GetQueueDetailsResponse is the result of GetQueueDetails.
+type GetQueueDetailsResponse struct {
 	HttpResponse *http.Response
-	Model        []QueueResource
+	Answer       []QueueResource
 }
 
-// GetQueueDetailsOperationOptions holds the query and header parameters of GetQueueDetails.
-type GetQueueDetailsOperationOptions struct {
-	SeriesId       *int
-	EpisodeIds     []int
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetQueueDetailsResponse) Answered() bool { return r.Answer != nil }
+
+// GetQueueDetailsOptions holds the query and header parameters of GetQueueDetails.
+type GetQueueDetailsOptions struct {
+	SeriesId       SeriesID
+	EpisodeIds     []EpisodeID
 	IncludeSeries  *bool
 	IncludeEpisode *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetQueueDetailsOperationOptions) ToHeaders() *client.Headers {
+func (o GetQueueDetailsOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetQueueDetailsOperationOptions) ToQuery() *client.QueryParams {
+func (o GetQueueDetailsOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
-	if o.SeriesId != nil {
-		out.Append("seriesId", strconv.Itoa(*o.SeriesId))
+	if o.SeriesId != 0 {
+		out.Append("seriesId", strconv.Itoa(int(o.SeriesId)))
 	}
 	for _, v := range o.EpisodeIds {
-		out.Append("episodeIds", strconv.Itoa(v))
+		out.Append("episodeIds", strconv.Itoa(int(v)))
 	}
 	if o.IncludeSeries != nil {
 		out.Append("includeSeries", strconv.FormatBool(*o.IncludeSeries))
@@ -49,13 +54,23 @@ func (o GetQueueDetailsOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetQueueDetails calls GET /api/v3/queue/details.
-func (c Client) GetQueueDetails(ctx context.Context, options GetQueueDetailsOperationOptions) (result GetQueueDetailsOperationResponse, err error) {
+func (c Client) GetQueueDetails(ctx context.Context, options ...GetQueueDetailsOptions) (result GetQueueDetailsResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetQueueDetails takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetQueueDetailsOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetQueueDetails",
+		OptionsObject: option,
 		Path:          "/api/v3/queue/details",
 	}
 
@@ -73,7 +88,7 @@ func (c Client) GetQueueDetails(ctx context.Context, options GetQueueDetailsOper
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

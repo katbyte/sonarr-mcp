@@ -4,30 +4,31 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostImportListTestOperationResponse is the result of PostImportListTest.
-type PostImportListTestOperationResponse struct {
+// PostImportListTestResponse is the result of PostImportListTest.
+type PostImportListTestResponse struct {
 	HttpResponse *http.Response
 }
 
-// PostImportListTestOperationOptions holds the query and header parameters of PostImportListTest.
-type PostImportListTestOperationOptions struct {
+// PostImportListTestOptions holds the query and header parameters of PostImportListTest.
+type PostImportListTestOptions struct {
 	ForceTest *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o PostImportListTestOperationOptions) ToHeaders() *client.Headers {
+func (o PostImportListTestOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o PostImportListTestOperationOptions) ToQuery() *client.QueryParams {
+func (o PostImportListTestOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.ForceTest != nil {
 		out.Append("forceTest", strconv.FormatBool(*o.ForceTest))
@@ -36,14 +37,24 @@ func (o PostImportListTestOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // PostImportListTest calls POST /api/v3/importlist/test.
-func (c Client) PostImportListTest(ctx context.Context, input ImportListResource, options PostImportListTestOperationOptions) (result PostImportListTestOperationResponse, err error) {
+func (c Client) PostImportListTest(ctx context.Context, input ImportListResource, options ...PostImportListTestOptions) (result PostImportListTestResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("PostImportListTest takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option PostImportListTestOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodPost,
-		OptionsObject: options,
+		Operation:     "PostImportListTest",
+		OptionsObject: option,
 		Path:          "/api/v3/importlist/test",
 	}
 

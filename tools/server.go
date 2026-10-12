@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -53,12 +54,12 @@ func registerServerTools(r *registry) {
 			return nil, serverInfoOut{}, err
 		}
 
-		s := st.Model
+		s := st.Answer
 		out := serverInfoOut{
 			InstanceName:    s.InstanceName,
 			Version:         s.Version,
 			OperatingSystem: strings.TrimSpace(s.OsName + " " + s.OsVersion),
-			Docker:          boolv(s.IsDocker),
+			Docker:          s.IsDocker,
 			Branch:          s.Branch,
 			StartTime:       s.StartTime,
 			URLBase:         s.UrlBase,
@@ -66,7 +67,7 @@ func registerServerTools(r *registry) {
 			Series:          len(series),
 			SonarrMCP:       version.Version,
 		}
-		for _, h := range health.Model {
+		for _, h := range health.Answer {
 			switch h.Type {
 			case sonarr.HealthCheckResultError:
 				out.HealthErrors++
@@ -97,7 +98,7 @@ func registerServerTools(r *registry) {
 			return nil, healthOut{}, err
 		}
 		out := healthOut{}
-		for _, h := range health.Model {
+		for _, h := range health.Answer {
 			row := healthRow{Level: string(h.Type), Source: h.Source, Message: h.Message, WikiURL: h.WikiUrl}
 			out.Checks = append(out.Checks, row)
 		}
@@ -126,8 +127,8 @@ func registerServerTools(r *registry) {
 		if err != nil {
 			return nil, tasksOut{}, err
 		}
-		rows := make([]taskRow, 0, len(res.Model))
-		for _, t := range res.Model {
+		rows := make([]taskRow, 0, len(res.Answer))
+		for _, t := range res.Answer {
 			rows = append(rows, taskRow{
 				Name: t.Name, Command: t.TaskName, IntervalMinutes: t.Interval,
 				LastExecution: t.LastExecution, LastDuration: t.LastDuration, NextExecution: t.NextExecution,
@@ -154,10 +155,16 @@ func registerServerTools(r *registry) {
 		}
 		want := strings.ToLower(strings.ReplaceAll(in.Task, " ", ""))
 		var known []string
-		for _, t := range res.Model {
+		for _, t := range res.Answer {
 			known = append(known, t.TaskName)
 			if strings.EqualFold(t.TaskName, want) || strings.EqualFold(strings.ReplaceAll(t.Name, " ", ""), want) {
-				out, err := r.runCommand(ctx, t.TaskName, nil, waitFor(in.Wait))
+				// a task is queued by the name Sonarr lists it under, which no method knows ahead of time
+				body, err := json.Marshal(map[string]string{"name": t.TaskName})
+				if err != nil {
+					return nil, commandOut{}, err
+				}
+				sent, err := client.PostCommand(ctx, body)
+				out, err := r.settleCommand(ctx, t.TaskName, waitFor(in.Wait), sent, err)
 				return nil, out, err
 			}
 		}
@@ -167,7 +174,7 @@ func registerServerTools(r *registry) {
 	})
 
 	type commandsIn struct {
-		CommandID int `json:"command_id,omitempty" jsonschema:"only this command, by the command_id a tool that started it answered: how a search, refresh or rename still running when its wait ended is followed"`
+		CommandID sonarr.CommandID `json:"command_id,omitempty" jsonschema:"only this command, by the command_id a tool that started it answered: how a search, refresh or rename still running when its wait ended is followed"`
 		pageIn
 	}
 	type commandsOut struct {
@@ -186,7 +193,7 @@ func registerServerTools(r *registry) {
 			case err != nil:
 				return nil, commandsOut{}, err
 			}
-			return nil, commandsOut{Total: 1, Commands: []commandOut{projectCommand(one.Model)}}, nil
+			return nil, commandsOut{Total: 1, Commands: []commandOut{projectCommand(one.Answer)}}, nil
 		}
 
 		res, err := client.GetCommand(ctx)
@@ -196,16 +203,16 @@ func registerServerTools(r *registry) {
 		// Sonarr answers oldest first, and a busy one has run hundreds in the
 		// minutes it remembers: what is running or waiting comes first, then
 		// what finished, newest first, so the first page is the one wanted
-		slices.SortStableFunc(res.Model, func(a, b sonarr.CommandResource) int {
+		slices.SortStableFunc(res.Answer, func(a, b sonarr.CommandResource) int {
 			if doneA, doneB := commandDone(a.Status), commandDone(b.Status); doneA != doneB {
 				if doneB {
 					return -1
 				}
 				return 1
 			}
-			return b.Id - a.Id
+			return cmp.Compare(b.Id, a.Id)
 		})
-		commands, paged := pageRows(res.Model, in.pageIn)
+		commands, paged := pageRows(res.Answer, in.pageIn)
 		out := commandsOut{pageOut: paged, Commands: make([]commandOut, 0, len(commands))}
 		for i := range commands {
 			out.Commands = append(out.Commands, projectCommand(&commands[i]))
@@ -243,12 +250,12 @@ func registerServerTools(r *registry) {
 		// Sonarr pages its log table itself, and total is the entries at this
 		// level and above in it
 		records, paged, err := window(in.pageIn, func(page, size int) ([]sonarr.LogResource, int, error) {
-			res, err := client.GetLog(ctx, sonarr.GetLogOperationOptions{Page: new(page), PageSize: new(size), SortKey: "time", SortDirection: sonarr.SortDirectionDescending, Level: level})
+			res, err := client.GetLog(ctx, sonarr.GetLogOptions{Page: new(page), PageSize: new(size), SortKey: "time", SortDirection: sonarr.SortDirectionDescending, Level: level})
 			if err != nil {
 				return nil, 0, err
 			}
 
-			return res.Model.Records, res.Model.TotalRecords, nil
+			return res.Answer.Records, res.Answer.TotalRecords, nil
 		})
 		if err != nil {
 			return nil, logOut{}, err

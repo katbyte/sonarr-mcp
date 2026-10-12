@@ -4,35 +4,40 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetRenameOperationResponse is the result of GetRename.
-type GetRenameOperationResponse struct {
+// GetRenameResponse is the result of GetRename.
+type GetRenameResponse struct {
 	HttpResponse *http.Response
-	Model        []RenameEpisodeResource
+	Answer       []RenameEpisodeResource
 }
 
-// GetRenameOperationOptions holds the query and header parameters of GetRename.
-type GetRenameOperationOptions struct {
-	SeriesId     *int
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetRenameResponse) Answered() bool { return r.Answer != nil }
+
+// GetRenameOptions holds the query and header parameters of GetRename.
+type GetRenameOptions struct {
+	SeriesId     SeriesID
 	SeasonNumber *int
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetRenameOperationOptions) ToHeaders() *client.Headers {
+func (o GetRenameOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetRenameOperationOptions) ToQuery() *client.QueryParams {
+func (o GetRenameOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
-	if o.SeriesId != nil {
-		out.Append("seriesId", strconv.Itoa(*o.SeriesId))
+	if o.SeriesId != 0 {
+		out.Append("seriesId", strconv.Itoa(int(o.SeriesId)))
 	}
 	if o.SeasonNumber != nil {
 		out.Append("seasonNumber", strconv.Itoa(*o.SeasonNumber))
@@ -41,13 +46,23 @@ func (o GetRenameOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetRename calls GET /api/v3/rename.
-func (c Client) GetRename(ctx context.Context, options GetRenameOperationOptions) (result GetRenameOperationResponse, err error) {
+func (c Client) GetRename(ctx context.Context, options ...GetRenameOptions) (result GetRenameResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetRename takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetRenameOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetRename",
+		OptionsObject: option,
 		Path:          "/api/v3/rename",
 	}
 
@@ -65,7 +80,7 @@ func (c Client) GetRename(ctx context.Context, options GetRenameOperationOptions
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

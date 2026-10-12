@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostHistoryFailedByIdOperationResponse is the result of PostHistoryFailedById.
-type PostHistoryFailedByIdOperationResponse struct {
+// PostHistoryFailedByIdResponse is the result of PostHistoryFailedById.
+type PostHistoryFailedByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostHistoryFailedById calls POST /api/v3/history/failed/{id}.
-func (c Client) PostHistoryFailedById(ctx context.Context, id int) (result PostHistoryFailedByIdOperationResponse, err error) {
+func (c Client) PostHistoryFailedById(ctx context.Context, id int) (result PostHistoryFailedByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostHistoryFailedById",
 		Path:       fmt.Sprintf("/api/v3/history/failed/%d", id),
 	}
 

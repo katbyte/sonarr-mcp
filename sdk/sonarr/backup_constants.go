@@ -2,6 +2,8 @@
 
 package sonarr
 
+import "slices"
+
 // BackupType is the "BackupType" enum.
 type BackupType string
 
@@ -19,4 +21,9 @@ func PossibleValuesForBackupType() []string {
 		string(BackupTypeManual),
 		string(BackupTypeUpdate),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v BackupType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForBackupType(), string(v))
 }

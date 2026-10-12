@@ -9,12 +9,12 @@ type EpisodeResource struct {
 	AirDateUtc                 string               `json:"airDateUtc,omitempty"`
 	EndTime                    string               `json:"endTime,omitempty"`
 	EpisodeFile                *EpisodeFileResource `json:"episodeFile,omitempty"`
-	EpisodeFileId              int                  `json:"episodeFileId,omitempty"`
+	EpisodeFileId              EpisodeFileID        `json:"episodeFileId,omitempty"`
 	EpisodeNumber              int                  `json:"episodeNumber,omitempty"`
 	FinaleType                 string               `json:"finaleType,omitempty"`
 	GrabDate                   string               `json:"grabDate,omitempty"`
 	HasFile                    *bool                `json:"hasFile,omitempty"`
-	Id                         int                  `json:"id,omitempty"`
+	Id                         EpisodeID            `json:"id,omitempty"`
 	Images                     []MediaCover         `json:"images,omitzero"`
 	LastSearchTime             string               `json:"lastSearchTime,omitempty"`
 	Monitored                  *bool                `json:"monitored,omitempty"`
@@ -25,7 +25,7 @@ type EpisodeResource struct {
 	SceneSeasonNumber          int                  `json:"sceneSeasonNumber,omitempty"`
 	SeasonNumber               int                  `json:"seasonNumber,omitempty"`
 	Series                     *SeriesResource      `json:"series,omitempty"`
-	SeriesId                   int                  `json:"seriesId,omitempty"`
+	SeriesId                   SeriesID             `json:"seriesId,omitempty"`
 	Title                      string               `json:"title,omitempty"`
 	TvdbId                     int                  `json:"tvdbId,omitempty"`
 	UnverifiedSceneNumbering   *bool                `json:"unverifiedSceneNumbering,omitempty"`

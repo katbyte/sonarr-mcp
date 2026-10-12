@@ -522,6 +522,9 @@ var notWrapped = map[string]string{
 	"GetWantedCutoff": "audit_cutoff_unmet reads the episodes and files themselves", "GetWantedCutoffById": "audit_cutoff_unmet", "GetWantedMissing": "audit_missing_episodes", "GetWantedMissingById": "audit_missing_episodes",
 	"GetImportListExclusion": "exclusion_list reads the paged form", "GetImportListExclusionPaged": "exclusion_list reads the paged form by another name",
 	"GetHistoryComplete": "history_list pages", "GetHistorySeries": "history_list takes a series", "GetLogComplete": "log_list pages", "GetQueue": "queue_list reads the paged form with details", "GetQueueStatus": "queue_list counts",
+	// a list read whole has no use for the form that stops part way, and the log is read a page at a time
+	"GetBlocklistEach": "blocklist_list reads the whole list", "GetImportListExclusionPagedEach": "exclusion_list reads the whole list", "GetQueueEach": "queue_list reads the whole queue",
+	"GetWantedMissingEach": "audit_missing_episodes reads the whole list", "GetWantedCutoffEach": "audit_cutoff_unmet reads the whole list", "GetLogEach": "log_list reads the pages it was asked for",
 	"GetBlocklist": "blocklist_list reads the paged form by another name", "GetFileSystemType": "filesystem_list says what each entry is",
 	// what the server answers about itself that a tool has no use for
 	"GetApi": "server_info reads the status", "GetPing": "server_info reads the status", "GetIndexerFlag": "a fixed list of flag names a release carries", "GetQualityDefinitionLimits": "the bounds a size may be set within; Sonarr refuses one outside them",
@@ -546,7 +549,13 @@ var notWrapped = map[string]string{
 	// for other programs, not a caller
 	"PostReleasePush": "an indexer pushes a release to Sonarr; a caller grabs one with release_grab", "PostManualImport": "import_apply sends the files to the import command, which reprocesses them itself",
 	"PostSystemBackupRestoreUpload": "backup_restore restores one Sonarr holds; a model has no file to hand over",
+	// a command and the wait for it in one call
+	"BackupAndWait": waitsItself, "CutoffUnmetEpisodeSearchAndWait": waitsItself, "EpisodeSearchAndWait": waitsItself, "ManualImportAndWait": waitsItself, "MissingEpisodeSearchAndWait": waitsItself, "RefreshMonitoredDownloadsAndWait": waitsItself,
+	"RefreshSeriesAndWait": waitsItself, "RenameFilesAndWait": waitsItself, "RescanSeriesAndWait": waitsItself, "SeasonSearchAndWait": waitsItself, "SeriesSearchAndWait": waitsItself,
 }
+
+// waitsItself is why no tool calls a command's AndWait form: a command still running when the wait ends is an answer for a tool, and an error from AndWait.
+const waitsItself = "the tool queues the command with its own method and waits itself, so one still running when the wait ends is answered as it stands"
 
 // Every operation the Go client has is called by a tool, or is in
 // notWrapped with the reason; and nothing in notWrapped is called by a tool
@@ -573,9 +582,6 @@ func TestEveryOperationHasAToolOrAReason(t *testing.T) {
 	client := reflect.TypeFor[sonarr.Client]()
 	for method := range client.Methods() {
 		name := method.Name
-		if !strings.HasPrefix(name, "Get") && !strings.HasPrefix(name, "Post") && !strings.HasPrefix(name, "Put") && !strings.HasPrefix(name, "Delete") {
-			continue
-		}
 		called := strings.Contains(source.String(), "."+name+"(")
 		_, excused := notWrapped[name]
 		switch {

@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetCustomFormatOperationResponse is the result of GetCustomFormat.
-type GetCustomFormatOperationResponse struct {
+// GetCustomFormatResponse is the result of GetCustomFormat.
+type GetCustomFormatResponse struct {
 	HttpResponse *http.Response
-	Model        []CustomFormatResource
+	Answer       []CustomFormatResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetCustomFormatResponse) Answered() bool { return r.Answer != nil }
+
 // GetCustomFormat calls GET /api/v3/customformat.
-func (c Client) GetCustomFormat(ctx context.Context) (result GetCustomFormatOperationResponse, err error) {
+func (c Client) GetCustomFormat(ctx context.Context) (result GetCustomFormatResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetCustomFormat",
 		Path:       "/api/v3/customformat",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetCustomFormat(ctx context.Context) (result GetCustomFormatOper
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

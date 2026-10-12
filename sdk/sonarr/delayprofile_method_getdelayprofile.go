@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetDelayProfileOperationResponse is the result of GetDelayProfile.
-type GetDelayProfileOperationResponse struct {
+// GetDelayProfileResponse is the result of GetDelayProfile.
+type GetDelayProfileResponse struct {
 	HttpResponse *http.Response
-	Model        []DelayProfileResource
+	Answer       []DelayProfileResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetDelayProfileResponse) Answered() bool { return r.Answer != nil }
+
 // GetDelayProfile calls GET /api/v3/delayprofile.
-func (c Client) GetDelayProfile(ctx context.Context) (result GetDelayProfileOperationResponse, err error) {
+func (c Client) GetDelayProfile(ctx context.Context) (result GetDelayProfileResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetDelayProfile",
 		Path:       "/api/v3/delayprofile",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetDelayProfile(ctx context.Context) (result GetDelayProfileOper
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
@@ -14,15 +13,15 @@ import (
 
 // profileRow is a quality profile, as a person reads its settings page.
 type profileRow struct {
-	ID                int            `json:"id"`
-	Name              string         `json:"name"`
-	UpgradeAllowed    bool           `json:"upgrade_allowed"`
-	Cutoff            string         `json:"cutoff"                     jsonschema:"the quality Sonarr stops upgrading at"`
-	Allowed           []string       `json:"allowed_qualities"          jsonschema:"the qualities it will grab, best first"`
-	MinFormatScore    int            `json:"min_custom_format_score"`
-	CutoffFormatScore int            `json:"cutoff_custom_format_score"`
-	FormatScores      map[string]int `json:"custom_format_scores"       jsonschema:"the custom formats the profile scores, with their scores; formats scored 0 are left out"`
-	Series            int            `json:"series"                     jsonschema:"series on this profile"`
+	ID                sonarr.QualityProfileID `json:"id"`
+	Name              string                  `json:"name"`
+	UpgradeAllowed    bool                    `json:"upgrade_allowed"`
+	Cutoff            string                  `json:"cutoff"                     jsonschema:"the quality Sonarr stops upgrading at"`
+	Allowed           []string                `json:"allowed_qualities"          jsonschema:"the qualities it will grab, best first"`
+	MinFormatScore    int                     `json:"min_custom_format_score"`
+	CutoffFormatScore int                     `json:"cutoff_custom_format_score"`
+	FormatScores      map[string]int          `json:"custom_format_scores"       jsonschema:"the custom formats the profile scores, with their scores; formats scored 0 are left out"`
+	Series            int                     `json:"series"                     jsonschema:"series on this profile"`
 }
 
 // allowedQualities flattens a profile's items, best first as Sonarr orders
@@ -79,17 +78,17 @@ func projectProfile(p *sonarr.QualityProfileResource, series int) profileRow {
 
 // tagRow is a tag and everything that uses it.
 type tagRow struct {
-	ID              int      `json:"id"`
-	Label           string   `json:"label"`
-	Series          []string `json:"series"           jsonschema:"the series with the tag"`
-	Indexers        int      `json:"indexers"`
-	DownloadClients int      `json:"download_clients"`
-	DelayProfiles   int      `json:"delay_profiles"`
-	ReleaseProfiles int      `json:"release_profiles"`
-	ImportLists     int      `json:"import_lists"`
-	Notifications   int      `json:"notifications"`
-	AutoTags        int      `json:"auto_tags"`
-	InUse           bool     `json:"in_use"`
+	ID              sonarr.TagID `json:"id"`
+	Label           string       `json:"label"`
+	Series          []string     `json:"series"           jsonschema:"the series with the tag"`
+	Indexers        int          `json:"indexers"`
+	DownloadClients int          `json:"download_clients"`
+	DelayProfiles   int          `json:"delay_profiles"`
+	ReleaseProfiles int          `json:"release_profiles"`
+	ImportLists     int          `json:"import_lists"`
+	Notifications   int          `json:"notifications"`
+	AutoTags        int          `json:"auto_tags"`
+	InUse           bool         `json:"in_use"`
 }
 
 // rootFolderRow is a root folder and what is in it.
@@ -129,11 +128,11 @@ func registerConfigTools(r *registry) {
 		if err != nil {
 			return nil, profilesOut{}, err
 		}
-		counts := map[int]int{}
+		counts := map[sonarr.QualityProfileID]int{}
 		for i := range series {
 			counts[series[i].QualityProfileId]++
 		}
-		profiles, paged := pageRows(res.Model, in)
+		profiles, paged := pageRows(res.Answer, in)
 		out := profilesOut{pageOut: paged, Profiles: make([]profileRow, 0, len(profiles))}
 		for i := range profiles {
 			out.Profiles = append(out.Profiles, projectProfile(&profiles[i], counts[profiles[i].Id]))
@@ -158,12 +157,12 @@ func registerConfigTools(r *registry) {
 		if err != nil {
 			return nil, tagsOut{}, err
 		}
-		titles := map[int]string{}
+		titles := map[sonarr.SeriesID]string{}
 		for i := range series {
 			titles[series[i].Id] = series[i].Title
 		}
-		rows := make([]tagRow, 0, len(details.Model))
-		for _, d := range details.Model {
+		rows := make([]tagRow, 0, len(details.Answer))
+		for _, d := range details.Answer {
 			row := tagRow{
 				ID: d.Id, Label: d.Label, Indexers: len(d.IndexerIds), DownloadClients: len(d.DownloadClientIds),
 				DelayProfiles: len(d.DelayProfileIds), ReleaseProfiles: len(d.RestrictionIds), ImportLists: len(d.ImportListIds),
@@ -187,8 +186,8 @@ func registerConfigTools(r *registry) {
 		Label string `json:"label"`
 	}
 	type tagOut struct {
-		ID    int    `json:"id"`
-		Label string `json:"label"`
+		ID    sonarr.TagID `json:"id"`
+		Label string       `json:"label"`
 	}
 	add(r, writeTool, &mcp.Tool{
 		Name:        "tag_create",
@@ -208,7 +207,7 @@ func registerConfigTools(r *registry) {
 		if err != nil {
 			return nil, tagOut{}, err
 		}
-		for _, t := range existing.Model {
+		for _, t := range existing.Answer {
 			if strings.EqualFold(t.Label, label) {
 				return nil, tagOut{}, fmt.Errorf("tag %q already exists (id %d)", t.Label, t.Id)
 			}
@@ -218,7 +217,7 @@ func registerConfigTools(r *registry) {
 			return nil, tagOut{}, err
 		}
 
-		return nil, tagOut{ID: res.Model.Id, Label: res.Model.Label}, nil
+		return nil, tagOut{ID: res.Answer.Id, Label: res.Answer.Label}, nil
 	})
 
 	type tagRenameIn struct {
@@ -226,9 +225,9 @@ func registerConfigTools(r *registry) {
 		NewLabel string `json:"new_label" jsonschema:"what to call it; Sonarr stores labels in lower case"`
 	}
 	type tagRenameOut struct {
-		ID    int    `json:"id"`
-		Label string `json:"label"`
-		Was   string `json:"was"`
+		ID    sonarr.TagID `json:"id"`
+		Label string       `json:"label"`
+		Was   string       `json:"was"`
 	}
 	add(r, writeTool, &mcp.Tool{
 		Name:        "tag_rename",
@@ -249,12 +248,12 @@ func registerConfigTools(r *registry) {
 		if len(ids) != 1 {
 			return nil, tagRenameOut{}, errors.New("label is required")
 		}
-		res, err := client.PutTagById(ctx, strconv.Itoa(ids[0]), sonarr.TagResource{Id: ids[0], Label: label})
+		res, err := client.PutTagById(ctx, ids[0], sonarr.TagResource{Id: ids[0], Label: label})
 		if err != nil {
 			return nil, tagRenameOut{}, err
 		}
 
-		return nil, tagRenameOut{ID: res.Model.Id, Label: res.Model.Label, Was: strings.ToLower(strings.TrimSpace(in.Label))}, nil
+		return nil, tagRenameOut{ID: res.Answer.Id, Label: res.Answer.Label, Was: strings.ToLower(strings.TrimSpace(in.Label))}, nil
 	})
 
 	type tagDeleteIn struct {
@@ -309,7 +308,7 @@ func registerConfigTools(r *registry) {
 		if err != nil {
 			return nil, formatsOut{}, err
 		}
-		listed, paged := pageRows(formats.Model, in)
+		listed, paged := pageRows(formats.Answer, in)
 		out := formatsOut{pageOut: paged, Formats: make([]formatRow, 0, len(listed))}
 		for _, f := range listed {
 			row := formatRow{ID: f.Id, Name: f.Name, Scores: map[string]int{}}
@@ -323,7 +322,7 @@ func registerConfigTools(r *registry) {
 				}
 				row.Specifications = append(row.Specifications, desc)
 			}
-			for _, p := range profiles.Model {
+			for _, p := range profiles.Answer {
 				for _, item := range p.FormatItems {
 					if item.Format == f.Id && item.Score != 0 {
 						row.Scores[p.Name] = item.Score
@@ -352,7 +351,7 @@ func registerConfigTools(r *registry) {
 		if err != nil {
 			return nil, foldersOut{}, err
 		}
-		folders, paged := pageRows(res.Model, in)
+		folders, paged := pageRows(res.Answer, in)
 		out := foldersOut{pageOut: paged, RootFolders: make([]rootFolderRow, 0, len(folders))}
 		for _, f := range folders {
 			out.RootFolders = append(out.RootFolders, projectRootFolder(&f, series))
@@ -383,7 +382,7 @@ func registerConfigTools(r *registry) {
 			return nil, folderOut{}, err
 		}
 
-		return nil, folderOut{RootFolder: projectRootFolder(res.Model, series)}, nil
+		return nil, folderOut{RootFolder: projectRootFolder(res.Answer, series)}, nil
 	})
 
 	type removeOut struct {

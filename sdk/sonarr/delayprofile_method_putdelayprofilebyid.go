@@ -4,28 +4,51 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutDelayProfileByIdOperationResponse is the result of PutDelayProfileById.
-type PutDelayProfileByIdOperationResponse struct {
+// PutDelayProfileByIdResponse is the result of PutDelayProfileById.
+//
+// Answer is the DelayProfileResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutDelayProfileByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *DelayProfileResource
+	Answer       *DelayProfileResource
+	*DelayProfileResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutDelayProfileByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the DelayProfileResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutDelayProfileByIdResponse) Record() (DelayProfileResource, error) {
+	if r.Answer == nil {
+		return DelayProfileResource{}, errors.New("PutDelayProfileById answered no DelayProfileResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PutDelayProfileById calls PUT /api/v3/delayprofile/{id}.
-func (c Client) PutDelayProfileById(ctx context.Context, id string, input DelayProfileResource) (result PutDelayProfileByIdOperationResponse, err error) {
+func (c Client) PutDelayProfileById(ctx context.Context, id int, input DelayProfileResource) (result PutDelayProfileByIdResponse, err error) {
+	result.DelayProfileResource = &DelayProfileResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
-		Path:       fmt.Sprintf("/api/v3/delayprofile/%s", url.PathEscape(id)),
+		Operation:  "PutDelayProfileById",
+		Path:       fmt.Sprintf("/api/v3/delayprofile/%d", id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -46,11 +69,12 @@ func (c Client) PutDelayProfileById(ctx context.Context, id string, input DelayP
 		return
 	}
 
-	var model DelayProfileResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer DelayProfileResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.DelayProfileResource = result.Answer
 
 	return
 }

@@ -11,19 +11,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostDownloadClientActionByNameOperationResponse is the result of PostDownloadClientActionByName.
-type PostDownloadClientActionByNameOperationResponse struct {
+// PostDownloadClientActionByNameResponse is the result of PostDownloadClientActionByName.
+type PostDownloadClientActionByNameResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostDownloadClientActionByName calls POST /api/v3/downloadclient/action/{name}.
-func (c Client) PostDownloadClientActionByName(ctx context.Context, name string, input DownloadClientResource) (result PostDownloadClientActionByNameOperationResponse, err error) {
+func (c Client) PostDownloadClientActionByName(ctx context.Context, name string, input DownloadClientResource) (result PostDownloadClientActionByNameResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostDownloadClientActionByName",
 		Path:       fmt.Sprintf("/api/v3/downloadclient/action/%s", url.PathEscape(name)),
 	}
 

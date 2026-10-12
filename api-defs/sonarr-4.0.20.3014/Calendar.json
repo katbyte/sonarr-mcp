@@ -60,8 +60,13 @@
           "Field": "Tags",
           "In": "Query",
           "Type": {
-            "Type": "String"
-          }
+            "Type": "List",
+            "NestedItem": {
+              "Type": "ID",
+              "ReferenceName": "TagID"
+            }
+          },
+          "CommaSeparated": true
         }
       ],
       "Response": {
@@ -87,7 +92,8 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeID"
           }
         }
       ],

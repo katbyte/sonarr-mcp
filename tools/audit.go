@@ -30,12 +30,12 @@ type auditIn struct {
 
 // finding is one row of an audit's worklist.
 type finding struct {
-	Series   string `json:"series,omitempty"`
-	SeriesID int    `json:"series_id,omitempty"`
-	Subject  string `json:"subject,omitempty"   jsonschema:"what the finding is about: an episode, a file, a folder, a download, a setting"`
-	Problem  string `json:"problem"             jsonschema:"the kind of problem, a short fixed phrase an audit's findings can be grouped by"`
-	Detail   string `json:"detail"`
-	Fix      string `json:"fix,omitempty"       jsonschema:"how to fix it, naming the tool"`
+	Series   string          `json:"series,omitempty"`
+	SeriesID sonarr.SeriesID `json:"series_id,omitempty"`
+	Subject  string          `json:"subject,omitempty"   jsonschema:"what the finding is about: an episode, a file, a folder, a download, a setting"`
+	Problem  string          `json:"problem"             jsonschema:"the kind of problem, a short fixed phrase an audit's findings can be grouped by"`
+	Detail   string          `json:"detail"`
+	Fix      string          `json:"fix,omitempty"       jsonschema:"how to fix it, naming the tool"`
 }
 
 // auditOut is what most audits answer.
@@ -64,9 +64,9 @@ type snapshot struct {
 	named bool
 
 	mu          sync.Mutex
-	files       map[int][]sonarr.EpisodeFileResource
-	episodes    map[int][]sonarr.EpisodeResource
-	disk        map[int][]string
+	files       map[sonarr.SeriesID][]sonarr.EpisodeFileResource
+	episodes    map[sonarr.SeriesID][]sonarr.EpisodeResource
+	disk        map[sonarr.SeriesID][]string
 	folders     map[string]map[string]string
 	folderState *folders
 	profiles    []sonarr.QualityProfileResource
@@ -75,7 +75,7 @@ type snapshot struct {
 // snap reads the series an audit covers: one, when named, or every one.
 func (r *registry) snap(ctx context.Context, series string) (*snapshot, error) {
 	s := &snapshot{
-		r: r, files: map[int][]sonarr.EpisodeFileResource{}, episodes: map[int][]sonarr.EpisodeResource{}, disk: map[int][]string{},
+		r: r, files: map[sonarr.SeriesID][]sonarr.EpisodeFileResource{}, episodes: map[sonarr.SeriesID][]sonarr.EpisodeResource{}, disk: map[sonarr.SeriesID][]string{},
 		folders: map[string]map[string]string{},
 	}
 	if series != "" {
@@ -97,7 +97,7 @@ func (r *registry) snap(ctx context.Context, series string) (*snapshot, error) {
 
 // only is the id of the one series the audit was asked about, or 0 when it
 // covers the whole library.
-func (s *snapshot) only() int {
+func (s *snapshot) only() sonarr.SeriesID {
 	if s.named {
 		return s.series[0].Id
 	}
@@ -106,7 +106,7 @@ func (s *snapshot) only() int {
 }
 
 // covers reports whether a series is in the snapshot.
-func (s *snapshot) covers(seriesID int) bool {
+func (s *snapshot) covers(seriesID sonarr.SeriesID) bool {
 	return slices.ContainsFunc(s.series, func(x sonarr.SeriesResource) bool { return x.Id == seriesID })
 }
 
@@ -160,7 +160,7 @@ func (s *snapshot) warm(ctx context.Context, what reads) error {
 
 // filesOf are the files Sonarr records for a series, read once. The lock is
 // not held while Sonarr is asked, so several series are read side by side.
-func (s *snapshot) filesOf(ctx context.Context, seriesID int) ([]sonarr.EpisodeFileResource, error) {
+func (s *snapshot) filesOf(ctx context.Context, seriesID sonarr.SeriesID) ([]sonarr.EpisodeFileResource, error) {
 	s.mu.Lock()
 	f, ok := s.files[seriesID]
 	s.mu.Unlock()
@@ -168,18 +168,18 @@ func (s *snapshot) filesOf(ctx context.Context, seriesID int) ([]sonarr.EpisodeF
 		return f, nil
 	}
 
-	res, err := s.r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: new(seriesID)})
+	res, err := s.r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOptions{SeriesId: seriesID})
 	if err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
-	s.files[seriesID] = res.Model
+	s.files[seriesID] = res.Answer
 	s.mu.Unlock()
 
-	return res.Model, nil
+	return res.Answer, nil
 }
 
-func (s *snapshot) episodesOf(ctx context.Context, seriesID int) ([]sonarr.EpisodeResource, error) {
+func (s *snapshot) episodesOf(ctx context.Context, seriesID sonarr.SeriesID) ([]sonarr.EpisodeResource, error) {
 	s.mu.Lock()
 	e, ok := s.episodes[seriesID]
 	s.mu.Unlock()
@@ -211,7 +211,7 @@ func (s *snapshot) foldersIn(ctx context.Context, parent string) (map[string]str
 	}
 	// Sonarr lists the contents of a path ending in a separator, and the
 	// parent's contents otherwise
-	res, err := s.r.client.GetFileSystem(ctx, sonarr.GetFileSystemOperationOptions{Path: parent + "/"})
+	res, err := s.r.client.GetFileSystem(ctx, sonarr.GetFileSystemOptions{Path: parent + "/"})
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +221,7 @@ func (s *snapshot) foldersIn(ctx context.Context, parent string) (map[string]str
 			Path string `json:"path"`
 		} `json:"directories"`
 	}
-	if err := unmarshalRaw(res.Model, &listing); err != nil {
+	if err := unmarshalRaw(res.Answer, &listing); err != nil {
 		return nil, fmt.Errorf("reading the folders in %s: %w", parent, err)
 	}
 	out := make(map[string]string, len(listing.Directories))
@@ -258,14 +258,14 @@ func (s *snapshot) diskOf(ctx context.Context, series *sonarr.SeriesResource) ([
 // the extras and specials folders it skips itself. A folder that is not
 // there has none.
 func (s *snapshot) videoFiles(ctx context.Context, folder string) ([]string, error) {
-	res, err := s.r.client.GetFileSystemMediaFiles(ctx, sonarr.GetFileSystemMediaFilesOperationOptions{Path: folder})
+	res, err := s.r.client.GetFileSystemMediaFiles(ctx, sonarr.GetFileSystemMediaFilesOptions{Path: folder})
 	if err != nil {
 		return nil, err
 	}
 	var files []struct {
 		Path string `json:"path"`
 	}
-	if err := unmarshalRaw(res.Model, &files); err != nil {
+	if err := unmarshalRaw(res.Answer, &files); err != nil {
 		return nil, fmt.Errorf("reading the files in %s: %w", folder, err)
 	}
 	var out []string
@@ -287,15 +287,15 @@ func (s *snapshot) qualityProfiles(ctx context.Context) ([]sonarr.QualityProfile
 		if err != nil {
 			return nil, err
 		}
-		s.profiles = res.Model
+		s.profiles = res.Answer
 	}
 
 	return s.profiles, nil
 }
 
 // episodeNumbers maps each file of a series to the episodes it holds.
-func episodeNumbers(eps []sonarr.EpisodeResource) map[int][]int {
-	out := map[int][]int{}
+func episodeNumbers(eps []sonarr.EpisodeResource) map[sonarr.EpisodeFileID][]int {
+	out := map[sonarr.EpisodeFileID][]int{}
 	for _, e := range eps {
 		if e.EpisodeFileId > 0 {
 			out[e.EpisodeFileId] = append(out[e.EpisodeFileId], e.EpisodeNumber)

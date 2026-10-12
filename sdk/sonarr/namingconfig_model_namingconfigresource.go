@@ -10,8 +10,8 @@ type NamingConfigResource struct {
 	DailyEpisodeFormat           string `json:"dailyEpisodeFormat"`
 	Id                           int    `json:"id"`
 	MultiEpisodeStyle            int    `json:"multiEpisodeStyle"`
-	RenameEpisodes               *bool  `json:"renameEpisodes,omitempty"`
-	ReplaceIllegalCharacters     *bool  `json:"replaceIllegalCharacters,omitempty"`
+	RenameEpisodes               bool   `json:"renameEpisodes"`
+	ReplaceIllegalCharacters     bool   `json:"replaceIllegalCharacters"`
 	SeasonFolderFormat           string `json:"seasonFolderFormat"`
 	SeriesFolderFormat           string `json:"seriesFolderFormat"`
 	SpecialsFolderFormat         string `json:"specialsFolderFormat"`

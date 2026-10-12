@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostAutoTaggingOperationResponse is the result of PostAutoTagging.
-type PostAutoTaggingOperationResponse struct {
+// PostAutoTaggingResponse is the result of PostAutoTagging.
+//
+// Answer is the AutoTaggingResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PostAutoTaggingResponse struct {
 	HttpResponse *http.Response
-	Model        *AutoTaggingResource
+	Answer       *AutoTaggingResource
+	*AutoTaggingResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostAutoTaggingResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the AutoTaggingResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PostAutoTaggingResponse) Record() (AutoTaggingResource, error) {
+	if r.Answer == nil {
+		return AutoTaggingResource{}, errors.New("PostAutoTagging answered no AutoTaggingResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PostAutoTagging calls POST /api/v3/autotagging.
-func (c Client) PostAutoTagging(ctx context.Context, input AutoTaggingResource) (result PostAutoTaggingOperationResponse, err error) {
+func (c Client) PostAutoTagging(ctx context.Context, input AutoTaggingResource) (result PostAutoTaggingResponse, err error) {
+	result.AutoTaggingResource = &AutoTaggingResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusCreated,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostAutoTagging",
 		Path:       "/api/v3/autotagging",
 	}
 
@@ -44,11 +68,12 @@ func (c Client) PostAutoTagging(ctx context.Context, input AutoTaggingResource) 
 		return
 	}
 
-	var model AutoTaggingResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer AutoTaggingResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.AutoTaggingResource = result.Answer
 
 	return
 }

@@ -2,6 +2,8 @@
 
 package sonarr
 
+import "slices"
+
 // ListSyncLevelType is the "ListSyncLevelType" enum.
 type ListSyncLevelType string
 
@@ -21,4 +23,9 @@ func PossibleValuesForListSyncLevelType() []string {
 		string(ListSyncLevelTypeKeepAndUnmonitor),
 		string(ListSyncLevelTypeKeepAndTag),
 	}
+}
+
+// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.
+func (v ListSyncLevelType) Known() bool {
+	return v == "" || slices.Contains(PossibleValuesForListSyncLevelType(), string(v))
 }

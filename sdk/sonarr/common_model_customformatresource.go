@@ -9,3 +9,9 @@ type CustomFormatResource struct {
 	Name                            string                            `json:"name,omitempty"`
 	Specifications                  []CustomFormatSpecificationSchema `json:"specifications,omitzero"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m CustomFormatResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m CustomFormatResource) GetId() int { return m.Id }

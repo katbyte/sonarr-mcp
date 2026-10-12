@@ -4,7 +4,6 @@ import (
 	"context"
 	"maps"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
@@ -39,26 +38,26 @@ func registerSettingsTools(r *registry) {
 		loses: "its settings and its API key or login, which Sonarr does not keep once it is gone",
 		list: func(ctx context.Context) ([]sonarr.IndexerResource, error) {
 			res, err := c.GetIndexer(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		kinds: func(ctx context.Context) ([]sonarr.IndexerResource, error) {
 			res, err := c.GetIndexerSchema(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.IndexerResource, force bool) (*sonarr.IndexerResource, error) {
-			res, err := c.PostIndexer(ctx, rec, sonarr.PostIndexerOperationOptions{ForceSave: new(force)})
-			return res.Model, err
+			res, err := c.PostIndexer(ctx, rec, sonarr.PostIndexerOptions{ForceSave: new(force)})
+			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.IndexerResource, force bool) (*sonarr.IndexerResource, error) {
-			res, err := c.PutIndexerById(ctx, id, rec, sonarr.PutIndexerByIdOperationOptions{ForceSave: new(force)})
-			return res.Model, err
+			res, err := c.PutIndexerById(ctx, id, rec, sonarr.PutIndexerByIdOptions{ForceSave: new(force)})
+			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
 			_, err := c.DeleteIndexerById(ctx, id)
 			return err
 		},
 		test: func(ctx context.Context, rec sonarr.IndexerResource) error {
-			_, err := c.PostIndexerTest(ctx, rec, sonarr.PostIndexerTestOperationOptions{ForceTest: new(true)})
+			_, err := c.PostIndexerTest(ctx, rec, sonarr.PostIndexerTestOptions{ForceTest: new(true)})
 			return err
 		},
 		// as Sonarr's own page does: used for whatever the kind supports
@@ -78,26 +77,26 @@ func registerSettingsTools(r *registry) {
 		loses: "its settings and its API key or login, which Sonarr does not keep once it is gone",
 		list: func(ctx context.Context) ([]sonarr.DownloadClientResource, error) {
 			res, err := c.GetDownloadClient(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		kinds: func(ctx context.Context) ([]sonarr.DownloadClientResource, error) {
 			res, err := c.GetDownloadClientSchema(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.DownloadClientResource, force bool) (*sonarr.DownloadClientResource, error) {
-			res, err := c.PostDownloadClient(ctx, rec, sonarr.PostDownloadClientOperationOptions{ForceSave: new(force)})
-			return res.Model, err
+			res, err := c.PostDownloadClient(ctx, rec, sonarr.PostDownloadClientOptions{ForceSave: new(force)})
+			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.DownloadClientResource, force bool) (*sonarr.DownloadClientResource, error) {
-			res, err := c.PutDownloadClientById(ctx, id, rec, sonarr.PutDownloadClientByIdOperationOptions{ForceSave: new(force)})
-			return res.Model, err
+			res, err := c.PutDownloadClientById(ctx, id, rec, sonarr.PutDownloadClientByIdOptions{ForceSave: new(force)})
+			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
 			_, err := c.DeleteDownloadClientById(ctx, id)
 			return err
 		},
 		test: func(ctx context.Context, rec sonarr.DownloadClientResource) error {
-			_, err := c.PostDownloadClientTest(ctx, rec, sonarr.PostDownloadClientTestOperationOptions{ForceTest: new(true)})
+			_, err := c.PostDownloadClientTest(ctx, rec, sonarr.PostDownloadClientTestOptions{ForceTest: new(true)})
 			return err
 		},
 		on:         switchedOn("enable"),
@@ -113,31 +112,31 @@ func registerSettingsTools(r *registry) {
 		loses: "its settings and its webhook address, token or login, which Sonarr does not keep once it is gone",
 		list: func(ctx context.Context) ([]sonarr.NotificationResource, error) {
 			res, err := c.GetNotification(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		kinds: func(ctx context.Context) ([]sonarr.NotificationResource, error) {
 			res, err := c.GetNotificationSchema(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.NotificationResource, force bool) (*sonarr.NotificationResource, error) {
-			res, err := c.PostNotification(ctx, rec, sonarr.PostNotificationOperationOptions{ForceSave: new(force)})
-			return res.Model, err
+			res, err := c.PostNotification(ctx, rec, sonarr.PostNotificationOptions{ForceSave: new(force)})
+			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.NotificationResource, force bool) (*sonarr.NotificationResource, error) {
-			res, err := c.PutNotificationById(ctx, id, rec, sonarr.PutNotificationByIdOperationOptions{ForceSave: new(force)})
-			return res.Model, err
+			res, err := c.PutNotificationById(ctx, id, rec, sonarr.PutNotificationByIdOptions{ForceSave: new(force)})
+			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
 			_, err := c.DeleteNotificationById(ctx, id)
 			return err
 		},
 		test: func(ctx context.Context, rec sonarr.NotificationResource) error {
-			_, err := c.PostNotificationTest(ctx, rec, sonarr.PostNotificationTestOperationOptions{ForceTest: new(true)})
+			_, err := c.PostNotificationTest(ctx, rec, sonarr.PostNotificationTestOptions{ForceTest: new(true)})
 			return err
 		},
 		testAll: func(ctx context.Context) ([]sonarr.ProviderTestAllResult, error) {
 			res, err := c.PostNotificationTestAll(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		// every event it is sent for
 		on: func(rec map[string]any) []string {
@@ -156,31 +155,31 @@ func registerSettingsTools(r *registry) {
 		loses: "its settings and its API key or login; the series it added stay in the library",
 		list: func(ctx context.Context) ([]sonarr.ImportListResource, error) {
 			res, err := c.GetImportList(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		kinds: func(ctx context.Context) ([]sonarr.ImportListResource, error) {
 			res, err := c.GetImportListSchema(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.ImportListResource, force bool) (*sonarr.ImportListResource, error) {
-			res, err := c.PostImportList(ctx, rec, sonarr.PostImportListOperationOptions{ForceSave: new(force)})
-			return res.Model, err
+			res, err := c.PostImportList(ctx, rec, sonarr.PostImportListOptions{ForceSave: new(force)})
+			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.ImportListResource, force bool) (*sonarr.ImportListResource, error) {
-			res, err := c.PutImportListById(ctx, id, rec, sonarr.PutImportListByIdOperationOptions{ForceSave: new(force)})
-			return res.Model, err
+			res, err := c.PutImportListById(ctx, id, rec, sonarr.PutImportListByIdOptions{ForceSave: new(force)})
+			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
 			_, err := c.DeleteImportListById(ctx, id)
 			return err
 		},
 		test: func(ctx context.Context, rec sonarr.ImportListResource) error {
-			_, err := c.PostImportListTest(ctx, rec, sonarr.PostImportListTestOperationOptions{ForceTest: new(true)})
+			_, err := c.PostImportListTest(ctx, rec, sonarr.PostImportListTestOptions{ForceTest: new(true)})
 			return err
 		},
 		testAll: func(ctx context.Context) ([]sonarr.ProviderTestAllResult, error) {
 			res, err := c.PostImportListTestAll(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		on:       switchedOn("enableAutomaticAdd"),
 		listSays: "The import lists: what adds series to Sonarr on its own - a Trakt or IMDb list, Plex watchlist, another Sonarr, Simkl, AniList - each with whether it adds automatically, the root folder, quality profile and monitoring its series get, its tags and its settings without credentials. exclusion_list is what they are told never to add.",
@@ -203,11 +202,11 @@ func registerSettingsTools(r *registry) {
 		prefix: "metadata", one: "a metadata consumer", many: "metadata consumers", nameKey: "name",
 		list: func(ctx context.Context) ([]sonarr.MetadataResource, error) {
 			res, err := c.GetMetadata(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.MetadataResource, force bool) (*sonarr.MetadataResource, error) {
-			res, err := c.PutMetadataById(ctx, id, rec, sonarr.PutMetadataByIdOperationOptions{ForceSave: new(force)})
-			return res.Model, err
+			res, err := c.PutMetadataById(ctx, id, rec, sonarr.PutMetadataByIdOptions{ForceSave: new(force)})
+			return res.Answer, err
 		},
 		listSays: "The metadata Sonarr writes beside episode files for a media player to read - Kodi (XBMC) and Emby .nfo files and images, Roksbox, WDTV, Plex - each with whether it is on and what it writes.",
 		editSays: "Turn a metadata consumer on or off (set enable) and choose what it writes beside the files (its own settings by name: seriesMetadata, episodeMetadata, seriesImages, seasonImages, episodeImages). Sonarr writes the files as it next refreshes each series.",
@@ -221,15 +220,15 @@ func registerSettingsTools(r *registry) {
 		},
 		list: func(ctx context.Context) ([]sonarr.DelayProfileResource, error) {
 			res, err := c.GetDelayProfile(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.DelayProfileResource, _ bool) (*sonarr.DelayProfileResource, error) {
 			res, err := c.PostDelayProfile(ctx, rec)
-			return res.Model, err
+			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.DelayProfileResource, _ bool) (*sonarr.DelayProfileResource, error) {
-			res, err := c.PutDelayProfileById(ctx, strconv.Itoa(id), rec)
-			return res.Model, err
+			res, err := c.PutDelayProfileById(ctx, id, rec)
+			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
 			_, err := c.DeleteDelayProfileById(ctx, id)
@@ -247,15 +246,15 @@ func registerSettingsTools(r *registry) {
 		blank: func() sonarr.ReleaseProfileResource { return sonarr.ReleaseProfileResource{Enabled: new(true)} },
 		list: func(ctx context.Context) ([]sonarr.ReleaseProfileResource, error) {
 			res, err := c.GetReleaseProfile(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.ReleaseProfileResource, _ bool) (*sonarr.ReleaseProfileResource, error) {
 			res, err := c.PostReleaseProfile(ctx, rec)
-			return res.Model, err
+			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.ReleaseProfileResource, _ bool) (*sonarr.ReleaseProfileResource, error) {
-			res, err := c.PutReleaseProfileById(ctx, strconv.Itoa(id), rec)
-			return res.Model, err
+			res, err := c.PutReleaseProfileById(ctx, id, rec)
+			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
 			_, err := c.DeleteReleaseProfileById(ctx, id)
@@ -273,15 +272,15 @@ func registerSettingsTools(r *registry) {
 		blank: func() sonarr.RemotePathMappingResource { return sonarr.RemotePathMappingResource{} },
 		list: func(ctx context.Context) ([]sonarr.RemotePathMappingResource, error) {
 			res, err := c.GetRemotePathMapping(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.RemotePathMappingResource, _ bool) (*sonarr.RemotePathMappingResource, error) {
 			res, err := c.PostRemotePathMapping(ctx, rec)
-			return res.Model, err
+			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.RemotePathMappingResource, _ bool) (*sonarr.RemotePathMappingResource, error) {
-			res, err := c.PutRemotePathMappingById(ctx, strconv.Itoa(id), rec)
-			return res.Model, err
+			res, err := c.PutRemotePathMappingById(ctx, id, rec)
+			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
 			_, err := c.DeleteRemotePathMappingById(ctx, id)
@@ -306,19 +305,19 @@ func registerSettingsTools(r *registry) {
 			if err != nil {
 				return nil, err
 			}
-			return specMaps(res.Model)
+			return specMaps(res.Answer)
 		},
 		list: func(ctx context.Context) ([]sonarr.CustomFormatResource, error) {
 			res, err := c.GetCustomFormat(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.CustomFormatResource, _ bool) (*sonarr.CustomFormatResource, error) {
 			res, err := c.PostCustomFormat(ctx, rec)
-			return res.Model, err
+			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.CustomFormatResource, _ bool) (*sonarr.CustomFormatResource, error) {
-			res, err := c.PutCustomFormatById(ctx, strconv.Itoa(id), rec)
-			return res.Model, err
+			res, err := c.PutCustomFormatById(ctx, id, rec)
+			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
 			_, err := c.DeleteCustomFormatById(ctx, id)
@@ -340,19 +339,19 @@ func registerSettingsTools(r *registry) {
 			if err != nil {
 				return nil, err
 			}
-			return specMaps(res.Model)
+			return specMaps(res.Answer)
 		},
 		list: func(ctx context.Context) ([]sonarr.AutoTaggingResource, error) {
 			res, err := c.GetAutoTagging(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.AutoTaggingResource, _ bool) (*sonarr.AutoTaggingResource, error) {
 			res, err := c.PostAutoTagging(ctx, rec)
-			return res.Model, err
+			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.AutoTaggingResource, _ bool) (*sonarr.AutoTaggingResource, error) {
-			res, err := c.PutAutoTaggingById(ctx, strconv.Itoa(id), rec)
-			return res.Model, err
+			res, err := c.PutAutoTaggingById(ctx, id, rec)
+			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
 			_, err := c.DeleteAutoTaggingById(ctx, id)
@@ -370,15 +369,15 @@ func registerSettingsTools(r *registry) {
 		blank: func() sonarr.CustomFilterResource { return sonarr.CustomFilterResource{} },
 		list: func(ctx context.Context) ([]sonarr.CustomFilterResource, error) {
 			res, err := c.GetCustomFilter(ctx)
-			return res.Model, err
+			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.CustomFilterResource, _ bool) (*sonarr.CustomFilterResource, error) {
 			res, err := c.PostCustomFilter(ctx, rec)
-			return res.Model, err
+			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.CustomFilterResource, _ bool) (*sonarr.CustomFilterResource, error) {
-			res, err := c.PutCustomFilterById(ctx, strconv.Itoa(id), rec)
-			return res.Model, err
+			res, err := c.PutCustomFilterById(ctx, id, rec)
+			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
 			_, err := c.DeleteCustomFilterById(ctx, id)

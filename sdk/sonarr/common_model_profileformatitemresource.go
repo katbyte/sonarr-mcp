@@ -9,3 +9,9 @@ type ProfileFormatItemResource struct {
 	Name   string `json:"name,omitempty"`
 	Score  int    `json:"score,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m ProfileFormatItemResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m ProfileFormatItemResource) GetId() int { return m.Id }

@@ -10,5 +10,5 @@ type IndexerBulkResource struct {
 	EnableRss               *bool     `json:"enableRss,omitempty"`
 	Ids                     []int     `json:"ids,omitzero"`
 	Priority                int       `json:"priority,omitempty"`
-	Tags                    []int     `json:"tags,omitzero"`
+	Tags                    []TagID   `json:"tags,omitzero"`
 }

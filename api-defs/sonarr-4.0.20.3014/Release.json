@@ -12,7 +12,8 @@
           "Field": "SeriesId",
           "In": "Query",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         },
         {
@@ -20,7 +21,8 @@
           "Field": "EpisodeId",
           "In": "Query",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeID"
           }
         },
         {

@@ -50,7 +50,7 @@
           "Name": "id",
           "Argument": "id",
           "Type": {
-            "Type": "String"
+            "Type": "Integer"
           }
         }
       ],

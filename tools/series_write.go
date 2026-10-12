@@ -18,15 +18,15 @@ import (
 
 // lookupRow is a show SkyHook knows, as series_lookup and series_add name it.
 type lookupRow struct {
-	Title    string `json:"title"`
-	Year     int    `json:"year,omitempty"`
-	TvdbID   int    `json:"tvdb_id"`
-	Status   string `json:"status"`
-	Network  string `json:"network,omitempty"`
-	Seasons  int    `json:"seasons"`
-	Overview string `json:"overview,omitempty" jsonschema:"the first sentences of the plot"`
-	InSonarr bool   `json:"in_sonarr"          jsonschema:"already in the library"`
-	ID       int    `json:"id,omitempty"       jsonschema:"the Sonarr id, when already in the library"`
+	Title    string          `json:"title"`
+	Year     int             `json:"year,omitempty"`
+	TvdbID   sonarr.TvdbID   `json:"tvdb_id"`
+	Status   string          `json:"status"`
+	Network  string          `json:"network,omitempty"`
+	Seasons  int             `json:"seasons"`
+	Overview string          `json:"overview,omitempty" jsonschema:"the first sentences of the plot"`
+	InSonarr bool            `json:"in_sonarr"          jsonschema:"already in the library"`
+	ID       sonarr.SeriesID `json:"id,omitempty"       jsonschema:"the Sonarr id, when already in the library"`
 }
 
 func lookupSummary(s *sonarr.SeriesResource) lookupRow {
@@ -60,12 +60,12 @@ func shortText(s string, n int) string {
 // lookup asks Sonarr (and through it SkyHook, TheTVDB's front) for the shows a
 // term could mean.
 func (r *registry) lookup(ctx context.Context, term string) ([]sonarr.SeriesResource, error) {
-	res, err := r.client.GetSeriesLookup(ctx, sonarr.GetSeriesLookupOperationOptions{Term: strings.TrimSpace(term)})
+	res, err := r.client.GetSeriesLookup(ctx, sonarr.GetSeriesLookupOptions{Term: strings.TrimSpace(term)})
 	if err != nil {
 		return nil, err
 	}
 
-	return res.Model, nil
+	return res.Answer, nil
 }
 
 // folderYear reads the "(2002)" a folder or name ends with.
@@ -83,7 +83,7 @@ var folderYear = regexp.MustCompile(`^(.*?)\s*[\(\[]((?:19|20)\d\d)[\)\]]\s*$`)
 func pickLookup(term string, found []sonarr.SeriesResource) (*sonarr.SeriesResource, bool) {
 	if m := providerRef.FindStringSubmatch(term); len(m) == 3 && strings.EqualFold(m[1], "tvdb") {
 		for i := range found {
-			if strconv.Itoa(found[i].TvdbId) == m[2] {
+			if strconv.Itoa(int(found[i].TvdbId)) == m[2] {
 				return &found[i], true
 			}
 		}
@@ -127,17 +127,17 @@ func (r *registry) mostUsedProfile(ctx context.Context) (*sonarr.QualityProfileR
 	if err != nil {
 		return nil, err
 	}
-	if len(res.Model) == 0 {
+	if len(res.Answer) == 0 {
 		return nil, errors.New("sonarr has no quality profiles")
 	}
-	counts := map[int]int{}
+	counts := map[sonarr.QualityProfileID]int{}
 	for i := range series {
 		counts[series[i].QualityProfileId]++
 	}
-	best := &res.Model[0]
-	for i := range res.Model {
-		if counts[res.Model[i].Id] > counts[best.Id] {
-			best = &res.Model[i]
+	best := &res.Answer[0]
+	for i := range res.Answer {
+		if counts[res.Answer[i].Id] > counts[best.Id] {
+			best = &res.Answer[i]
 		}
 	}
 
@@ -307,11 +307,11 @@ func registerSeriesWriteTools(r *registry) {
 		// are gone
 		var added *sonarr.SeriesResource
 		for deadline := time.Now().Add(waitFor(in.Wait)); ; {
-			now, readErr := client.GetSeriesById(ctx, res.Model.Id, sonarr.GetSeriesByIdOperationOptions{})
+			now, readErr := client.GetSeriesById(ctx, res.Answer.Id, sonarr.GetSeriesByIdOptions{})
 			if readErr != nil {
-				return nil, addOut{}, fmt.Errorf("%s was added, and reading it back failed: %w", res.Model.Title, readErr)
+				return nil, addOut{}, fmt.Errorf("%s was added, and reading it back failed: %w", res.Answer.Title, readErr)
 			}
-			added = now.Model
+			added = now.Answer
 			if added.AddOptions == nil || !time.Now().Before(deadline) {
 				break
 			}
@@ -367,11 +367,11 @@ func registerSeriesWriteTools(r *registry) {
 		// the index holds a series without its statistics' latest word, and
 		// another edit may have just changed it, so the record to write back
 		// is read fresh, once the series is this call's alone
-		cur, err := client.GetSeriesById(ctx, s.Id, sonarr.GetSeriesByIdOperationOptions{})
+		cur, err := client.GetSeriesById(ctx, s.Id, sonarr.GetSeriesByIdOptions{})
 		if err != nil {
 			return nil, editOut{}, err
 		}
-		body, err := answered(cur.Model, s.Title)
+		body, err := answered(cur.Answer, s.Title)
 		if err != nil {
 			return nil, editOut{}, err
 		}
@@ -426,14 +426,14 @@ func registerSeriesWriteTools(r *registry) {
 			body.RootFolderPath = path.Dir(strings.TrimRight(in.Path, "/"))
 		}
 		if len(in.AddTags) > 0 || len(in.RemoveTags) > 0 {
-			var addIDs, removeIDs []int
+			var addIDs, removeIDs []sonarr.TagID
 			if addIDs, err = r.resolveTags(ctx, in.AddTags, true); err != nil {
 				return nil, editOut{}, err
 			}
 			if removeIDs, err = r.resolveTags(ctx, in.RemoveTags, false); err != nil {
 				return nil, editOut{}, err
 			}
-			tags := slices.DeleteFunc(slices.Clone(body.Tags), func(id int) bool { return slices.Contains(removeIDs, id) })
+			tags := slices.DeleteFunc(slices.Clone(body.Tags), func(id sonarr.TagID) bool { return slices.Contains(removeIDs, id) })
 			for _, id := range addIDs {
 				if !slices.Contains(tags, id) {
 					tags = append(tags, id)
@@ -452,7 +452,7 @@ func registerSeriesWriteTools(r *registry) {
 			return nil, editOut{Series: summariseSeries(&body, profiles, tagNames)}, nil
 		}
 
-		res, err := client.PutSeriesById(ctx, strconv.Itoa(body.Id), body, sonarr.PutSeriesByIdOperationOptions{MoveFiles: new(in.MoveFiles)})
+		res, err := client.PutSeriesById(ctx, body.Id, body, sonarr.PutSeriesByIdOptions{MoveFiles: new(in.MoveFiles)})
 		if err != nil {
 			return nil, editOut{}, err
 		}
@@ -460,7 +460,7 @@ func registerSeriesWriteTools(r *registry) {
 			return nil, editOut{}, err
 		}
 
-		return nil, editOut{Series: summariseSeries(res.Model, profiles, tagNames), Changed: changed}, nil
+		return nil, editOut{Series: summariseSeries(res.Answer, profiles, tagNames), Changed: changed}, nil
 	})
 
 	type deleteIn struct {
@@ -504,7 +504,7 @@ func registerSeriesWriteTools(r *registry) {
 			return nil, out, nil
 		}
 
-		if _, err := client.DeleteSeriesById(ctx, s.Id, sonarr.DeleteSeriesByIdOperationOptions{DeleteFiles: new(in.DeleteFiles), AddImportListExclusion: new(in.AddImportExclusion)}); err != nil {
+		if _, err := client.DeleteSeriesById(ctx, s.Id, sonarr.DeleteSeriesByIdOptions{DeleteFiles: new(in.DeleteFiles), AddImportListExclusion: new(in.AddImportExclusion)}); err != nil {
 			return nil, deleteOut{}, err
 		}
 		out.Deleted, out.FilesDeleted = label, in.DeleteFiles
@@ -520,16 +520,17 @@ func registerSeriesWriteTools(r *registry) {
 		Command commandOut    `json:"command"`
 		Series  seriesSummary `json:"series"  jsonschema:"the series as it stands after the command"`
 	}
-	seriesCommand := func(ctx context.Context, name string, in commandIn) (seriesCommandOut, error) {
+	seriesCommand := func(ctx context.Context, name string, in commandIn, queue func(context.Context, sonarr.SeriesID) (queuedCommand, error)) (seriesCommandOut, error) {
 		s, err := r.resolveSeries(ctx, in.Series)
 		if err != nil {
 			return seriesCommandOut{}, err
 		}
-		cmd, err := r.runCommand(ctx, name, map[string]any{"seriesId": s.Id}, waitFor(in.Wait))
+		sent, err := queue(ctx, s.Id)
+		cmd, err := r.settleCommand(ctx, name, waitFor(in.Wait), sent, err)
 		if err != nil {
 			return seriesCommandOut{}, err
 		}
-		after, err := client.GetSeriesById(ctx, s.Id, sonarr.GetSeriesByIdOperationOptions{})
+		after, err := client.GetSeriesById(ctx, s.Id, sonarr.GetSeriesByIdOptions{})
 		if err != nil {
 			return seriesCommandOut{}, err
 		}
@@ -538,14 +539,16 @@ func registerSeriesWriteTools(r *registry) {
 			return seriesCommandOut{}, err
 		}
 
-		return seriesCommandOut{Command: cmd, Series: summariseSeries(after.Model, profiles, tags)}, nil
+		return seriesCommandOut{Command: cmd, Series: summariseSeries(after.Answer, profiles, tags)}, nil
 	}
 
 	add(r, writeTool, &mcp.Tool{
 		Name:        "series_refresh",
 		Description: "Refresh a series from TheTVDB - new episodes, changed titles and air dates - then rescan its folder. Use after a show's listing changes, or when episodes Sonarr should know about are missing from it.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in commandIn) (*mcp.CallToolResult, seriesCommandOut, error) {
-		out, err := seriesCommand(ctx, "RefreshSeries", in)
+		out, err := seriesCommand(ctx, "RefreshSeries", in, func(ctx context.Context, id sonarr.SeriesID) (queuedCommand, error) {
+			return client.RefreshSeries(ctx, sonarr.RefreshSeriesCommand{SeriesId: id})
+		})
 		return nil, out, err
 	})
 
@@ -553,7 +556,9 @@ func registerSeriesWriteTools(r *registry) {
 		Name:        "series_rescan",
 		Description: "Rescan a series' folder, so Sonarr picks up files added, removed or replaced on disk outside it. Files it cannot place are left for import_scan to explain.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in commandIn) (*mcp.CallToolResult, seriesCommandOut, error) {
-		out, err := seriesCommand(ctx, "RescanSeries", in)
+		out, err := seriesCommand(ctx, "RescanSeries", in, func(ctx context.Context, id sonarr.SeriesID) (queuedCommand, error) {
+			return client.RescanSeries(ctx, sonarr.RescanSeriesCommand{SeriesId: id})
+		})
 		return nil, out, err
 	})
 
@@ -565,7 +570,9 @@ func registerSeriesWriteTools(r *registry) {
 		Name:        "series_search",
 		Description: "Search the indexers for every monitored episode of a series that is missing or below its profile's cutoff, grabbing the best releases Sonarr accepts, then report what is in the download queue for it.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in commandIn) (*mcp.CallToolResult, searchOut, error) {
-		res, err := seriesCommand(ctx, "SeriesSearch", in)
+		res, err := seriesCommand(ctx, "SeriesSearch", in, func(ctx context.Context, id sonarr.SeriesID) (queuedCommand, error) {
+			return client.SeriesSearch(ctx, sonarr.SeriesSearchCommand{SeriesId: id})
+		})
 		if err != nil {
 			return nil, searchOut{}, err
 		}
@@ -578,16 +585,16 @@ func registerSeriesWriteTools(r *registry) {
 	})
 
 	type renameIn struct {
-		Series string `json:"series"                 jsonschema:"the series: title, Sonarr id or tvdb:<id>"`
-		Files  []int  `json:"file_ids,omitempty"     jsonschema:"only these episode files; default every file whose name does not match the naming format"`
-		DryRun bool   `json:"dry_run,omitempty"      jsonschema:"report what would be renamed without renaming"`
-		Wait   int    `json:"wait_seconds,omitempty" jsonschema:"how long to wait for the renames, default 60"`
+		Series string                 `json:"series"                 jsonschema:"the series: title, Sonarr id or tvdb:<id>"`
+		Files  []sonarr.EpisodeFileID `json:"file_ids,omitempty"     jsonschema:"only these episode files; default every file whose name does not match the naming format"`
+		DryRun bool                   `json:"dry_run,omitempty"      jsonschema:"report what would be renamed without renaming"`
+		Wait   int                    `json:"wait_seconds,omitempty" jsonschema:"how long to wait for the renames, default 60"`
 	}
 	type renameRow struct {
-		FileID   int    `json:"file_id"`
-		Episodes string `json:"episodes"`
-		From     string `json:"from"`
-		To       string `json:"to"`
+		FileID   sonarr.EpisodeFileID `json:"file_id"`
+		Episodes string               `json:"episodes"`
+		From     string               `json:"from"`
+		To       string               `json:"to"`
 	}
 	type renameOut struct {
 		Renamed []renameRow `json:"renamed"           jsonschema:"what was (or with dry_run, would be) renamed"`
@@ -608,13 +615,13 @@ func registerSeriesWriteTools(r *registry) {
 		} else if !on {
 			return nil, renameOut{}, errors.New("sonarr's Rename Episodes setting is off, so it renames nothing; turn it on in its media management settings first")
 		}
-		plan, err := client.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: new(s.Id)})
+		plan, err := client.GetRename(ctx, sonarr.GetRenameOptions{SeriesId: s.Id})
 		if err != nil {
 			return nil, renameOut{}, err
 		}
 		out := renameOut{}
-		var ids []int
-		for _, p := range plan.Model {
+		var ids []sonarr.EpisodeFileID
+		for _, p := range plan.Answer {
 			if len(in.Files) > 0 && !slices.Contains(in.Files, p.EpisodeFileId) {
 				continue
 			}
@@ -633,7 +640,8 @@ func registerSeriesWriteTools(r *registry) {
 		if in.DryRun || len(ids) == 0 {
 			return nil, out, nil
 		}
-		cmd, err := r.runCommand(ctx, "RenameFiles", map[string]any{"seriesId": s.Id, "files": ids}, waitFor(in.Wait))
+		sent, err := client.RenameFiles(ctx, sonarr.RenameFilesCommand{SeriesId: s.Id, Files: ids})
+		cmd, err := r.settleCommand(ctx, "RenameFiles", waitFor(in.Wait), sent, err)
 		out.Command = &cmd
 
 		return nil, out, err

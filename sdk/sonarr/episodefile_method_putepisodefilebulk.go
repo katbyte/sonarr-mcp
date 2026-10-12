@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutEpisodeFileBulkOperationResponse is the result of PutEpisodeFileBulk.
-type PutEpisodeFileBulkOperationResponse struct {
+// PutEpisodeFileBulkResponse is the result of PutEpisodeFileBulk.
+type PutEpisodeFileBulkResponse struct {
 	HttpResponse *http.Response
-	Model        []EpisodeFileResource
+	Answer       []EpisodeFileResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutEpisodeFileBulkResponse) Answered() bool { return r.Answer != nil }
+
 // PutEpisodeFileBulk calls PUT /api/v3/episodefile/bulk.
-func (c Client) PutEpisodeFileBulk(ctx context.Context, input []EpisodeFileResource) (result PutEpisodeFileBulkOperationResponse, err error) {
+func (c Client) PutEpisodeFileBulk(ctx context.Context, input []EpisodeFileResource) (result PutEpisodeFileBulkResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
+		Operation:  "PutEpisodeFileBulk",
 		Path:       "/api/v3/episodefile/bulk",
 	}
 
@@ -44,7 +49,7 @@ func (c Client) PutEpisodeFileBulk(ctx context.Context, input []EpisodeFileResou
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

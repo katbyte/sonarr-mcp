@@ -61,6 +61,7 @@ func FromSpec(cfg config.Service, spec *openapi.Spec, applied []string, log func
 		}
 	}
 	im.assignOwners(groups)
+	kinds := im.applyIDs(groups)
 
 	if len(im.failures) > 0 {
 		slices.Sort(im.failures)
@@ -76,6 +77,12 @@ func FromSpec(cfg config.Service, spec *openapi.Spec, applied []string, log func
 		Source:      cfg.Spec,
 		Auth:        cfg.Auth,
 		Workarounds: applied,
+		Dates:       cfg.Dates.Layouts(),
+		Days:        cfg.Days.Layouts(),
+
+		DatesKeepUnread: cfg.Dates.KeepUnread,
+		DaysKeepUnread:  cfg.Days.KeepUnread,
+		IDs:             kinds,
 	}
 	if svc.Workarounds == nil {
 		svc.Workarounds = []string{}
@@ -118,24 +125,25 @@ func (im *importer) checkWords() {
 }
 
 // keepNull marks the fields the service config names in KeepNull, which the
-// generator holds as pointers. A field the document no longer has, or no
-// longer declares a nullable number, fails the import: the config then names
-// something the SDK cannot keep, and the entry must go or change.
+// generator holds as pointers. A field the document no longer has, or that is
+// neither a string nor a nullable number, fails the import: the config then
+// names something the SDK cannot keep, and the entry must go or change.
 func (im *importer) keepNull() {
 	for _, name := range im.cfg.KeepNull {
 		schema, prop, ok := strings.Cut(name, ".")
 		var field *definitions.Field
 		for _, m := range im.models {
-			if ok && m.SchemaName == schema {
+			// by the document's schema name, or by the model's own name for a record the document declares inline and the importer named
+			if ok && (m.SchemaName == schema || m.Name == schema) {
 				field = fieldNamed(m.Fields, prop)
 			}
 		}
 		switch {
 		case field == nil:
 			im.fail(fmt.Sprintf("the config's KeepNull names %s, a field the document does not have: change or remove the entry", name))
-		case !field.Type.Numeric():
-			im.fail(fmt.Sprintf("the config's KeepNull names %s, which is %s, not a number: change or remove the entry", name, field.Type))
-		case !field.Nullable:
+		case !field.Type.Numeric() && field.Type.Type != definitions.String && field.Type.Type != definitions.Boolean:
+			im.fail(fmt.Sprintf("the config's KeepNull names %s, which is %s, not a boolean, a string or a number: change or remove the entry", name, field.Type))
+		case field.Type.Numeric() && !field.Nullable:
 			im.fail(fmt.Sprintf("the config's KeepNull names %s, which the document no longer declares nullable: remove the entry", name))
 		default:
 			field.KeepsNull = true

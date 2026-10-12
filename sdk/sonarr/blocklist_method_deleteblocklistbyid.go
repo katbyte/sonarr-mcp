@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteBlocklistByIdOperationResponse is the result of DeleteBlocklistById.
-type DeleteBlocklistByIdOperationResponse struct {
+// DeleteBlocklistByIdResponse is the result of DeleteBlocklistById.
+type DeleteBlocklistByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteBlocklistById calls DELETE /api/v3/blocklist/{id}.
-func (c Client) DeleteBlocklistById(ctx context.Context, id int) (result DeleteBlocklistByIdOperationResponse, err error) {
+func (c Client) DeleteBlocklistById(ctx context.Context, id int) (result DeleteBlocklistByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteBlocklistById",
 		Path:       fmt.Sprintf("/api/v3/blocklist/%d", id),
 	}
 

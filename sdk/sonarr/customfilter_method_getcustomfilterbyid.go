@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetCustomFilterByIdOperationResponse is the result of GetCustomFilterById.
-type GetCustomFilterByIdOperationResponse struct {
+// GetCustomFilterByIdResponse is the result of GetCustomFilterById.
+//
+// Answer is the CustomFilterResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetCustomFilterByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *CustomFilterResource
+	Answer       *CustomFilterResource
+	*CustomFilterResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetCustomFilterByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the CustomFilterResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetCustomFilterByIdResponse) Record() (CustomFilterResource, error) {
+	if r.Answer == nil {
+		return CustomFilterResource{}, errors.New("GetCustomFilterById answered no CustomFilterResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetCustomFilterById calls GET /api/v3/customfilter/{id}.
-func (c Client) GetCustomFilterById(ctx context.Context, id int) (result GetCustomFilterByIdOperationResponse, err error) {
+func (c Client) GetCustomFilterById(ctx context.Context, id int) (result GetCustomFilterByIdResponse, err error) {
+	result.CustomFilterResource = &CustomFilterResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetCustomFilterById",
 		Path:       fmt.Sprintf("/api/v3/customfilter/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetCustomFilterById(ctx context.Context, id int) (result GetCust
 		return
 	}
 
-	var model CustomFilterResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer CustomFilterResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.CustomFilterResource = result.Answer
 
 	return
 }

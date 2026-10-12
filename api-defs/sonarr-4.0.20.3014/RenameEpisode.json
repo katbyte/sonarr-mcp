@@ -12,7 +12,8 @@
           "Field": "SeriesId",
           "In": "Query",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         },
         {
@@ -48,7 +49,8 @@
           "Name": "EpisodeFileId",
           "JsonName": "episodeFileId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeFileID"
           }
         },
         {
@@ -96,7 +98,8 @@
           "Name": "SeriesId",
           "JsonName": "seriesId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         }
       ]

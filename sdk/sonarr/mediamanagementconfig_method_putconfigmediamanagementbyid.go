@@ -4,28 +4,51 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutConfigMediaManagementByIdOperationResponse is the result of PutConfigMediaManagementById.
-type PutConfigMediaManagementByIdOperationResponse struct {
+// PutConfigMediaManagementByIdResponse is the result of PutConfigMediaManagementById.
+//
+// Answer is the MediaManagementConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutConfigMediaManagementByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *MediaManagementConfigResource
+	Answer       *MediaManagementConfigResource
+	*MediaManagementConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutConfigMediaManagementByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the MediaManagementConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutConfigMediaManagementByIdResponse) Record() (MediaManagementConfigResource, error) {
+	if r.Answer == nil {
+		return MediaManagementConfigResource{}, errors.New("PutConfigMediaManagementById answered no MediaManagementConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PutConfigMediaManagementById calls PUT /api/v3/config/mediamanagement/{id}.
-func (c Client) PutConfigMediaManagementById(ctx context.Context, id string, input MediaManagementConfigResource) (result PutConfigMediaManagementByIdOperationResponse, err error) {
+func (c Client) PutConfigMediaManagementById(ctx context.Context, id int, input MediaManagementConfigResource) (result PutConfigMediaManagementByIdResponse, err error) {
+	result.MediaManagementConfigResource = &MediaManagementConfigResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
-		Path:       fmt.Sprintf("/api/v3/config/mediamanagement/%s", url.PathEscape(id)),
+		Operation:  "PutConfigMediaManagementById",
+		Path:       fmt.Sprintf("/api/v3/config/mediamanagement/%d", id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -46,11 +69,12 @@ func (c Client) PutConfigMediaManagementById(ctx context.Context, id string, inp
 		return
 	}
 
-	var model MediaManagementConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer MediaManagementConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.MediaManagementConfigResource = result.Answer
 
 	return
 }

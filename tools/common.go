@@ -2,15 +2,14 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/katbyte/pandorest/client"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
@@ -150,13 +149,13 @@ func runtimeMinutes(s string) (float64, bool) {
 }
 
 // profileNames maps quality profile ids to names.
-func (r *registry) profileNames(ctx context.Context) (map[int]string, error) {
+func (r *registry) profileNames(ctx context.Context) (map[sonarr.QualityProfileID]string, error) {
 	res, err := r.client.GetQualityProfile(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[int]string, len(res.Model))
-	for _, p := range res.Model {
+	out := make(map[sonarr.QualityProfileID]string, len(res.Answer))
+	for _, p := range res.Answer {
 		out[p.Id] = p.Name
 	}
 
@@ -170,10 +169,10 @@ func (r *registry) resolveProfile(ctx context.Context, ref string) (*sonarr.Qual
 	if err != nil {
 		return nil, err
 	}
-	names := make([]string, 0, len(res.Model))
-	for i := range res.Model {
-		p := &res.Model[i]
-		if strings.EqualFold(p.Name, strings.TrimSpace(ref)) || strconv.Itoa(p.Id) == strings.TrimSpace(ref) {
+	names := make([]string, 0, len(res.Answer))
+	for i := range res.Answer {
+		p := &res.Answer[i]
+		if strings.EqualFold(p.Name, strings.TrimSpace(ref)) || strconv.Itoa(int(p.Id)) == strings.TrimSpace(ref) {
 			return p, nil
 		}
 		names = append(names, p.Name)
@@ -183,13 +182,13 @@ func (r *registry) resolveProfile(ctx context.Context, ref string) (*sonarr.Qual
 }
 
 // tagLabels maps tag ids to labels.
-func (r *registry) tagLabels(ctx context.Context) (map[int]string, error) {
+func (r *registry) tagLabels(ctx context.Context) (map[sonarr.TagID]string, error) {
 	res, err := r.client.GetTag(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[int]string, len(res.Model))
-	for _, t := range res.Model {
+	out := make(map[sonarr.TagID]string, len(res.Answer))
+	for _, t := range res.Answer {
 		out[t.Id] = t.Label
 	}
 
@@ -197,13 +196,13 @@ func (r *registry) tagLabels(ctx context.Context) (map[int]string, error) {
 }
 
 // labels names a list of tag ids, sorted.
-func labels(ids []int, byID map[int]string) []string {
+func labels(ids []sonarr.TagID, byID map[sonarr.TagID]string) []string {
 	out := make([]string, 0, len(ids))
 	for _, id := range ids {
 		if l, ok := byID[id]; ok {
 			out = append(out, l)
 		} else {
-			out = append(out, strconv.Itoa(id))
+			out = append(out, strconv.Itoa(int(id)))
 		}
 	}
 	slices.Sort(out)
@@ -214,28 +213,28 @@ func labels(ids []int, byID map[int]string) []string {
 // resolveTags turns tag labels into ids. A label Sonarr does not have is
 // created when create is set, and an error naming the existing labels
 // otherwise. Sonarr stores labels lower case, so matching ignores case.
-func (r *registry) resolveTags(ctx context.Context, refs []string, create bool) ([]int, error) {
+func (r *registry) resolveTags(ctx context.Context, refs []string, create bool) ([]sonarr.TagID, error) {
 	res, err := r.client.GetTag(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var out []int
+	var out []sonarr.TagID
 	for _, ref := range refs {
 		ref = strings.TrimSpace(ref)
 		if ref == "" {
 			continue
 		}
-		id := 0
-		for _, t := range res.Model {
-			if strings.EqualFold(t.Label, ref) || strconv.Itoa(t.Id) == ref {
+		var id sonarr.TagID
+		for _, t := range res.Answer {
+			if strings.EqualFold(t.Label, ref) || strconv.Itoa(int(t.Id)) == ref {
 				id = t.Id
 				break
 			}
 		}
 		if id == 0 {
 			if !create {
-				have := make([]string, 0, len(res.Model))
-				for _, t := range res.Model {
+				have := make([]string, 0, len(res.Answer))
+				for _, t := range res.Answer {
 					have = append(have, t.Label)
 				}
 				return nil, fmt.Errorf("no tag %q (have: %s)", ref, strings.Join(have, ", "))
@@ -244,12 +243,12 @@ func (r *registry) resolveTags(ctx context.Context, refs []string, create bool) 
 			if err != nil {
 				return nil, fmt.Errorf("creating tag %q: %w", ref, err)
 			}
-			tag, err := answered(made.Model, "the new tag")
+			tag, err := answered(made.Answer, "the new tag")
 			if err != nil {
 				return nil, fmt.Errorf("creating tag %q: %w", ref, err)
 			}
 			id = tag.Id
-			res.Model = append(res.Model, tag)
+			res.Answer = append(res.Answer, tag)
 		}
 		if !slices.Contains(out, id) {
 			out = append(out, id)
@@ -266,10 +265,10 @@ func (r *registry) resolveRootFolder(ctx context.Context, ref string) (*sonarr.R
 	if err != nil {
 		return nil, err
 	}
-	paths := make([]string, 0, len(res.Model))
-	for i := range res.Model {
-		f := &res.Model[i]
-		if ref == "" && len(res.Model) == 1 {
+	paths := make([]string, 0, len(res.Answer))
+	for i := range res.Answer {
+		f := &res.Answer[i]
+		if ref == "" && len(res.Answer) == 1 {
 			return f, nil
 		}
 		if strings.TrimRight(f.Path, "/\\") == strings.TrimRight(strings.TrimSpace(ref), "/\\") || strconv.Itoa(f.Id) == ref {
@@ -277,11 +276,11 @@ func (r *registry) resolveRootFolder(ctx context.Context, ref string) (*sonarr.R
 		}
 		paths = append(paths, f.Path)
 	}
-	if len(res.Model) == 0 {
+	if len(res.Answer) == 0 {
 		return nil, errors.New("sonarr has no root folders; add one first")
 	}
 	if ref == "" {
-		return nil, fmt.Errorf("sonarr has %d root folders, so name one: %s", len(res.Model), strings.Join(paths, ", "))
+		return nil, fmt.Errorf("sonarr has %d root folders, so name one: %s", len(res.Answer), strings.Join(paths, ", "))
 	}
 
 	return nil, fmt.Errorf("no root folder %q (have: %s)", ref, strings.Join(paths, ", "))
@@ -298,15 +297,18 @@ const commandWait = 60 * time.Second
 // commandPoll is how often a running command is looked at.
 var commandPoll = 500 * time.Millisecond
 
+// The client waits on a command at the same pace.
+func init() { sonarr.CommandPoll = commandPoll }
+
 // commandOut is what a tool that ran a command reports about it.
 type commandOut struct {
-	ID       int    `json:"command_id"`
-	Name     string `json:"command"`
-	Status   string `json:"status"             jsonschema:"queued, started, completed, failed, aborted or cancelled; queued or started means it was still running when the wait ended"`
-	Message  string `json:"message,omitempty"  jsonschema:"what Sonarr said about the run, e.g. how many releases a search grabbed"`
-	Started  string `json:"started,omitempty"`
-	Ended    string `json:"ended,omitempty"`
-	Duration string `json:"duration,omitempty"`
+	ID       sonarr.CommandID `json:"command_id"`
+	Name     string           `json:"command"`
+	Status   string           `json:"status"             jsonschema:"queued, started, completed, failed, aborted or cancelled; queued or started means it was still running when the wait ended"`
+	Message  string           `json:"message,omitempty"  jsonschema:"what Sonarr said about the run, e.g. how many releases a search grabbed"`
+	Started  string           `json:"started,omitempty"`
+	Ended    string           `json:"ended,omitempty"`
+	Duration string           `json:"duration,omitempty"`
 }
 
 func projectCommand(c *sonarr.CommandResource) commandOut {
@@ -321,39 +323,37 @@ func projectCommand(c *sonarr.CommandResource) commandOut {
 	}
 }
 
-// runCommand queues a command with its own fields, and waits up to wait for
-// it to finish (0 does not wait). A command that fails is an error; one still
-// running when the wait ends is not, and is reported as it stands.
-func (r *registry) runCommand(ctx context.Context, name string, fields map[string]any, wait time.Duration) (commandOut, error) {
-	body := map[string]any{"name": name}
-	maps.Copy(body, fields)
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return commandOut{}, err
-	}
-	res, err := r.client.PostCommand(ctx, raw)
+// queuedCommand is what a command's own method answers: the command as Sonarr queued it.
+type queuedCommand interface {
+	Record() (sonarr.CommandResource, error)
+}
+
+// settleCommand is a command a tool has just queued, waited for when wait is more than nothing. A command still running when the wait ends is
+// answered as it stands, since that is not a failure; one that failed, or was aborted or cancelled, is an error saying what Sonarr said.
+func (r *registry) settleCommand(ctx context.Context, name string, wait time.Duration, queued queuedCommand, err error) (commandOut, error) {
 	if err != nil {
 		return commandOut{}, fmt.Errorf("queueing %s: %w", name, err)
 	}
-	cmd := res.Model
-	if wait <= 0 {
-		return projectCommand(cmd), nil
+	cmd, err := queued.Record()
+	if err != nil {
+		return commandOut{}, fmt.Errorf("queueing %s: %w", name, err)
 	}
 
-	deadline := time.Now().Add(wait)
-	for !commandDone(cmd.Status) && time.Now().Before(deadline) {
-		select {
-		case <-ctx.Done():
-			return projectCommand(cmd), ctx.Err()
-		case <-time.After(commandPoll):
+	if wait > 0 && !commandDone(cmd.Status) {
+		after, err := r.client.WaitForCommand(ctx, cmd.Id, wait)
+		// one still running when the wait ended, or one Sonarr failed, is an answer, read below; any other error is the asking itself failing
+		if err != nil && !errors.Is(err, client.ErrCommandRunning) && !errors.Is(err, client.ErrCommandFailed) {
+			return projectCommand(&cmd), fmt.Errorf("checking %s: %w", name, err)
 		}
-		got, err := r.client.GetCommandById(ctx, cmd.Id)
+
+		latest, err := after.Record()
 		if err != nil {
-			return projectCommand(cmd), fmt.Errorf("checking %s: %w", name, err)
+			return projectCommand(&cmd), fmt.Errorf("checking %s: %w", name, err)
 		}
-		cmd = got.Model
+		cmd = latest
 	}
-	out := projectCommand(cmd)
+
+	out := projectCommand(&cmd)
 	switch cmd.Status {
 	case sonarr.CommandStatusFailed, sonarr.CommandStatusAborted, sonarr.CommandStatusCancelled, sonarr.CommandStatusOrphaned:
 		msg := cmd.Message

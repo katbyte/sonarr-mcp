@@ -7,3 +7,9 @@ type Language struct {
 	Id   int    `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m Language) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m Language) GetId() int { return m.Id }

@@ -19,7 +19,7 @@ func (r *registry) renaming(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	return naming.Model != nil && boolv(naming.Model.RenameEpisodes), nil
+	return naming.Answer != nil && naming.Answer.RenameEpisodes, nil
 }
 
 // folders is what disk and Sonarr say about each other's folders, read once
@@ -33,10 +33,10 @@ type folders struct {
 	// audit_health reports those, and nothing under them can be judged
 	unreachable map[string]bool
 	// missing are the series whose own folder is not on disk
-	missing map[int]bool
+	missing map[sonarr.SeriesID]bool
 	// movedTo is the folder that looks like a series whose folder is gone,
 	// and movedFrom the series such a folder belongs to
-	movedTo   map[int]sonarr.UnmappedFolder
+	movedTo   map[sonarr.SeriesID]sonarr.UnmappedFolder
 	movedFrom map[string]*sonarr.SeriesResource
 	// emptyRoots are the root folders that are there but hold none of their
 	// series' folders: a drive not mounted, rather than a rename
@@ -57,11 +57,11 @@ func (r *registry) folderState(ctx context.Context, s *snapshot) (*folders, erro
 		return nil, err
 	}
 	f := &folders{
-		unmapped: map[string][]sonarr.UnmappedFolder{}, unreachable: map[string]bool{}, missing: map[int]bool{},
-		movedTo: map[int]sonarr.UnmappedFolder{}, movedFrom: map[string]*sonarr.SeriesResource{}, emptyRoots: map[string]int{},
+		unmapped: map[string][]sonarr.UnmappedFolder{}, unreachable: map[string]bool{}, missing: map[sonarr.SeriesID]bool{},
+		movedTo: map[sonarr.SeriesID]sonarr.UnmappedFolder{}, movedFrom: map[string]*sonarr.SeriesResource{}, emptyRoots: map[string]int{},
 	}
 	var rootPaths []string
-	for _, root := range roots.Model {
+	for _, root := range roots.Answer {
 		p := strings.TrimRight(root.Path, "/")
 		rootPaths = append(rootPaths, p)
 		if !boolv(root.Accessible) {
@@ -407,23 +407,23 @@ func (r *registry) auditNaming(ctx context.Context, s *snapshot, limit int) (aud
 		if series.Statistics == nil || series.Statistics.EpisodeFileCount == 0 {
 			continue
 		}
-		plan, err := r.client.GetRename(ctx, sonarr.GetRenameOperationOptions{SeriesId: new(series.Id)})
+		plan, err := r.client.GetRename(ctx, sonarr.GetRenameOptions{SeriesId: series.Id})
 		if err != nil {
 			return auditOut{}, err
 		}
-		if len(plan.Model) == 0 {
+		if len(plan.Answer) == 0 {
 			continue
 		}
 		var samples []string
-		for j, p := range plan.Model {
+		for j, p := range plan.Answer {
 			if j == 3 {
 				break
 			}
 			samples = append(samples, fmt.Sprintf("%s -> %s", path.Base(p.ExistingPath), path.Base(p.NewPath)))
 		}
-		detail := fmt.Sprintf("%d of %d files are not named to the format: %s", len(plan.Model), series.Statistics.EpisodeFileCount, strings.Join(samples, "; "))
+		detail := fmt.Sprintf("%d of %d files are not named to the format: %s", len(plan.Answer), series.Statistics.EpisodeFileCount, strings.Join(samples, "; "))
 		out.report(limit, finding{
-			Series: series.Title, SeriesID: series.Id, Subject: fmt.Sprintf("%d files", len(plan.Model)), Problem: problemNamesOffFormat,
+			Series: series.Title, SeriesID: series.Id, Subject: fmt.Sprintf("%d files", len(plan.Answer)), Problem: problemNamesOffFormat,
 			Detail: detail, Fix: "series_rename (dry_run first to see every rename)",
 		})
 	}

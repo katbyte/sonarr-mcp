@@ -187,7 +187,7 @@ func registerProfileTools(r *registry) {
 			if err != nil {
 				return nil, profileOut{}, err
 			}
-			if body, err = answered(blank.Model, "the blank profile"); err != nil {
+			if body, err = answered(blank.Answer, "the blank profile"); err != nil {
 				return nil, profileOut{}, err
 			}
 		}
@@ -200,7 +200,7 @@ func registerProfileTools(r *registry) {
 			return nil, profileOut{}, err
 		}
 
-		return nil, profileOut{Profile: projectProfile(res.Model, 0)}, nil
+		return nil, profileOut{Profile: projectProfile(res.Answer, 0)}, nil
 	})
 
 	type editIn struct {
@@ -224,12 +224,12 @@ func registerProfileTools(r *registry) {
 		if len(changed) == 0 {
 			return nil, profileOut{Profile: was}, nil
 		}
-		res, err := client.PutQualityProfileById(ctx, strconv.Itoa(body.Id), body)
+		res, err := client.PutQualityProfileById(ctx, body.Id, body)
 		if err != nil {
 			return nil, profileOut{}, err
 		}
 
-		return nil, profileOut{Profile: projectProfile(res.Model, 0), Changed: changed}, nil
+		return nil, profileOut{Profile: projectProfile(res.Answer, 0), Changed: changed}, nil
 	})
 
 	type deleteIn struct {
@@ -290,8 +290,8 @@ func registerProfileTools(r *registry) {
 		if err != nil {
 			return nil, definitionsOut{}, err
 		}
-		slices.SortStableFunc(res.Model, func(a, b sonarr.QualityDefinitionResource) int { return b.Weight - a.Weight })
-		definitions, paged := pageRows(res.Model, in)
+		slices.SortStableFunc(res.Answer, func(a, b sonarr.QualityDefinitionResource) int { return b.Weight - a.Weight })
+		definitions, paged := pageRows(res.Answer, in)
 		out := definitionsOut{pageOut: paged, Definitions: make([]definitionRow, 0, len(definitions))}
 		for i := range definitions {
 			out.Definitions = append(out.Definitions, projectDefinition(&definitions[i]))
@@ -319,19 +319,19 @@ func registerProfileTools(r *registry) {
 		if err != nil {
 			return nil, definitionOut{}, err
 		}
-		i := slices.IndexFunc(res.Model, func(d sonarr.QualityDefinitionResource) bool {
+		i := slices.IndexFunc(res.Answer, func(d sonarr.QualityDefinitionResource) bool {
 			return d.Quality != nil && strings.EqualFold(d.Quality.Name, strings.TrimSpace(in.Quality))
 		})
 		if i < 0 {
-			have := make([]string, 0, len(res.Model))
-			for _, d := range res.Model {
+			have := make([]string, 0, len(res.Answer))
+			for _, d := range res.Answer {
 				if d.Quality != nil {
 					have = append(have, d.Quality.Name)
 				}
 			}
 			return nil, definitionOut{}, fmt.Errorf("no quality %q (have: %s)", in.Quality, strings.Join(have, ", "))
 		}
-		body := res.Model[i]
+		body := res.Answer[i]
 		was := projectDefinition(&body)
 		if in.Title != "" {
 			body.Title = in.Title
@@ -349,11 +349,11 @@ func registerProfileTools(r *registry) {
 		if now == was {
 			return nil, definitionOut{Definition: was}, nil
 		}
-		saved, err := client.PutQualityDefinitionById(ctx, strconv.Itoa(body.Id), body)
+		saved, err := client.PutQualityDefinitionById(ctx, body.Id, body)
 		if err != nil {
 			return nil, definitionOut{}, err
 		}
-		out := definitionOut{Definition: projectDefinition(saved.Model)}
+		out := definitionOut{Definition: projectDefinition(saved.Answer)}
 		for _, c := range []struct {
 			what     string
 			from, to any
@@ -382,7 +382,7 @@ func registerProfileTools(r *registry) {
 		if err != nil {
 			return nil, languagesOut{}, err
 		}
-		languages, paged := pageRows(res.Model, in)
+		languages, paged := pageRows(res.Answer, in)
 		out := languagesOut{pageOut: paged, Languages: make([]languageRow, 0, len(languages))}
 		for _, l := range languages {
 			out.Languages = append(out.Languages, languageRow{ID: l.Id, Name: l.Name})
@@ -396,9 +396,9 @@ func registerExclusionTools(r *registry) {
 	client := r.client
 
 	type exclusionRow struct {
-		ID     int    `json:"id"`
-		Title  string `json:"title"`
-		TvdbID int    `json:"tvdb_id"`
+		ID     int           `json:"id"`
+		Title  string        `json:"title"`
+		TvdbID sonarr.TvdbID `json:"tvdb_id"`
 	}
 	type listOut struct {
 		pageOut
@@ -408,7 +408,7 @@ func registerExclusionTools(r *registry) {
 		Name:        "exclusion_list",
 		Description: "The shows import lists are told never to add: the ones deleted with add_import_exclusion, or excluded by hand. A show an import list keeps not adding is usually here.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in pageIn) (*mcp.CallToolResult, listOut, error) {
-		res, err := client.GetImportListExclusionPagedComplete(ctx, sonarr.GetImportListExclusionPagedOperationOptions{})
+		res, err := client.GetImportListExclusionPagedComplete(ctx, sonarr.GetImportListExclusionPagedOptions{})
 		if err != nil {
 			return nil, listOut{}, err
 		}
@@ -444,7 +444,7 @@ func registerExclusionTools(r *registry) {
 			return nil, exclusionRow{}, err
 		}
 
-		return nil, exclusionRow{ID: res.Model.Id, Title: res.Model.Title, TvdbID: res.Model.TvdbId}, nil
+		return nil, exclusionRow{ID: res.Answer.Id, Title: res.Answer.Title, TvdbID: res.Answer.TvdbId}, nil
 	})
 
 	type removeIn struct {
@@ -457,14 +457,15 @@ func registerExclusionTools(r *registry) {
 		Name:        "exclusion_remove",
 		Description: "Lift an import list exclusion, so the lists may add the show again on their next sync.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in removeIn) (*mcp.CallToolResult, removeOut, error) {
-		res, err := client.GetImportListExclusionPagedComplete(ctx, sonarr.GetImportListExclusionPagedOperationOptions{})
+		res, err := client.GetImportListExclusionPagedComplete(ctx, sonarr.GetImportListExclusionPagedOptions{})
 		if err != nil {
 			return nil, removeOut{}, err
 		}
 		ref := strings.TrimSpace(in.Exclusion)
-		tvdb := 0
+		var tvdb sonarr.TvdbID
 		if m := providerRef.FindStringSubmatch(ref); len(m) == 3 && strings.EqualFold(m[1], "tvdb") {
-			tvdb, _ = strconv.Atoi(m[2])
+			n, _ := strconv.Atoi(m[2])
+			tvdb = sonarr.TvdbID(n)
 		}
 		id, numeric := strconv.Atoi(ref)
 		i := slices.IndexFunc(res.Items, func(e sonarr.ImportListExclusionResource) bool {
@@ -573,12 +574,12 @@ func registerBulkTools(r *registry) {
 		defer unlock()
 
 		// Sonarr's editor adds tags or takes them off in one call, not both
-		send := func(tags []int, how sonarr.ApplyTags) ([]sonarr.SeriesResource, error) {
+		send := func(tags []sonarr.TagID, how sonarr.ApplyTags) ([]sonarr.SeriesResource, error) {
 			call := body
 			call.Tags, call.ApplyTags = tags, how
 			res, err := client.PutSeriesEditor(ctx, call)
 
-			return res.Model, err
+			return res.Answer, err
 		}
 		var after []sonarr.SeriesResource
 		switch {
@@ -607,7 +608,7 @@ func registerBulkTools(r *registry) {
 			if err != nil {
 				return nil, bulkOut{}, err
 			}
-			after = res.Model
+			after = res.Answer
 			changed = append(changed, "tags removed: "+strings.Join(in.RemoveTags, ", "))
 		}
 
@@ -642,9 +643,9 @@ func registerSystemTools(r *registry) {
 		if err != nil {
 			return nil, err
 		}
-		slices.SortStableFunc(res.Model, func(a, b sonarr.BackupResource) int { return strings.Compare(b.Time, a.Time) })
+		slices.SortStableFunc(res.Answer, func(a, b sonarr.BackupResource) int { return strings.Compare(b.Time, a.Time) })
 
-		return res.Model, nil
+		return res.Answer, nil
 	}
 	findBackup := func(ctx context.Context, ref string) (*sonarr.BackupResource, error) {
 		all, err := backups(ctx)
@@ -694,7 +695,8 @@ func registerSystemTools(r *registry) {
 		Name:        "backup_create",
 		Description: "Back up Sonarr's database and settings now, before a change worth being able to undo. The backup is kept with the scheduled ones, under Sonarr's own retention.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in backupCreateIn) (*mcp.CallToolResult, backupCreateOut, error) {
-		cmd, err := r.runCommand(ctx, "Backup", nil, waitFor(in.Wait))
+		sent, err := client.Backup(ctx, sonarr.BackupCommand{})
+		cmd, err := r.settleCommand(ctx, "Backup", waitFor(in.Wait), sent, err)
 		out := backupCreateOut{Command: cmd}
 		if err != nil || !commandDone(sonarr.CommandStatus(cmd.Status)) {
 			return nil, out, err
@@ -785,10 +787,10 @@ func registerSystemTools(r *registry) {
 		if err != nil {
 			return nil, updatesOut{}, err
 		}
-		updates, paged := pageRows(res.Model, in)
+		updates, paged := pageRows(res.Answer, in)
 		out := updatesOut{pageOut: paged, Updates: make([]updateRow, 0, len(updates))}
 		for _, u := range updates {
-			row := updateRow{Version: u.Version, Branch: u.Branch, Released: day(u.ReleaseDate), Installed: boolv(u.Installed) || u.InstalledOn != "", Latest: boolv(u.Latest), Installable: boolv(u.Installable)}
+			row := updateRow{Version: u.Version, Branch: u.Branch, Released: day(u.ReleaseDate), Installed: u.Installed || u.InstalledOn != "", Latest: u.Latest, Installable: u.Installable}
 			if u.Changes != nil {
 				row.New, row.Fixed = u.Changes.New, u.Changes.Fixed
 			}
@@ -854,7 +856,7 @@ func registerSystemTools(r *registry) {
 		if err != nil {
 			return nil, diskOut{}, err
 		}
-		disks, paged := pageRows(res.Model, in)
+		disks, paged := pageRows(res.Answer, in)
 		out := diskOut{pageOut: paged, Disks: make([]diskRow, 0, len(disks))}
 		for _, d := range disks {
 			row := diskRow{Path: d.Path, Label: d.Label, Free: humanSize(d.FreeSpace), Total: humanSize(d.TotalSpace)}
@@ -883,8 +885,8 @@ func registerSystemTools(r *registry) {
 		if err != nil {
 			return nil, logFilesOut{}, err
 		}
-		slices.SortStableFunc(res.Model, func(a, b sonarr.LogFileResource) int { return strings.Compare(b.LastWriteTime, a.LastWriteTime) })
-		files, paged := pageRows(res.Model, in)
+		slices.SortStableFunc(res.Answer, func(a, b sonarr.LogFileResource) int { return strings.Compare(b.LastWriteTime, a.LastWriteTime) })
+		files, paged := pageRows(res.Answer, in)
 		out := logFilesOut{pageOut: paged, Files: make([]logFileRow, 0, len(files))}
 		for _, f := range files {
 			out.Files = append(out.Files, logFileRow{Filename: f.Filename, Written: f.LastWriteTime})
@@ -944,7 +946,7 @@ func registerSystemTools(r *registry) {
 	})
 
 	type cancelIn struct {
-		CommandID int `json:"command_id" jsonschema:"the command to cancel, as command_list or the tool that started it names it"`
+		CommandID sonarr.CommandID `json:"command_id" jsonschema:"the command to cancel, as command_list or the tool that started it names it"`
 	}
 	type cancelOut struct {
 		Cancelled commandOut `json:"cancelled" jsonschema:"the command as it stood when it was cancelled"`
@@ -961,21 +963,21 @@ func registerSystemTools(r *registry) {
 			return nil, cancelOut{}, err
 		}
 		switch {
-		case commandDone(cur.Model.Status):
-			return nil, cancelOut{}, fmt.Errorf("command %d (%s) has already %s: there is nothing left to cancel", in.CommandID, cur.Model.Name, cur.Model.Status)
-		case cur.Model.Status == sonarr.CommandStatusStarted:
-			return nil, cancelOut{}, fmt.Errorf("command %d (%s) has already started, and Sonarr cannot stop a command once it is running", in.CommandID, cur.Model.Name)
+		case commandDone(cur.Answer.Status):
+			return nil, cancelOut{}, fmt.Errorf("command %d (%s) has already %s: there is nothing left to cancel", in.CommandID, cur.Answer.Name, cur.Answer.Status)
+		case cur.Answer.Status == sonarr.CommandStatusStarted:
+			return nil, cancelOut{}, fmt.Errorf("command %d (%s) has already started, and Sonarr cannot stop a command once it is running", in.CommandID, cur.Answer.Name)
 		}
 		// it may start between the look and the call, which Sonarr answers
 		// with a conflict
 		if _, err := client.DeleteCommandById(ctx, in.CommandID); err != nil {
 			if apiclient.StatusCode(err) == http.StatusConflict {
-				return nil, cancelOut{}, fmt.Errorf("command %d (%s) has already started, and Sonarr cannot stop a command once it is running", in.CommandID, cur.Model.Name)
+				return nil, cancelOut{}, fmt.Errorf("command %d (%s) has already started, and Sonarr cannot stop a command once it is running", in.CommandID, cur.Answer.Name)
 			}
 			return nil, cancelOut{}, err
 		}
 
-		return nil, cancelOut{Cancelled: projectCommand(cur.Model)}, nil
+		return nil, cancelOut{Cancelled: projectCommand(cur.Answer)}, nil
 	})
 
 	type browseIn struct {
@@ -1005,7 +1007,7 @@ func registerSystemTools(r *registry) {
 		if path != "" && !strings.HasSuffix(path, "/") {
 			path += "/"
 		}
-		res, err := client.GetFileSystem(ctx, sonarr.GetFileSystemOperationOptions{Path: path, IncludeFiles: new(in.Files)})
+		res, err := client.GetFileSystem(ctx, sonarr.GetFileSystemOptions{Path: path, IncludeFiles: new(in.Files)})
 		if err != nil {
 			return nil, browseOut{}, err
 		}
@@ -1021,7 +1023,7 @@ func registerSystemTools(r *registry) {
 				Size int64  `json:"size"`
 			} `json:"files"`
 		}
-		if err := unmarshalRaw(res.Model, &listing); err != nil {
+		if err := unmarshalRaw(res.Answer, &listing); err != nil {
 			return nil, browseOut{}, fmt.Errorf("reading %s: %w", in.Path, err)
 		}
 		rows := make([]browseRow, 0, len(listing.Directories)+len(listing.Files))

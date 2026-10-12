@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetCustomFormatSchemaOperationResponse is the result of GetCustomFormatSchema.
-type GetCustomFormatSchemaOperationResponse struct {
+// GetCustomFormatSchemaResponse is the result of GetCustomFormatSchema.
+type GetCustomFormatSchemaResponse struct {
 	HttpResponse *http.Response
-	Model        []CustomFormatSpecificationSchema
+	Answer       []CustomFormatSpecificationSchema
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetCustomFormatSchemaResponse) Answered() bool { return r.Answer != nil }
+
 // GetCustomFormatSchema calls GET /api/v3/customformat/schema.
-func (c Client) GetCustomFormatSchema(ctx context.Context) (result GetCustomFormatSchemaOperationResponse, err error) {
+func (c Client) GetCustomFormatSchema(ctx context.Context) (result GetCustomFormatSchemaResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetCustomFormatSchema",
 		Path:       "/api/v3/customformat/schema",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetCustomFormatSchema(ctx context.Context) (result GetCustomForm
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

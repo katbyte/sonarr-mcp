@@ -9,19 +9,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteIndexerBulkOperationResponse is the result of DeleteIndexerBulk.
-type DeleteIndexerBulkOperationResponse struct {
+// DeleteIndexerBulkResponse is the result of DeleteIndexerBulk.
+type DeleteIndexerBulkResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteIndexerBulk calls DELETE /api/v3/indexer/bulk.
-func (c Client) DeleteIndexerBulk(ctx context.Context, input IndexerBulkResource) (result DeleteIndexerBulkOperationResponse, err error) {
+func (c Client) DeleteIndexerBulk(ctx context.Context, input IndexerBulkResource) (result DeleteIndexerBulkResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteIndexerBulk",
 		Path:       "/api/v3/indexer/bulk",
 	}
 

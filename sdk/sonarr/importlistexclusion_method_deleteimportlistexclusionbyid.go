@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteImportListExclusionByIdOperationResponse is the result of DeleteImportListExclusionById.
-type DeleteImportListExclusionByIdOperationResponse struct {
+// DeleteImportListExclusionByIdResponse is the result of DeleteImportListExclusionById.
+type DeleteImportListExclusionByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteImportListExclusionById calls DELETE /api/v3/importlistexclusion/{id}.
-func (c Client) DeleteImportListExclusionById(ctx context.Context, id int) (result DeleteImportListExclusionByIdOperationResponse, err error) {
+func (c Client) DeleteImportListExclusionById(ctx context.Context, id int) (result DeleteImportListExclusionByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteImportListExclusionById",
 		Path:       fmt.Sprintf("/api/v3/importlistexclusion/%d", id),
 	}
 

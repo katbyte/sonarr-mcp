@@ -4,24 +4,48 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetQualityProfileSchemaOperationResponse is the result of GetQualityProfileSchema.
-type GetQualityProfileSchemaOperationResponse struct {
+// GetQualityProfileSchemaResponse is the result of GetQualityProfileSchema.
+//
+// Answer is the QualityProfileResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetQualityProfileSchemaResponse struct {
 	HttpResponse *http.Response
-	Model        *QualityProfileResource
+	Answer       *QualityProfileResource
+	*QualityProfileResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetQualityProfileSchemaResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the QualityProfileResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetQualityProfileSchemaResponse) Record() (QualityProfileResource, error) {
+	if r.Answer == nil {
+		return QualityProfileResource{}, errors.New("GetQualityProfileSchema answered no QualityProfileResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetQualityProfileSchema calls GET /api/v3/qualityprofile/schema.
-func (c Client) GetQualityProfileSchema(ctx context.Context) (result GetQualityProfileSchemaOperationResponse, err error) {
+func (c Client) GetQualityProfileSchema(ctx context.Context) (result GetQualityProfileSchemaResponse, err error) {
+	result.QualityProfileResource = &QualityProfileResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetQualityProfileSchema",
 		Path:       "/api/v3/qualityprofile/schema",
 	}
 
@@ -39,11 +63,12 @@ func (c Client) GetQualityProfileSchema(ctx context.Context) (result GetQualityP
 		return
 	}
 
-	var model QualityProfileResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer QualityProfileResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.QualityProfileResource = result.Answer
 
 	return
 }

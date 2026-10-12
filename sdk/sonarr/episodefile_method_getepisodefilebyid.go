@@ -4,26 +4,52 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetEpisodeFileByIdOperationResponse is the result of GetEpisodeFileById.
-type GetEpisodeFileByIdOperationResponse struct {
+// GetEpisodeFileByIdResponse is the result of GetEpisodeFileById.
+//
+// Answer is the EpisodeFileResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetEpisodeFileByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *EpisodeFileResource
+	Answer       *EpisodeFileResource
+	*EpisodeFileResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetEpisodeFileByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the EpisodeFileResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetEpisodeFileByIdResponse) Record() (EpisodeFileResource, error) {
+	if r.Answer == nil {
+		return EpisodeFileResource{}, errors.New("GetEpisodeFileById answered no EpisodeFileResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetEpisodeFileById calls GET /api/v3/episodefile/{id}.
-func (c Client) GetEpisodeFileById(ctx context.Context, id int) (result GetEpisodeFileByIdOperationResponse, err error) {
+func (c Client) GetEpisodeFileById(ctx context.Context, id EpisodeFileID) (result GetEpisodeFileByIdResponse, err error) {
+	result.EpisodeFileResource = &EpisodeFileResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
-		Path:       fmt.Sprintf("/api/v3/episodefile/%d", id),
+		Operation:  "GetEpisodeFileById",
+		Path:       fmt.Sprintf("/api/v3/episodefile/%s", url.PathEscape(strconv.Itoa(int(id)))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -40,11 +66,12 @@ func (c Client) GetEpisodeFileById(ctx context.Context, id int) (result GetEpiso
 		return
 	}
 
-	var model EpisodeFileResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer EpisodeFileResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.EpisodeFileResource = result.Answer
 
 	return
 }

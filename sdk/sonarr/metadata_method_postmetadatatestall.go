@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostMetadataTestAllOperationResponse is the result of PostMetadataTestAll.
-type PostMetadataTestAllOperationResponse struct {
+// PostMetadataTestAllResponse is the result of PostMetadataTestAll.
+type PostMetadataTestAllResponse struct {
 	HttpResponse *http.Response
-	Model        []ProviderTestAllResult
+	Answer       []ProviderTestAllResult
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostMetadataTestAllResponse) Answered() bool { return r.Answer != nil }
+
 // PostMetadataTestAll calls POST /api/v3/metadata/testall.
-func (c Client) PostMetadataTestAll(ctx context.Context) (result PostMetadataTestAllOperationResponse, err error) {
+func (c Client) PostMetadataTestAll(ctx context.Context) (result PostMetadataTestAllResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 			http.StatusBadRequest,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostMetadataTestAll",
 		Path:       "/api/v3/metadata/testall",
 	}
 
@@ -40,7 +45,7 @@ func (c Client) PostMetadataTestAll(ctx context.Context) (result PostMetadataTes
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

@@ -38,12 +38,50 @@ func (g *gen) modelFile(m *definitions.Model) string {
 				b.WriteString("\n")
 			}
 			b.WriteString(comment("\t", f.Description))
-			fmt.Fprintf(&b, "\t%s %s `json:%q`\n", f.Name, g.fieldType(f), fieldTag(m, f))
+			fmt.Fprintf(&b, "\t%s %s `json:%q`\n", f.Name, g.fieldType(m, f), g.fieldTag(m, f))
 		}
 		b.WriteString("}\n")
+		b.WriteString(g.accessors(m))
 	}
 
 	return g.fileHeader(b.String())
+}
+
+// accessors are GetName and GetId for a record that has a Name and an Id, so
+// that code which handles records of several types alike can take them
+// through one interface. A record with a field already so named gets none.
+func (g *gen) accessors(m *definitions.Model) string {
+	var name, id *definitions.Field
+	for i := range m.Fields {
+		f := &m.Fields[i]
+		switch f.Name {
+		case "GetName", "GetId":
+			return ""
+		case "Name":
+			name = f
+		case "Id":
+			id = f
+		}
+	}
+	if name == nil || id == nil {
+		return ""
+	}
+	nameType, idType := g.fieldType(m, name), g.fieldType(m, id)
+	if strings.TrimPrefix(nameType, "*") != "string" || strings.HasPrefix(idType, "[") || strings.HasPrefix(idType, "map") {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n// GetName is the record's Name, for code that handles records of several types alike.\n")
+	if strings.HasPrefix(nameType, "*") {
+		fmt.Fprintf(&b, "func (m %s) GetName() string {\n\tif m.Name == nil {\n\t\treturn \"\"\n\t}\n\n\treturn *m.Name\n}\n", m.Name)
+	} else {
+		fmt.Fprintf(&b, "func (m %s) GetName() string { return m.Name }\n", m.Name)
+	}
+	b.WriteString("\n// GetId is the record's Id, for code that handles records of several types alike.\n")
+	fmt.Fprintf(&b, "func (m %s) GetId() %s { return m.Id }\n", m.Name, idType)
+
+	return b.String()
 }
 
 func (g *gen) constantsFile(grp *definitions.Group) string {
@@ -76,7 +114,8 @@ func (g *gen) constantsFile(grp *definitions.Group) string {
 		for _, v := range c.Values {
 			fmt.Fprintf(&b, "\t\tstring(%s),\n", v.Name)
 		}
-		b.WriteString("\t}\n}\n")
+		b.WriteString("\t}\n}\n\n")
+		fmt.Fprintf(&b, "// Known reports whether the value is one the document lists, or empty; a server may answer one it does not.\nfunc (v %s) Known() bool { return v == \"\" || slices.Contains(%s(), string(v)) }\n", c.Name, possible)
 	}
 
 	return g.fileHeader(b.String())

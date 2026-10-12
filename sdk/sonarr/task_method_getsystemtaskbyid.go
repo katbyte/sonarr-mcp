@@ -4,25 +4,49 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetSystemTaskByIdOperationResponse is the result of GetSystemTaskById.
-type GetSystemTaskByIdOperationResponse struct {
+// GetSystemTaskByIdResponse is the result of GetSystemTaskById.
+//
+// Answer is the TaskResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetSystemTaskByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *TaskResource
+	Answer       *TaskResource
+	*TaskResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetSystemTaskByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the TaskResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetSystemTaskByIdResponse) Record() (TaskResource, error) {
+	if r.Answer == nil {
+		return TaskResource{}, errors.New("GetSystemTaskById answered no TaskResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetSystemTaskById calls GET /api/v3/system/task/{id}.
-func (c Client) GetSystemTaskById(ctx context.Context, id int) (result GetSystemTaskByIdOperationResponse, err error) {
+func (c Client) GetSystemTaskById(ctx context.Context, id int) (result GetSystemTaskByIdResponse, err error) {
+	result.TaskResource = &TaskResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetSystemTaskById",
 		Path:       fmt.Sprintf("/api/v3/system/task/%d", id),
 	}
 
@@ -40,11 +64,12 @@ func (c Client) GetSystemTaskById(ctx context.Context, id int) (result GetSystem
 		return
 	}
 
-	var model TaskResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer TaskResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.TaskResource = result.Answer
 
 	return
 }

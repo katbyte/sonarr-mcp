@@ -2,23 +2,17 @@
 
 package sonarr_test
 
-// Operation coverage: the client's transport records every request the suite
-// makes, and a whole run checks each of the SDK's operations was made at
-// least once. The generated tests prove each method builds its request; only
-// a call against Sonarr proves the request is one Sonarr accepts and the
-// answer one the method decodes, so an operation nothing calls is an
-// operation nothing has proved.
+// Operation coverage: the client records every request the suite makes, and a whole run checks each of the SDK's operations was made at least once.
+// The generated tests prove each method builds its request; only a call against Sonarr proves the request is one Sonarr accepts and the answer one
+// the method decodes, so an operation nothing calls is an operation nothing has proved.
 
 import (
 	"encoding/json"
-	"net/http"
-	"regexp"
-	"slices"
-	"strings"
-	"sync"
 
+	"github.com/katbyte/pandorest/client"
 	"github.com/katbyte/pandorest/config"
 	"github.com/katbyte/pandorest/definitions"
+	"github.com/katbyte/pandorest/sweep"
 	"github.com/katbyte/sonarr-mcp/sdk/pandorest/workarounds"
 )
 
@@ -31,35 +25,8 @@ var notCalled = map[string]string{
 	"PostSystemBackupRestoreUpload": "the same restore, from an uploaded zip",
 }
 
-// recorder is the client's transport: it remembers every request, then hands
-// it on.
-type recorder struct {
-	base http.RoundTripper
-
-	mu   sync.Mutex
-	seen []string // "GET /api/v3/series/7"
-}
-
-func (r *recorder) RoundTrip(req *http.Request) (*http.Response, error) {
-	r.mu.Lock()
-	r.seen = append(r.seen, req.Method+" "+req.URL.Path)
-	r.mu.Unlock()
-
-	return r.base.RoundTrip(req)
-}
-
-// template is an operation's path as a pattern, and how literal it is: a
-// request matches the most literal template it can, so /api/v3/log/file/update
-// is GetLogFileUpdate rather than GetLogFileByFilename with "update".
-type template struct {
-	name     string
-	method   string
-	path     string
-	pattern  *regexp.Regexp
-	literals int
-}
-
-var placeholder = regexp.MustCompile(`\{[^}]+\}`)
+// calls is every request the suite's client sent, for the check at the end of a whole run.
+var calls client.Calls
 
 // loadDefinitions reads the definitions the SDK was generated from: the ones
 // beside the highest-versioned document under api-defs.
@@ -73,69 +40,15 @@ func loadDefinitions() (*definitions.Service, error) {
 	return definitions.Load(svc.Path(svc.Definitions))
 }
 
-func templates() ([]template, error) {
-	svc, err := loadDefinitions()
+// uncovered is what a whole run left wrong, and how many operations there are: each operation nothing called that notCalled does not excuse, and
+// each it excuses that was called after all.
+func uncovered() (problems []string, total int, err error) {
+	defs, err := loadDefinitions()
 	if err != nil {
-		return nil, err
-	}
-	var out []template
-	for _, op := range svc.Operations() {
-		quoted := regexp.QuoteMeta(op.Path)
-		// QuoteMeta escapes the braces too; put the placeholders back as a
-		// single path segment each
-		quoted = regexp.MustCompile(`\\\{[^}]+\\\}`).ReplaceAllString(quoted, `[^/]+`)
-		out = append(out, template{
-			name: op.Name, method: op.Method, path: op.Path, pattern: regexp.MustCompile("^" + quoted + "$"),
-			literals: len(placeholder.ReplaceAllString(op.Path, "")),
-		})
+		return nil, 0, err
 	}
 
-	return out, nil
-}
-
-// coverage is what a whole run called: how many of the operations, those no
-// request matched that notCalled does not explain, and those notCalled names
-// that were called after all.
-type coverage struct {
-	total, called  int
-	missing, stale []string
-}
-
-func operationCoverage() (coverage, error) {
-	tpls, err := templates()
-	if err != nil {
-		return coverage{}, err
-	}
-	called := map[string]bool{}
-	rec.mu.Lock()
-	seen := slices.Clone(rec.seen)
-	rec.mu.Unlock()
-	for _, req := range seen {
-		method, path, _ := strings.Cut(req, " ")
-		best := -1
-		for i, tpl := range tpls {
-			if tpl.method == method && tpl.pattern.MatchString(path) && (best < 0 || tpl.literals > tpls[best].literals) {
-				best = i
-			}
-		}
-		if best >= 0 {
-			called[tpls[best].name] = true
-		}
-	}
-	c := coverage{total: len(tpls), called: len(called)}
-	for _, tpl := range tpls {
-		_, excused := notCalled[tpl.name]
-		switch {
-		case called[tpl.name] && excused:
-			c.stale = append(c.stale, tpl.name)
-		case !called[tpl.name] && !excused:
-			c.missing = append(c.missing, tpl.name+" ("+tpl.method+" "+tpl.path+")")
-		}
-	}
-	slices.Sort(c.missing)
-	slices.Sort(c.stale)
-
-	return c, nil
+	return sweep.NeverCalled(defs, calls.Seen(), notCalled), len(defs.Operations()), nil
 }
 
 // jsonRaw renders a value as the raw JSON an untyped body takes.

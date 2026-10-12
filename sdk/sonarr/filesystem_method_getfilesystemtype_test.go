@@ -13,7 +13,7 @@ func TestOperationGetFileSystemType(t *testing.T) {
 	t.Parallel()
 
 	c, s := newOperationServer(t, 200, "application/json", "{}")
-	result, err := c.GetFileSystemType(t.Context(), GetFileSystemTypeOperationOptions{
+	result, err := c.GetFileSystemType(t.Context(), GetFileSystemTypeOptions{
 		Path: "v-Path",
 	})
 	if err != nil {
@@ -26,13 +26,13 @@ func TestOperationGetFileSystemType(t *testing.T) {
 	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
-	if result.Model == nil {
-		t.Error("the model was not decoded")
+	if result.Answer == nil || !result.Answered() {
+		t.Error("the answer was not decoded")
 	}
 
 	// an answer that does not decode is an error, with the response
 	c, _ = newOperationServer(t, 200, "application/json", "<html>")
-	result, err = c.GetFileSystemType(t.Context(), GetFileSystemTypeOperationOptions{
+	result, err = c.GetFileSystemType(t.Context(), GetFileSystemTypeOptions{
 		Path: "v-Path",
 	})
 	if err == nil || client.StatusCode(err) != 0 || result.HttpResponse == nil {
@@ -41,10 +41,19 @@ func TestOperationGetFileSystemType(t *testing.T) {
 
 	// a status the operation does not document is an error, with the response
 	c, _ = newOperationServer(t, 418, "text/plain", "no")
-	result, err = c.GetFileSystemType(t.Context(), GetFileSystemTypeOperationOptions{
+	result, err = c.GetFileSystemType(t.Context(), GetFileSystemTypeOptions{
 		Path: "v-Path",
 	})
 	if client.StatusCode(err) != 418 || result.HttpResponse == nil {
 		t.Errorf("an undocumented status = %v, %+v", err, result.HttpResponse)
+	}
+
+	// the options may be left out, and two are refused before any request
+	c, s = newOperationServer(t, 200, "application/json", "{}")
+	if _, err = c.GetFileSystemType(t.Context()); err != nil {
+		t.Errorf("without options = %v", err)
+	}
+	if _, err = c.GetFileSystemType(t.Context(), GetFileSystemTypeOptions{}, GetFileSystemTypeOptions{}); err == nil || len(s.requests) != 1 {
+		t.Errorf("two options structs = %v, %d requests", err, len(s.requests))
 	}
 }

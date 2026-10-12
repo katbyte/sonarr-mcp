@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetMetadataOperationResponse is the result of GetMetadata.
-type GetMetadataOperationResponse struct {
+// GetMetadataResponse is the result of GetMetadata.
+type GetMetadataResponse struct {
 	HttpResponse *http.Response
-	Model        []MetadataResource
+	Answer       []MetadataResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetMetadataResponse) Answered() bool { return r.Answer != nil }
+
 // GetMetadata calls GET /api/v3/metadata.
-func (c Client) GetMetadata(ctx context.Context) (result GetMetadataOperationResponse, err error) {
+func (c Client) GetMetadata(ctx context.Context) (result GetMetadataResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetMetadata",
 		Path:       "/api/v3/metadata",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetMetadata(ctx context.Context) (result GetMetadataOperationRes
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

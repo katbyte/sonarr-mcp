@@ -46,7 +46,11 @@ func Validate(svc *Service) error {
 				return
 			}
 			check(where, *t.NestedItem)
-		case Boolean, Integer, Integer64, Float, Double, String, RawObject, Any, RawFile:
+		case Boolean, Integer, Integer64, Float, Double, String, RawObject, Any, RawFile, DateTime, Date, UnixSeconds, UnixMillis:
+		case ID:
+			if svc.IDBase(t.ReferenceName) == "" {
+				problems = append(problems, fmt.Sprintf("%s: id of a kind the service does not declare %q", where, t.ReferenceName))
+			}
 		default:
 			problems = append(problems, fmt.Sprintf("%s: unknown type %q", where, t.Type))
 		}

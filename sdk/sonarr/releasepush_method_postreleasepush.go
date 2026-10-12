@@ -9,20 +9,25 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostReleasePushOperationResponse is the result of PostReleasePush.
-type PostReleasePushOperationResponse struct {
+// PostReleasePushResponse is the result of PostReleasePush.
+type PostReleasePushResponse struct {
 	HttpResponse *http.Response
-	Model        []ReleaseResource
+	Answer       []ReleaseResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostReleasePushResponse) Answered() bool { return r.Answer != nil }
+
 // PostReleasePush calls POST /api/v3/release/push.
-func (c Client) PostReleasePush(ctx context.Context, input ReleaseResource) (result PostReleasePushOperationResponse, err error) {
+func (c Client) PostReleasePush(ctx context.Context, input ReleaseResource) (result PostReleasePushResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostReleasePush",
 		Path:       "/api/v3/release/push",
 	}
 
@@ -44,7 +49,7 @@ func (c Client) PostReleasePush(ctx context.Context, input ReleaseResource) (res
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

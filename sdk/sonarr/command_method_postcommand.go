@@ -5,25 +5,53 @@ package sonarr
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostCommandOperationResponse is the result of PostCommand.
-type PostCommandOperationResponse struct {
+// PostCommandResponse is the result of PostCommand.
+//
+// Answer is the CommandResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PostCommandResponse struct {
 	HttpResponse *http.Response
-	Model        *CommandResource
+	Answer       *CommandResource
+	*CommandResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PostCommandResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the CommandResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PostCommandResponse) Record() (CommandResource, error) {
+	if r.Answer == nil {
+		return CommandResource{}, errors.New("PostCommand answered no CommandResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PostCommand calls POST /api/v3/command.
-func (c Client) PostCommand(ctx context.Context, input json.RawMessage) (result PostCommandOperationResponse, err error) {
+func (c Client) PostCommand(ctx context.Context, input json.RawMessage) (result PostCommandResponse, err error) {
+	result.CommandResource = &CommandResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusCreated,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostCommand",
 		Path:       "/api/v3/command",
 	}
 
@@ -45,11 +73,47 @@ func (c Client) PostCommand(ctx context.Context, input json.RawMessage) (result 
 		return
 	}
 
-	var model CommandResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer CommandResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.CommandResource = result.Answer
 
 	return
+}
+
+// CommandPoll is how often WaitForCommand asks after a command.
+var CommandPoll = 2 * time.Second
+
+// WaitForCommand asks after the command every CommandPoll until the server says it finished (completed, failed, aborted, cancelled, orphaned), or ctx ends, or wait
+// runs out, and answers it as it stands: a command that failed is an error carrying what the server said, wrapping
+// client.ErrCommandFailed, and one still running when wait ran out wraps client.ErrCommandRunning, for a caller that takes
+// that as an answer. For a command queued by its own method, <Name>AndWait does both at once.
+func (c Client) WaitForCommand(ctx context.Context, id CommandID, wait time.Duration) (result GetCommandByIdResponse, err error) {
+	deadline := time.Now().Add(wait)
+	for {
+		result, err = c.GetCommandById(ctx, id)
+		if err != nil || result.Answer == nil {
+			return
+		}
+		status := string(result.Answer.Status)
+		if slices.Contains([]string{"failed", "aborted", "cancelled", "orphaned"}, status) {
+			err = fmt.Errorf("the command %v %s %s: %s: %w", id, string(result.Answer.Name), status, strings.TrimSpace(strings.Join([]string{string(result.Answer.Message), string(result.Answer.Exception)}, " ")), client.ErrCommandFailed)
+			return
+		}
+		if slices.Contains([]string{"completed", "failed", "aborted", "cancelled", "orphaned"}, status) {
+			return
+		}
+		if time.Now().After(deadline) {
+			err = fmt.Errorf("the command %v is still %s after %s: %w", id, status, wait, client.ErrCommandRunning)
+			return
+		}
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+			return
+		case <-time.After(CommandPoll):
+		}
+	}
 }

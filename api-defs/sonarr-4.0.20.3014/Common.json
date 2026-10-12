@@ -343,7 +343,8 @@
           "Name": "Id",
           "JsonName": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeFileID"
           }
         },
         {
@@ -440,7 +441,8 @@
           "Name": "SeriesId",
           "JsonName": "seriesId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         },
         {
@@ -500,7 +502,8 @@
           "Name": "EpisodeFileId",
           "JsonName": "episodeFileId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeFileID"
           }
         },
         {
@@ -537,7 +540,8 @@
           "Name": "Id",
           "JsonName": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeID"
           }
         },
         {
@@ -625,7 +629,8 @@
           "Name": "SeriesId",
           "JsonName": "seriesId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         },
         {
@@ -1377,7 +1382,8 @@
           "Name": "Id",
           "JsonName": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "QualityProfileID"
           }
         },
         {
@@ -1513,7 +1519,8 @@
           "Name": "EpisodeId",
           "JsonName": "episodeId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeID"
           },
           "Nullable": true
         },
@@ -1604,7 +1611,8 @@
           "Name": "SeriesId",
           "JsonName": "seriesId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           },
           "Nullable": true
         },
@@ -1719,7 +1727,8 @@
           "Name": "Id",
           "JsonName": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeID"
           }
         },
         {
@@ -1852,7 +1861,8 @@
           "Name": "EpisodeId",
           "JsonName": "episodeId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "EpisodeID"
           },
           "Nullable": true
         },
@@ -1862,7 +1872,8 @@
           "Type": {
             "Type": "List",
             "NestedItem": {
-              "Type": "Integer"
+              "Type": "ID",
+              "ReferenceName": "EpisodeID"
             }
           },
           "Nullable": true
@@ -2055,7 +2066,8 @@
           "Name": "MappedSeriesId",
           "JsonName": "mappedSeriesId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           },
           "Nullable": true
         },
@@ -2164,7 +2176,8 @@
           "Name": "SeriesId",
           "JsonName": "seriesId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           },
           "Nullable": true
         },
@@ -2232,7 +2245,8 @@
           "Name": "TvdbId",
           "JsonName": "tvdbId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "TvdbID"
           }
         }
       ]
@@ -2509,7 +2523,8 @@
           "Name": "Id",
           "JsonName": "id",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         },
         {
@@ -2622,7 +2637,8 @@
           "Name": "QualityProfileId",
           "JsonName": "qualityProfileId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "QualityProfileID"
           }
         },
         {
@@ -2713,7 +2729,8 @@
           "Type": {
             "Type": "List",
             "NestedItem": {
-              "Type": "Integer"
+              "Type": "ID",
+              "ReferenceName": "TagID"
             }
           },
           "Nullable": true
@@ -2759,7 +2776,8 @@
           "Name": "TvdbId",
           "JsonName": "tvdbId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "TvdbID"
           }
         },
         {

@@ -4,37 +4,42 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetCalendarOperationResponse is the result of GetCalendar.
-type GetCalendarOperationResponse struct {
+// GetCalendarResponse is the result of GetCalendar.
+type GetCalendarResponse struct {
 	HttpResponse *http.Response
-	Model        []EpisodeResource
+	Answer       []EpisodeResource
 }
 
-// GetCalendarOperationOptions holds the query and header parameters of GetCalendar.
-type GetCalendarOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetCalendarResponse) Answered() bool { return r.Answer != nil }
+
+// GetCalendarOptions holds the query and header parameters of GetCalendar.
+type GetCalendarOptions struct {
 	Start                string
 	End                  string
 	Unmonitored          *bool
 	IncludeSeries        *bool
 	IncludeEpisodeFile   *bool
 	IncludeEpisodeImages *bool
-	Tags                 string
+	Tags                 []TagID
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetCalendarOperationOptions) ToHeaders() *client.Headers {
+func (o GetCalendarOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetCalendarOperationOptions) ToQuery() *client.QueryParams {
+func (o GetCalendarOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.Start != "" {
 		out.Append("start", o.Start)
@@ -54,20 +59,30 @@ func (o GetCalendarOperationOptions) ToQuery() *client.QueryParams {
 	if o.IncludeEpisodeImages != nil {
 		out.Append("includeEpisodeImages", strconv.FormatBool(*o.IncludeEpisodeImages))
 	}
-	if o.Tags != "" {
-		out.Append("tags", o.Tags)
+	if len(o.Tags) > 0 {
+		out.Append("tags", client.Joined(o.Tags))
 	}
 	return &out
 }
 
 // GetCalendar calls GET /api/v3/calendar.
-func (c Client) GetCalendar(ctx context.Context, options GetCalendarOperationOptions) (result GetCalendarOperationResponse, err error) {
+func (c Client) GetCalendar(ctx context.Context, options ...GetCalendarOptions) (result GetCalendarResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetCalendar takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetCalendarOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetCalendar",
+		OptionsObject: option,
 		Path:          "/api/v3/calendar",
 	}
 
@@ -85,7 +100,7 @@ func (c Client) GetCalendar(ctx context.Context, options GetCalendarOperationOpt
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

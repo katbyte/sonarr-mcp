@@ -1,14 +1,15 @@
 package generator
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -18,18 +19,36 @@ import (
 
 // gen holds what every file of one package needs.
 type gen struct {
-	svc       *definitions.Service
-	opts      Options
+	svc   *definitions.Service
+	opts  Options
+	kinds map[definitions.ObjectType]bool
+	// sent are the models a request body reaches, whose booleans stay pointers
+	sent      map[string]bool
 	models    map[string]*definitions.Model
 	constants map[string]*definitions.Constant
 	// paged is the service's first list operation, which says how its lists
 	// page; nil for a service with none
 	paged *definitions.Operation
 
-	// declared maps each package-level identifier to what declared it
+	// declared maps each package-level identifier to what declared it, in
+	// the package being rendered (pkg); clashes are collected across them
 	declared map[string]string
 	clashes  []string
+
+	// the grouped layout: pkg is the package being rendered, qual the
+	// qualifier its references to the types package carry ("emby." in a
+	// group, "" in the types package itself), pkgs each group's package
+	// name, and imports what the file being rendered imports beyond what
+	// its body shows
+	pkg     string
+	qual    string
+	pkgs    map[string]string
+	imports []importSpec
 }
+
+// importSpec is one import a generated file needs: a path, and the name it
+// is referred to by when that is not the path's last element.
+type importSpec struct{ path, alias string }
 
 func newGen(svc *definitions.Service, opts Options) (*gen, error) {
 	if svc.Package == "" || !isIdent(svc.Package) {
@@ -45,6 +64,12 @@ func newGen(svc *definitions.Service, opts Options) (*gen, error) {
 		models:    svc.Models(),
 		constants: svc.Constants(),
 		declared:  map[string]string{},
+		pkg:       svc.Package,
+	}
+	if opts.Grouped {
+		if err := g.groupPackages(); err != nil {
+			return nil, err
+		}
 	}
 	for _, o := range svc.Operations() {
 		if o.Pageable != nil {
@@ -52,9 +77,14 @@ func newGen(svc *definitions.Service, opts Options) (*gen, error) {
 			break
 		}
 	}
+	g.kinds = kindsUsed(svc)
+	g.sent = sentModels(svc)
 
 	if opts.Client != "" && (opts.Credential != "" || opts.NewDoc != "") {
 		return nil, fmt.Errorf("%s: its config words the default client.go's New (Credential, NewDoc) and gives a Client of its own as well, which has its own words: drop one or the other", svc.Name)
+	}
+	if opts.Client != "" && opts.Grouped {
+		return nil, fmt.Errorf("%s: a Client of the service's own is for the flat layout; grouped, the constructor is generated, and an authorizer declared beside the generated files is named in Auth by its lowercase name", svc.Name)
 	}
 	if opts.Client == "" {
 		// New's parameter must be a name, and not one New already uses
@@ -65,7 +95,11 @@ func newGen(svc *definitions.Service, opts Options) (*gen, error) {
 			return nil, fmt.Errorf("%s: NewDoc must document New, and start with its name: %q", svc.Name, opts.NewDoc)
 		}
 		if !isIdent(svc.Auth) {
-			return nil, fmt.Errorf("%s: Auth %q is not the name of an authorizer of %s, which the default client.go needs; name one, or give the service a Client of its own", svc.Name, svc.Auth, opts.ClientImport)
+			return nil, fmt.Errorf("%s: Auth %q is not the name of an authorizer of %s, or of one declared beside the generated files, which the default client.go needs; name one, or give the service a Client of its own", svc.Name, svc.Auth, opts.ClientImport)
+		}
+		if localAuth(svc.Auth) {
+			// declared by hand beside the generated files, and not to be declared again
+			g.declare(svc.Auth, "the service's own file")
 		}
 		if opts.ClientService != "" && !isIdent(opts.ClientService) {
 			return nil, fmt.Errorf("%s: ClientService %q is not the name of a value in the package", svc.Name, opts.ClientService)
@@ -143,14 +177,50 @@ func declarations(src string) ([]string, error) {
 	return names, nil
 }
 
-// declare records a package-level identifier.
+// declare records a package-level identifier of the package being rendered.
 func (g *gen) declare(name, by string) {
 	if prev, ok := g.declared[name]; ok {
-		g.clashes = append(g.clashes, fmt.Sprintf("%s is declared by both %s and %s", name, prev, by))
+		where := ""
+		if g.opts.Grouped {
+			where = "package " + g.pkg + ": "
+		}
+		g.clashes = append(g.clashes, fmt.Sprintf("%s%s is declared by both %s and %s", where, name, prev, by))
 		return
 	}
 	g.declared[name] = by
 }
+
+// localAuth reports whether Auth names an authorizer declared beside the
+// generated files rather than one of the base client's: by its lowercase
+// name, which an exported one of the base client's cannot have.
+func localAuth(auth string) bool {
+	first, _ := utf8.DecodeRuneInString(auth)
+
+	return unicode.IsLower(first)
+}
+
+// authorizerExpr is the expression that wraps the credential in the
+// service's authorizer: the base client's, or the package's own.
+func authorizerExpr(auth, credential string) string {
+	if localAuth(auth) {
+		return auth + "(" + credential + ")"
+	}
+
+	return "client." + auth + "(" + credential + ")"
+}
+
+// cmpOr is the first of two strings that is not empty.
+func cmpOr(a, b string) string {
+	if a != "" {
+		return a
+	}
+
+	return b
+}
+
+// typeName is how a name declared in the types package is written in the
+// package being rendered.
+func (g *gen) typeName(name string) string { return g.qual + name }
 
 func (g *gen) checkIdentifiers() error {
 	if len(g.clashes) == 0 {
@@ -184,6 +254,14 @@ func (g *gen) goType(t definitions.TypeRef) string {
 		return "float64"
 	case definitions.String:
 		return "string"
+	case definitions.DateTime:
+		return g.typeName("Time")
+	case definitions.Date:
+		return g.typeName("Day")
+	case definitions.UnixSeconds:
+		return g.typeName("Unix")
+	case definitions.UnixMillis:
+		return g.typeName("UnixMilli")
 	case definitions.Any:
 		return "any"
 	case definitions.RawObject:
@@ -194,8 +272,8 @@ func (g *gen) goType(t definitions.TypeRef) string {
 		return "[]" + g.goType(*t.NestedItem)
 	case definitions.Dictionary:
 		return "map[string]" + g.goType(*t.NestedItem)
-	case definitions.Reference:
-		return t.ReferenceName
+	case definitions.Reference, definitions.ID:
+		return g.typeName(t.ReferenceName)
 	}
 
 	return "any"
@@ -205,44 +283,58 @@ func (g *gen) goType(t definitions.TypeRef) string {
 // pointer, anything else as goType has it.
 func (g *gen) heldType(t definitions.TypeRef) string {
 	if t.Type == definitions.Reference && g.isStruct(t.ReferenceName) {
-		return "*" + t.ReferenceName
+		return "*" + g.typeName(t.ReferenceName)
 	}
 
 	return g.goType(t)
 }
 
 // fieldType is how a model holds a field: a struct model by pointer, a
-// boolean as *bool, a number whose null is kept (KeepsNull) by pointer, the
-// rest by value.
-func (g *gen) fieldType(f *definitions.Field) string {
-	if f.Type.Type == definitions.Boolean {
-		return "*bool"
-	}
-	if f.KeepsNull {
+// number or string whose null is kept (KeepsNull) by pointer, a boolean by
+// pointer where boolPointer says, the rest by value.
+func (g *gen) fieldType(m *definitions.Model, f *definitions.Field) string {
+	if f.KeepsNull || g.boolPointer(m, f) {
 		return "*" + g.heldType(f.Type)
 	}
 
 	return g.heldType(f.Type)
 }
 
-// fieldTag is the JSON tag of a model's field. Booleans are *bool with omitempty:
-// the servers default many flags to true, so a body must be able to leave one
-// unset as well as send an explicit false. Lists and maps are omitzero, so a
-// nil one is left out but an empty one is sent, which is how a body clears a
-// list. The rest are omitempty, except the strings and numbers of a model
-// written back whole (a settings object), which are always sent: read "",
-// write "", rather than a null the server does not save. A field the
-// document requires is always sent whatever it is, so an empty string goes
-// as "" rather than not at all.
-func fieldTag(m *definitions.Model, f *definitions.Field) string {
-	if f.Required {
+// boolPointer says when a boolean is held by pointer: when the document
+// declares it nullable or KeepNull names it; and in a model a request body
+// reaches, unless the model is written back whole or the field is required,
+// since a boolean by value is always sent and a server that keeps what it is
+// not sent would read a flag never set as switched off (an edit of a user's
+// email removing an administrator). A model only ever answered holds its
+// booleans by value, false when the server left them out, which is what
+// every caller read them as through a helper.
+func (g *gen) boolPointer(m *definitions.Model, f *definitions.Field) bool {
+	if f.Type.Type != definitions.Boolean {
+		return false
+	}
+
+	return f.KeepsNull || f.Nullable || (g.sent[m.Name] && !m.WrittenWhole && !f.Required)
+}
+
+// fieldTag is the JSON tag of a model's field. A boolean by value is always
+// sent, so a record written back whole carries its false flags and a server
+// that defaults a flag to true reads the false; one held by pointer
+// (boolPointer) is omitempty, so nil leaves it unset. Lists and
+// maps are omitzero, so a nil one is left out but an empty one is sent,
+// which is how a body clears a list. The rest are omitempty, except the
+// strings and numbers of a model written back whole (a settings object),
+// which are always sent: read "", write "", rather than a null the server
+// does not save. A field the document requires is always sent whatever it
+// is, so an empty string goes as "" rather than not at all.
+func (g *gen) fieldTag(m *definitions.Model, f *definitions.Field) string {
+	if f.Required || (f.Type.Type == definitions.Boolean && !g.boolPointer(m, f)) {
 		return f.JSONName
 	}
 	switch f.Type.Type {
-	case definitions.List, definitions.Dictionary:
+	case definitions.List, definitions.Dictionary, definitions.DateTime, definitions.Date, definitions.UnixSeconds, definitions.UnixMillis:
 		return f.JSONName + ",omitzero"
 	case definitions.String, definitions.Integer, definitions.Integer64, definitions.Float, definitions.Double:
-		// a number whose null is kept is a pointer, and its nil is left out
+		// a number or string whose null is kept is a pointer, and its nil is left out
 		if m.WrittenWhole && !f.KeepsNull {
 			return f.JSONName
 		}
@@ -258,34 +350,49 @@ func (g *gen) fileHeader(body string) string {
 	var b strings.Builder
 	b.WriteString(Header)
 	b.WriteString("\n")
-	fmt.Fprintf(&b, "package %s\n\n", g.svc.Package)
+	fmt.Fprintf(&b, "package %s\n\n", g.pkg)
 
 	var std, ext []string
 	for _, imp := range []struct{ path, use string }{
+		{"bytes", "bytes."},
 		{"context", "context."},
 		{"encoding/json", "json."},
 		{"errors", "errors."},
 		{"fmt", "fmt."},
 		{"io", "io."},
+		{"iter", "iter."},
 		{"net/http", "http."},
 		{"net/http/httptest", "httptest."},
 		{"net/url", "url."},
+		{"reflect", "reflect."},
+		{"regexp", "regexp."},
 		{"slices", "slices."},
 		{"strconv", "strconv."},
 		{"strings", "strings."},
 		{"testing", "testing."},
+		{"time", "time."},
 	} {
 		if usesPackage(body, imp.use) {
 			std = append(std, imp.path)
 		}
 	}
 	if usesPackage(body, "client.") {
-		ext = append(ext, g.opts.ClientImport)
+		ext = append(ext, strconv.Quote(g.opts.ClientImport))
+	}
+	if g.qual != "" && usesPackage(body, g.qual) {
+		ext = append(ext, g.rootImport().String())
+	}
+	for _, imp := range g.imports {
+		ext = append(ext, imp.String())
 	}
 	switch len(std) + len(ext) {
 	case 0:
 	case 1:
-		fmt.Fprintf(&b, "import %q\n\n", append(std, ext...)[0])
+		if len(std) == 1 {
+			fmt.Fprintf(&b, "import %q\n\n", std[0])
+		} else {
+			fmt.Fprintf(&b, "import %s\n\n", ext[0])
+		}
 	default:
 		b.WriteString("import (\n")
 		for _, p := range std {
@@ -295,13 +402,32 @@ func (g *gen) fileHeader(body string) string {
 			b.WriteString("\n")
 		}
 		for _, p := range ext {
-			fmt.Fprintf(&b, "\t%q\n", p)
+			fmt.Fprintf(&b, "\t%s\n", p)
 		}
 		b.WriteString(")\n\n")
 	}
 	b.WriteString(body)
 
 	return b.String()
+}
+
+// String renders the import as it is written in an import block.
+func (i importSpec) String() string {
+	if i.alias != "" && i.alias != path.Base(i.path) {
+		return i.alias + " " + strconv.Quote(i.path)
+	}
+
+	return strconv.Quote(i.path)
+}
+
+// rootImport is how a group imports the types package: Dir's import path,
+// or the package under it when Dir is not named for it (see grouped.go).
+func (g *gen) rootImport() importSpec {
+	if filepath.Base(g.opts.Dir) == g.svc.Package {
+		return importSpec{g.opts.ImportPath, g.svc.Package}
+	}
+
+	return importSpec{path.Join(g.opts.ImportPath, g.svc.Package), g.svc.Package}
 }
 
 // usesPackage reports whether code refers to a package selector such as
@@ -406,7 +532,7 @@ const DocumentVersion = %q
 // Client type, and a New that wraps its credential in the base client's
 // authorizer the service's Auth names and makes the client the service's own
 // way where it says what that is. Its arguments: the document's title, the
-// authorizer, what makes the client (the package's client.Service, or the
+// credential wrapped in the authorizer, what makes the client (the package's client.Service, or the
 // base client itself), New's documentation, its parameter for the credential
 // and its refusal of an empty one.
 const defaultClient = `// Client is a client for %[1]s; each of its operations is a method.
@@ -419,7 +545,8 @@ type Client struct {
 	if %[5]s == "" {
 		return nil, errors.New(%[6]q)
 	}
-	c, err := %[3]s.New(baseURL, client.%[2]s(%[5]s), opts...)
+	// the credential is a secret whatever the authorizer makes of it, so no error repeats it
+	c, err := %[3]s.New(baseURL, %[2]s, append(opts[:len(opts):len(opts)], client.WithSecrets(%[5]s))...)
 	if err != nil {
 		return nil, err
 	}
@@ -444,16 +571,22 @@ func (g *gen) clientFile() string {
 	if g.opts.Credential != "" {
 		argument, refusal = credentialArgument(g.opts.Credential), g.opts.Credential+" is required"
 	}
-	doc := cmp.Or(g.opts.NewDoc, fmt.Sprintf(defaultNewDoc, g.svc.Title, argument))
+	doc := cmpOr(g.opts.NewDoc, fmt.Sprintf(defaultNewDoc, g.svc.Title, argument))
 
-	return g.fileHeader(g.apiVersionConsts() + fmt.Sprintf(defaultClient, g.svc.Title, g.svc.Auth, cmp.Or(g.opts.ClientService, "client"), comment("", doc), argument, refusal))
+	return g.fileHeader(g.apiVersionConsts() + fmt.Sprintf(defaultClient, g.svc.Title, authorizerExpr(g.svc.Auth, argument), cmpOr(g.opts.ClientService, "client"), comment("", doc), argument, refusal))
 }
 
 // credentialArgument is the name of New's parameter for a credential the
 // service calls by a name of its own: "API key" is apiKey.
 func credentialArgument(credential string) string {
+	words := strings.FieldsFunc(credential, func(r rune) bool { return !isIdentRune(r) || r == '_' })
+	if len(words) > 2 {
+		// a phrase ("TMDB read access token or API key") is for the doc, not for an argument name
+		return "credential"
+	}
+
 	var b strings.Builder
-	for i, word := range strings.FieldsFunc(credential, func(r rune) bool { return !isIdentRune(r) || r == '_' }) {
+	for i, word := range words {
 		if i == 0 {
 			b.WriteString(strings.ToLower(word))
 			continue
@@ -472,38 +605,77 @@ func credentialArgument(credential string) string {
 // service's own, a test) would then be told it has no package comment. Its
 // first line says what wrote it instead, which is how Generated knows it.
 func (g *gen) docFile() string {
+	// no generated header here: a linter skips a file marked generated and then misses the package comment, and flags the
+	// hand-written file beside it as lacking one; the comment's first line says what wrote it instead, and Generated knows it
 	var b strings.Builder
 	fmt.Fprintf(&b, "// Package %s is a typed client for %s %s, generated by pandorest\n", g.svc.Package, g.svc.Title, g.svc.APIVersion)
 	fmt.Fprintf(&b, "// from the definitions in %s, which were imported from %s.\n", filepath.ToSlash(g.opts.Definitions), g.svc.Source)
-	fmt.Fprintf(&b, `//
-// # Layout
+	b.WriteString("//\n// # Layout\n//\n")
+	if g.opts.Grouped {
+		fmt.Fprintf(&b, `// This package holds every model (model_<model>.go), every enum
+// (constants_<tag>.go) and every operation's options and response types
+// (operation_<operation>.go), so that a caller names them all as %[1]s.X. The
+// operations are methods on the Client of their tag's package, one package
+// per tag beside this one, and %[2]s/client holds New and a Client with a
+// field for each. A caller imports this package and client, and never a
+// tag's. The requests go through the hand-written base client,
+// %[3]s.
 //
-// Every operation of the API is a method on Client, in a file of its own named
+`, g.svc.Package, path.Base(g.opts.ImportPath), g.opts.ClientImport)
+	} else {
+		fmt.Fprintf(&b, `// Every operation of the API is a method on Client, in a file of its own named
 // <tag>_method_<operation>.go. Each model is in <tag>_model_<model>.go and each
 // tag's enums in <tag>_constants.go; a model or enum more than one tag uses is
 // under common_. The requests go through the hand-written base client,
 // %s.
 //
-// # Calls
+`, g.opts.ClientImport)
+	}
+	b.WriteString(`// # Calls
 //
 // A method takes a context, then the path parameters in path order, then the
 // request body (input: the model for a JSON body, or an io.Reader and its
 // content type for raw bytes), then, when the operation has query or header
-// parameters, a <Name>OperationOptions. Unset options are not sent: a
-// boolean or a number is a pointer, sent when set (so 0 and false can be
-// asked for), an empty string or list is skipped, and a list is sent
-// comma-joined or as one parameter for each element, as the document says.
+// parameters, a <Name>Options, which may be left out when every one of them
+// is optional`)
+	if g.opts.InlineSingleOptions {
+		b.WriteString(`, and which an operation with one parameter takes as the
+// parameter itself, variadic when optional`)
+	}
+	b.WriteString(`.
+// Unset options are not sent: a boolean or a number is a pointer, sent when
+// set (so 0 and false can be asked for), an empty string or list is skipped,
+// and a list is sent comma-joined or as one parameter for each element, as
+// the document says.
 //
-// It returns a <Name>OperationResponse holding HttpResponse and, when the
-// operation answers JSON, Model. HttpResponse is set whenever the server
-// answered, including alongside an error, and its body can be read again. An
-// operation that answers a file leaves the body unread in
-// HttpResponse.Body for the caller to read and close. A status the operation
-// does not document is an error, and client.StatusCode reads the status from
-// it.
-`, g.opts.ClientImport)
+// It returns a <Name>Response holding HttpResponse and, when the operation
+// answers JSON, Answer: a pointer for a struct, enum or primitive, nil when
+// the server answered with no body, and the value for a list, map or raw
+// JSON. Answered() says whether a body came and was decoded. A struct answer
+// is also embedded, so res.Answer.Name may be read as res.Name, a zero record
+// when nothing was answered, and Record() hands it back by value with an
+// error when none came. HttpResponse is set whenever the server answered,
+// including alongside an error. An operation that answers a file has no
+// Answer: WriteTo(w) copies the file out and closes the body, Bytes(max)
+// reads it whole up to a size, Reader() hands the body over with its content
+// type, ContentLength() and Filename() say what the server said of it, and
+// the body is also still in HttpResponse.Body. A status the operation does
+// not document is an error: client.StatusCode reads the status from it, and
+// IsNotFound and the other Is helpers say which it is.
+`)
 	if g.paged != nil {
-		fmt.Fprintf(&b, "//\n// A list operation, one whose options page with %s and %s, also has a\n// <Name>Complete method that pages through every result.\n", g.paged.Pageable.StartIndexOption, g.paged.Pageable.LimitOption)
+		pages := g.paged.Pageable.StartIndexOption
+		if g.paged.Pageable.LimitOption != "" {
+			pages += " and " + g.paged.Pageable.LimitOption
+		}
+		fmt.Fprintf(&b, "//\n// A list operation, one whose options page with %s, also has a\n// <Name>Complete method that loads every result, and a <Name>Each that\n// hands them out one at a time as a range, so a loop that stops asks for no\n// page more.\n", pages)
+	}
+	if len(g.svc.IDs) > 0 {
+		names := make([]string, 0, len(g.svc.IDs))
+		for _, k := range g.svc.IDs {
+			names = append(names, k.Name)
+		}
+		fmt.Fprintf(&b, "//\n// # Ids\n//\n// %s are kinds of id the package tells apart, each a bare named type over\n// the int or string the document declares, so that one kind where another goes\n// does not compile. Where an id sits among the options it is held by value and\n// sent when not zero. int(id) and SeriesID(n) convert one value, client.IDs and\n// client.StringIDs a list.\n", strings.Join(names, ", "))
 	}
 	if notes := comment("", g.opts.Notes); notes != "" {
 		b.WriteString("//\n")
@@ -518,4 +690,134 @@ func (g *gen) docFile() string {
 	fmt.Fprintf(&b, "package %s\n", g.svc.Package)
 
 	return b.String()
+}
+
+// kindsUsed is every type a service's fields, options, path parameters and bodies are of, so that a
+// type the package declares only when something is of it (Unix, UnixMilli) is declared then.
+func kindsUsed(svc *definitions.Service) map[definitions.ObjectType]bool {
+	kinds := map[definitions.ObjectType]bool{}
+	var note func(t definitions.TypeRef)
+	note = func(t definitions.TypeRef) {
+		kinds[t.Type] = true
+		if t.NestedItem != nil {
+			note(*t.NestedItem)
+		}
+	}
+	for _, m := range svc.Models() {
+		for i := range m.Fields {
+			note(m.Fields[i].Type)
+		}
+	}
+	for _, o := range svc.Operations() {
+		for i := range o.Options {
+			note(o.Options[i].Type)
+		}
+		for i := range o.PathParameters {
+			note(o.PathParameters[i].Type)
+		}
+		if o.Request != nil {
+			note(o.Request.Type)
+		}
+		if o.Response != nil {
+			note(o.Response.Type)
+		}
+	}
+
+	return kinds
+}
+
+// datesFile reports whether the package declares a date type: Time or Day from the service's layouts,
+// Unix or UnixMilli from a field a workaround declared an epoch.
+func (g *gen) datesFile() bool {
+	return len(g.svc.Dates) > 0 || len(g.svc.Days) > 0 || g.kinds[definitions.UnixSeconds] || g.kinds[definitions.UnixMillis]
+}
+
+// idBase is the base type of a kind of id, Integer when the service does not
+// declare the kind, which Validate has already refused.
+func (g *gen) idBase(kind string) definitions.ObjectType {
+	if base := g.svc.IDBase(kind); base != "" {
+		return base
+	}
+
+	return definitions.Integer
+}
+
+// idsFile declares a named type for each kind of id the service tells apart.
+func (g *gen) idsFile() string {
+	var b strings.Builder
+	for i, k := range g.svc.IDs {
+		g.declare(k.Name, "ids.go")
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		base := g.goType(definitions.TypeRef{Type: k.Base})
+		list := "client.IDs"
+		if k.Base == definitions.String {
+			list = "client.StringIDs"
+		}
+		fmt.Fprintf(&b, "// %s is a kind of id the service tells apart, which the compiler keeps from every other kind;\n// %s(id) and %s(n) convert one value, %s a list.\n", k.Name, base, k.Name, list)
+		fmt.Fprintf(&b, "type %s %s\n", k.Name, base)
+		if k.Shape != "" {
+			shape := shapeVar(k.Name)
+			g.declare(shape, "ids.go")
+			fmt.Fprintf(&b, "\n// %s is the shape every %s has.\nvar %s = regexp.MustCompile(%s)\n", shape, k.Name, shape, strconv.Quote(k.Shape))
+			fmt.Fprintf(&b, "\n// Check refuses a value that has not the shape every %s has, which a method does before sending a request with it; the error names the value.\n", k.Name)
+			fmt.Fprintf(&b, "func (id %s) Check() error {\n\tif !%s.MatchString(fmt.Sprint(%s(id))) {\n\t\treturn fmt.Errorf(\"%%v is not %s %s (the shape is %%s)\", %s(id), %s)\n\t}\n\n\treturn nil\n}\n", k.Name, shape, base, article(k.Name), k.Name, base, strconv.Quote(k.Shape))
+		}
+	}
+
+	return g.fileHeader(b.String())
+}
+
+// article is "an" before a name that starts with a vowel, else "a".
+func article(name string) string {
+	if strings.ContainsRune("AEIOUaeiou", rune(name[0])) {
+		return "an"
+	}
+
+	return "a"
+}
+
+// shapeVar names the variable holding a kind's shape: seriesIDShape.
+func shapeVar(kind string) string {
+	return strings.ToLower(kind[:1]) + kind[1:] + "Shape"
+}
+
+// idShape is the shape of a kind of id, or "" for one with none.
+func (g *gen) idShape(kind string) string {
+	if k := g.svc.IDKind(kind); k != nil {
+		return k.Shape
+	}
+
+	return ""
+}
+
+// sentModels is every model a request body reaches, itself or through a
+// field, a list or a map of it.
+func sentModels(svc *definitions.Service) map[string]bool {
+	models := svc.Models()
+	sent := map[string]bool{}
+	var reach func(t definitions.TypeRef)
+	reach = func(t definitions.TypeRef) {
+		switch {
+		case t.NestedItem != nil:
+			reach(*t.NestedItem)
+		case t.Type == definitions.Reference:
+			m := models[t.ReferenceName]
+			if m == nil || sent[m.Name] {
+				return
+			}
+			sent[m.Name] = true
+			for i := range m.Fields {
+				reach(m.Fields[i].Type)
+			}
+		}
+	}
+	for _, o := range svc.Operations() {
+		if o.Request != nil {
+			reach(o.Request.Type)
+		}
+	}
+
+	return sent
 }

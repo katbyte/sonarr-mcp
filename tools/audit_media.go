@@ -124,7 +124,7 @@ func (*registry) auditRuntime(ctx context.Context, s *snapshot, limit, tolerance
 		if err != nil {
 			return auditOut{}, err
 		}
-		byFile := map[int][]*sonarr.EpisodeResource{}
+		byFile := map[sonarr.EpisodeFileID][]*sonarr.EpisodeResource{}
 		for j := range eps {
 			if eps[j].EpisodeFileId > 0 {
 				byFile[eps[j].EpisodeFileId] = append(byFile[eps[j].EpisodeFileId], &eps[j])

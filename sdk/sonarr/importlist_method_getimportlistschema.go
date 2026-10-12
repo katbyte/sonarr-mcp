@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetImportListSchemaOperationResponse is the result of GetImportListSchema.
-type GetImportListSchemaOperationResponse struct {
+// GetImportListSchemaResponse is the result of GetImportListSchema.
+type GetImportListSchemaResponse struct {
 	HttpResponse *http.Response
-	Model        []ImportListResource
+	Answer       []ImportListResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetImportListSchemaResponse) Answered() bool { return r.Answer != nil }
+
 // GetImportListSchema calls GET /api/v3/importlist/schema.
-func (c Client) GetImportListSchema(ctx context.Context) (result GetImportListSchemaOperationResponse, err error) {
+func (c Client) GetImportListSchema(ctx context.Context) (result GetImportListSchemaResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetImportListSchema",
 		Path:       "/api/v3/importlist/schema",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetImportListSchema(ctx context.Context) (result GetImportListSc
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

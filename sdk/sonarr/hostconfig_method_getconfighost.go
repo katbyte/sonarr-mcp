@@ -4,24 +4,48 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetConfigHostOperationResponse is the result of GetConfigHost.
-type GetConfigHostOperationResponse struct {
+// GetConfigHostResponse is the result of GetConfigHost.
+//
+// Answer is the HostConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type GetConfigHostResponse struct {
 	HttpResponse *http.Response
-	Model        *HostConfigResource
+	Answer       *HostConfigResource
+	*HostConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetConfigHostResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the HostConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetConfigHostResponse) Record() (HostConfigResource, error) {
+	if r.Answer == nil {
+		return HostConfigResource{}, errors.New("GetConfigHost answered no HostConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // GetConfigHost calls GET /api/v3/config/host.
-func (c Client) GetConfigHost(ctx context.Context) (result GetConfigHostOperationResponse, err error) {
+func (c Client) GetConfigHost(ctx context.Context) (result GetConfigHostResponse, err error) {
+	result.HostConfigResource = &HostConfigResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetConfigHost",
 		Path:       "/api/v3/config/host",
 	}
 
@@ -39,11 +63,12 @@ func (c Client) GetConfigHost(ctx context.Context) (result GetConfigHostOperatio
 		return
 	}
 
-	var model HostConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer HostConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.HostConfigResource = result.Answer
 
 	return
 }

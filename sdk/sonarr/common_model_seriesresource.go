@@ -15,7 +15,7 @@ type SeriesResource struct {
 	FirstAired        string                    `json:"firstAired,omitempty"`
 	Folder            string                    `json:"folder,omitempty"`
 	Genres            []string                  `json:"genres,omitzero"`
-	Id                int                       `json:"id,omitempty"`
+	Id                SeriesID                  `json:"id,omitempty"`
 	Images            []MediaCover              `json:"images,omitzero"`
 	ImdbId            string                    `json:"imdbId,omitempty"`
 	LanguageProfileId int                       `json:"languageProfileId,omitempty"`
@@ -29,7 +29,7 @@ type SeriesResource struct {
 	Path              string                    `json:"path,omitempty"`
 	PreviousAiring    string                    `json:"previousAiring,omitempty"`
 	ProfileName       string                    `json:"profileName,omitempty"`
-	QualityProfileId  int                       `json:"qualityProfileId,omitempty"`
+	QualityProfileId  QualityProfileID          `json:"qualityProfileId,omitempty"`
 	Ratings           *Ratings                  `json:"ratings,omitempty"`
 	RemotePoster      string                    `json:"remotePoster,omitempty"`
 	RootFolderPath    string                    `json:"rootFolderPath,omitempty"`
@@ -40,13 +40,13 @@ type SeriesResource struct {
 	SortTitle         string                    `json:"sortTitle,omitempty"`
 	Statistics        *SeriesStatisticsResource `json:"statistics,omitempty"`
 	Status            SeriesStatusType          `json:"status,omitempty"`
-	Tags              []int                     `json:"tags,omitzero"`
+	Tags              []TagID                   `json:"tags,omitzero"`
 	Title             string                    `json:"title,omitempty"`
 	TitleSlug         string                    `json:"titleSlug,omitempty"`
 	TmdbId            int                       `json:"tmdbId,omitempty"`
 	TvMazeId          int                       `json:"tvMazeId,omitempty"`
 	TvRageId          int                       `json:"tvRageId,omitempty"`
-	TvdbId            int                       `json:"tvdbId,omitempty"`
+	TvdbId            TvdbID                    `json:"tvdbId,omitempty"`
 	UseSceneNumbering *bool                     `json:"useSceneNumbering,omitempty"`
 	Year              int                       `json:"year,omitempty"`
 }

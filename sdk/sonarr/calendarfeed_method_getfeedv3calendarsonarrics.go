@@ -4,38 +4,98 @@ package sonarr
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetFeedV3CalendarSonarrIcsOperationResponse is the result of GetFeedV3CalendarSonarrIcs.
+// GetFeedV3CalendarSonarrIcsResponse is the result of GetFeedV3CalendarSonarrIcs.
 //
-// The operation answers text/calendar, left unread in HttpResponse.Body, which
-// the caller must close.
-type GetFeedV3CalendarSonarrIcsOperationResponse struct {
+// The operation answers text/calendar, left unread in HttpResponse.Body. WriteTo copies
+// it out and Bytes reads it whole up to a size, each closing it; Reader hands it over
+// for the caller to read and close. After any of them the body is spent. A failed call
+// has no open body: the base client reads a refusal and closes it.
+type GetFeedV3CalendarSonarrIcsResponse struct {
 	HttpResponse *http.Response
 }
 
-// GetFeedV3CalendarSonarrIcsOperationOptions holds the query and header parameters of GetFeedV3CalendarSonarrIcs.
-type GetFeedV3CalendarSonarrIcsOperationOptions struct {
+// Reader is the file's body, for the caller to read and close, and the content
+// type the server named it; an empty body and "" when the operation gave no
+// answer, so a deferred Close is always safe. The body stays readable after
+// the result goes out of scope, and has no size or time limit of the client's:
+// the caller's context is the one bound on a slow read.
+func (r GetFeedV3CalendarSonarrIcsResponse) Reader() (io.ReadCloser, string) {
+	if r.HttpResponse == nil || r.HttpResponse.Body == nil {
+		return http.NoBody, ""
+	}
+
+	return r.HttpResponse.Body, r.HttpResponse.Header.Get("Content-Type")
+}
+
+// ContentLength is the file's length as the server named it, or -1 when it
+// did not, to refuse one too big before reading any of it.
+func (r GetFeedV3CalendarSonarrIcsResponse) ContentLength() int64 {
+	if r.HttpResponse == nil {
+		return -1
+	}
+
+	return r.HttpResponse.ContentLength
+}
+
+// Filename is the name the server gave the file (Content-Disposition), or ""
+// when it gave none, for a caller saving it under the server's name.
+func (r GetFeedV3CalendarSonarrIcsResponse) Filename() string {
+	if r.HttpResponse == nil {
+		return ""
+	}
+
+	return client.Filename(r.HttpResponse.Header)
+}
+
+// WriteTo copies the file to w and closes the body whatever happens, which is
+// the one way to take the answer that cannot leave it open. A writer that
+// failed is a client.WriteError, as against the server's side breaking off;
+// it fails when the operation gave no answer, and again once the body is spent.
+func (r GetFeedV3CalendarSonarrIcsResponse) WriteTo(w io.Writer) (int64, error) {
+	if r.HttpResponse == nil || r.HttpResponse.Body == nil {
+		return 0, errors.New("no answer to write")
+	}
+
+	return client.Copy(w, r.HttpResponse.Body)
+}
+
+// Bytes reads the file whole, up to max bytes, and closes the body: a file
+// over max is a client.TooLargeError rather than cut short without a word.
+func (r GetFeedV3CalendarSonarrIcsResponse) Bytes(max int64) ([]byte, error) {
+	if r.HttpResponse == nil || r.HttpResponse.Body == nil {
+		return nil, errors.New("no answer to read")
+	}
+
+	return client.ReadAtMost(r.HttpResponse.Body, max)
+}
+
+// GetFeedV3CalendarSonarrIcsOptions holds the query and header parameters of GetFeedV3CalendarSonarrIcs.
+type GetFeedV3CalendarSonarrIcsOptions struct {
 	PastDays      *int
 	FutureDays    *int
-	Tags          string
+	Tags          []TagID
 	Unmonitored   *bool
 	PremieresOnly *bool
 	AsAllDay      *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetFeedV3CalendarSonarrIcsOperationOptions) ToHeaders() *client.Headers {
+func (o GetFeedV3CalendarSonarrIcsOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetFeedV3CalendarSonarrIcsOperationOptions) ToQuery() *client.QueryParams {
+func (o GetFeedV3CalendarSonarrIcsOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.PastDays != nil {
 		out.Append("pastDays", strconv.Itoa(*o.PastDays))
@@ -43,8 +103,8 @@ func (o GetFeedV3CalendarSonarrIcsOperationOptions) ToQuery() *client.QueryParam
 	if o.FutureDays != nil {
 		out.Append("futureDays", strconv.Itoa(*o.FutureDays))
 	}
-	if o.Tags != "" {
-		out.Append("tags", o.Tags)
+	if len(o.Tags) > 0 {
+		out.Append("tags", client.Joined(o.Tags))
 	}
 	if o.Unmonitored != nil {
 		out.Append("unmonitored", strconv.FormatBool(*o.Unmonitored))
@@ -59,14 +119,24 @@ func (o GetFeedV3CalendarSonarrIcsOperationOptions) ToQuery() *client.QueryParam
 }
 
 // GetFeedV3CalendarSonarrIcs calls GET /feed/v3/calendar/sonarr.ics.
-func (c Client) GetFeedV3CalendarSonarrIcs(ctx context.Context, options GetFeedV3CalendarSonarrIcsOperationOptions) (result GetFeedV3CalendarSonarrIcsOperationResponse, err error) {
+func (c Client) GetFeedV3CalendarSonarrIcs(ctx context.Context, options ...GetFeedV3CalendarSonarrIcsOptions) (result GetFeedV3CalendarSonarrIcsResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetFeedV3CalendarSonarrIcs takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetFeedV3CalendarSonarrIcsOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		Accept: "text/calendar",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:     http.MethodGet,
-		OptionsObject:  options,
+		Operation:      "GetFeedV3CalendarSonarrIcs",
+		OptionsObject:  option,
 		Path:           "/feed/v3/calendar/sonarr.ics",
 		StreamResponse: true,
 	}

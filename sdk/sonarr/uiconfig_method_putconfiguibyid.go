@@ -4,28 +4,51 @@ package sonarr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// PutConfigUiByIdOperationResponse is the result of PutConfigUiById.
-type PutConfigUiByIdOperationResponse struct {
+// PutConfigUiByIdResponse is the result of PutConfigUiById.
+//
+// Answer is the UiConfigResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
+type PutConfigUiByIdResponse struct {
 	HttpResponse *http.Response
-	Model        *UiConfigResource
+	Answer       *UiConfigResource
+	*UiConfigResource
+}
+
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r PutConfigUiByIdResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the UiConfigResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r PutConfigUiByIdResponse) Record() (UiConfigResource, error) {
+	if r.Answer == nil {
+		return UiConfigResource{}, errors.New("PutConfigUiById answered no UiConfigResource")
+	}
+
+	return *r.Answer, nil
 }
 
 // PutConfigUiById calls PUT /api/v3/config/ui/{id}.
-func (c Client) PutConfigUiById(ctx context.Context, id string, input UiConfigResource) (result PutConfigUiByIdOperationResponse, err error) {
+func (c Client) PutConfigUiById(ctx context.Context, id int, input UiConfigResource) (result PutConfigUiByIdResponse, err error) {
+	result.UiConfigResource = &UiConfigResource{}
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusAccepted,
 		},
 		HTTPMethod: http.MethodPut,
-		Path:       fmt.Sprintf("/api/v3/config/ui/%s", url.PathEscape(id)),
+		Operation:  "PutConfigUiById",
+		Path:       fmt.Sprintf("/api/v3/config/ui/%d", id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
@@ -46,11 +69,12 @@ func (c Client) PutConfigUiById(ctx context.Context, id string, input UiConfigRe
 		return
 	}
 
-	var model UiConfigResource
-	result.Model = &model
-	if err = resp.Unmarshal(result.Model); err != nil {
+	var answer UiConfigResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.UiConfigResource = result.Answer
 
 	return
 }

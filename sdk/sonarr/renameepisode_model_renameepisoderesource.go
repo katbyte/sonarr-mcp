@@ -4,11 +4,11 @@ package sonarr
 
 // RenameEpisodeResource is the "RenameEpisodeResource" schema.
 type RenameEpisodeResource struct {
-	EpisodeFileId  int    `json:"episodeFileId,omitempty"`
-	EpisodeNumbers []int  `json:"episodeNumbers,omitzero"`
-	ExistingPath   string `json:"existingPath,omitempty"`
-	Id             int    `json:"id,omitempty"`
-	NewPath        string `json:"newPath,omitempty"`
-	SeasonNumber   int    `json:"seasonNumber,omitempty"`
-	SeriesId       int    `json:"seriesId,omitempty"`
+	EpisodeFileId  EpisodeFileID `json:"episodeFileId,omitempty"`
+	EpisodeNumbers []int         `json:"episodeNumbers,omitzero"`
+	ExistingPath   string        `json:"existingPath,omitempty"`
+	Id             int           `json:"id,omitempty"`
+	NewPath        string        `json:"newPath,omitempty"`
+	SeasonNumber   int           `json:"seasonNumber,omitempty"`
+	SeriesId       SeriesID      `json:"seriesId,omitempty"`
 }

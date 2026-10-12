@@ -12,7 +12,7 @@ type DelayProfileResource struct {
 	MinimumCustomFormatScore       int              `json:"minimumCustomFormatScore,omitempty"`
 	Order                          int              `json:"order,omitempty"`
 	PreferredProtocol              DownloadProtocol `json:"preferredProtocol,omitempty"`
-	Tags                           []int            `json:"tags,omitzero"`
+	Tags                           []TagID          `json:"tags,omitzero"`
 	TorrentDelay                   int              `json:"torrentDelay,omitempty"`
 	UsenetDelay                    int              `json:"usenetDelay,omitempty"`
 }

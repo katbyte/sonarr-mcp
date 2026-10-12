@@ -8,3 +8,9 @@ type LanguageResource struct {
 	Name      string `json:"name,omitempty"`
 	NameLower string `json:"nameLower,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m LanguageResource) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m LanguageResource) GetId() int { return m.Id }

@@ -11,19 +11,20 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostMetadataActionByNameOperationResponse is the result of PostMetadataActionByName.
-type PostMetadataActionByNameOperationResponse struct {
+// PostMetadataActionByNameResponse is the result of PostMetadataActionByName.
+type PostMetadataActionByNameResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostMetadataActionByName calls POST /api/v3/metadata/action/{name}.
-func (c Client) PostMetadataActionByName(ctx context.Context, name string, input MetadataResource) (result PostMetadataActionByNameOperationResponse, err error) {
+func (c Client) PostMetadataActionByName(ctx context.Context, name string, input MetadataResource) (result PostMetadataActionByNameResponse, err error) {
 	opts := client.RequestOptions{
 		ContentType: "application/json",
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostMetadataActionByName",
 		Path:       fmt.Sprintf("/api/v3/metadata/action/%s", url.PathEscape(name)),
 	}
 

@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// DeleteRemotePathMappingByIdOperationResponse is the result of DeleteRemotePathMappingById.
-type DeleteRemotePathMappingByIdOperationResponse struct {
+// DeleteRemotePathMappingByIdResponse is the result of DeleteRemotePathMappingById.
+type DeleteRemotePathMappingByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // DeleteRemotePathMappingById calls DELETE /api/v3/remotepathmapping/{id}.
-func (c Client) DeleteRemotePathMappingById(ctx context.Context, id int) (result DeleteRemotePathMappingByIdOperationResponse, err error) {
+func (c Client) DeleteRemotePathMappingById(ctx context.Context, id int) (result DeleteRemotePathMappingByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodDelete,
+		Operation:  "DeleteRemotePathMappingById",
 		Path:       fmt.Sprintf("/api/v3/remotepathmapping/%d", id),
 	}
 

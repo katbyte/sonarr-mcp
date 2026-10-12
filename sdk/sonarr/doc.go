@@ -14,21 +14,40 @@
 // A method takes a context, then the path parameters in path order, then the
 // request body (input: the model for a JSON body, or an io.Reader and its
 // content type for raw bytes), then, when the operation has query or header
-// parameters, a <Name>OperationOptions. Unset options are not sent: a
-// boolean or a number is a pointer, sent when set (so 0 and false can be
-// asked for), an empty string or list is skipped, and a list is sent
-// comma-joined or as one parameter for each element, as the document says.
+// parameters, a <Name>Options, which may be left out when every one of them
+// is optional.
+// Unset options are not sent: a boolean or a number is a pointer, sent when
+// set (so 0 and false can be asked for), an empty string or list is skipped,
+// and a list is sent comma-joined or as one parameter for each element, as
+// the document says.
 //
-// It returns a <Name>OperationResponse holding HttpResponse and, when the
-// operation answers JSON, Model. HttpResponse is set whenever the server
-// answered, including alongside an error, and its body can be read again. An
-// operation that answers a file leaves the body unread in
-// HttpResponse.Body for the caller to read and close. A status the operation
-// does not document is an error, and client.StatusCode reads the status from
-// it.
+// It returns a <Name>Response holding HttpResponse and, when the operation
+// answers JSON, Answer: a pointer for a struct, enum or primitive, nil when
+// the server answered with no body, and the value for a list, map or raw
+// JSON. Answered() says whether a body came and was decoded. A struct answer
+// is also embedded, so res.Answer.Name may be read as res.Name, a zero record
+// when nothing was answered, and Record() hands it back by value with an
+// error when none came. HttpResponse is set whenever the server answered,
+// including alongside an error. An operation that answers a file has no
+// Answer: WriteTo(w) copies the file out and closes the body, Bytes(max)
+// reads it whole up to a size, Reader() hands the body over with its content
+// type, ContentLength() and Filename() say what the server said of it, and
+// the body is also still in HttpResponse.Body. A status the operation does
+// not document is an error: client.StatusCode reads the status from it, and
+// IsNotFound and the other Is helpers say which it is.
 //
 // A list operation, one whose options page with Page and PageSize, also has a
-// <Name>Complete method that pages through every result.
+// <Name>Complete method that loads every result, and a <Name>Each that
+// hands them out one at a time as a range, so a loop that stops asks for no
+// page more.
+//
+// # Ids
+//
+// SeriesID, EpisodeID, EpisodeFileID, TagID, QualityProfileID, CommandID, TvdbID are kinds of id the package tells apart, each a bare named type over
+// the int or string the document declares, so that one kind where another goes
+// does not compile. Where an id sits among the options it is held by value and
+// sent when not zero. int(id) and SeriesID(n) convert one value, client.IDs and
+// client.StringIDs a list.
 //
 // Dates are strings: Sonarr sends RFC 3339 in UTC ("2026-09-19T13:00:00Z").
 //
@@ -36,12 +55,14 @@
 //
 // The importer fixed these bugs in the document before generating from it:
 //
+//   - sonarr-numbered-path-ids
 //   - sonarr-ui-routes
 //   - sonarr-undeclared-responses
 //   - sonarr-undeclared-write-responses
 //   - sonarr-created-accepted
 //   - sonarr-test-all-results
 //   - sonarr-command-body
+//   - sonarr-commands
 //   - sonarr-command-resource-body
 //   - sonarr-http-uri-string
 //   - sonarr-bulk-update-lists

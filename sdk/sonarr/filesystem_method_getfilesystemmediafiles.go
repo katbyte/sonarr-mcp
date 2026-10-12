@@ -5,30 +5,35 @@ package sonarr
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetFileSystemMediaFilesOperationResponse is the result of GetFileSystemMediaFiles.
-type GetFileSystemMediaFilesOperationResponse struct {
+// GetFileSystemMediaFilesResponse is the result of GetFileSystemMediaFiles.
+type GetFileSystemMediaFilesResponse struct {
 	HttpResponse *http.Response
-	Model        json.RawMessage
+	Answer       json.RawMessage
 }
 
-// GetFileSystemMediaFilesOperationOptions holds the query and header parameters of GetFileSystemMediaFiles.
-type GetFileSystemMediaFilesOperationOptions struct {
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetFileSystemMediaFilesResponse) Answered() bool { return r.Answer != nil }
+
+// GetFileSystemMediaFilesOptions holds the query and header parameters of GetFileSystemMediaFiles.
+type GetFileSystemMediaFilesOptions struct {
 	Path string
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetFileSystemMediaFilesOperationOptions) ToHeaders() *client.Headers {
+func (o GetFileSystemMediaFilesOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetFileSystemMediaFilesOperationOptions) ToQuery() *client.QueryParams {
+func (o GetFileSystemMediaFilesOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
 	if o.Path != "" {
 		out.Append("path", o.Path)
@@ -37,13 +42,23 @@ func (o GetFileSystemMediaFilesOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetFileSystemMediaFiles calls GET /api/v3/filesystem/mediafiles.
-func (c Client) GetFileSystemMediaFiles(ctx context.Context, options GetFileSystemMediaFilesOperationOptions) (result GetFileSystemMediaFilesOperationResponse, err error) {
+func (c Client) GetFileSystemMediaFiles(ctx context.Context, options ...GetFileSystemMediaFilesOptions) (result GetFileSystemMediaFilesResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetFileSystemMediaFiles takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetFileSystemMediaFilesOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetFileSystemMediaFiles",
+		OptionsObject: option,
 		Path:          "/api/v3/filesystem/mediafiles",
 	}
 
@@ -61,7 +76,7 @@ func (c Client) GetFileSystemMediaFiles(ctx context.Context, options GetFileSyst
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

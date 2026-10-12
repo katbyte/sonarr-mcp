@@ -4,9 +4,9 @@ package sonarr
 
 // EpisodeFileListResource is the "EpisodeFileListResource" schema.
 type EpisodeFileListResource struct {
-	EpisodeFileIds []int         `json:"episodeFileIds,omitzero"`
-	Languages      []Language    `json:"languages,omitzero"`
-	Quality        *QualityModel `json:"quality,omitempty"`
-	ReleaseGroup   string        `json:"releaseGroup,omitempty"`
-	SceneName      string        `json:"sceneName,omitempty"`
+	EpisodeFileIds []EpisodeFileID `json:"episodeFileIds,omitzero"`
+	Languages      []Language      `json:"languages,omitzero"`
+	Quality        *QualityModel   `json:"quality,omitempty"`
+	ReleaseGroup   string          `json:"releaseGroup,omitempty"`
+	SceneName      string          `json:"sceneName,omitempty"`
 }

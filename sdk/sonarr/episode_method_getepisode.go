@@ -4,49 +4,54 @@ package sonarr
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetEpisodeOperationResponse is the result of GetEpisode.
-type GetEpisodeOperationResponse struct {
+// GetEpisodeResponse is the result of GetEpisode.
+type GetEpisodeResponse struct {
 	HttpResponse *http.Response
-	Model        []EpisodeResource
+	Answer       []EpisodeResource
 }
 
-// GetEpisodeOperationOptions holds the query and header parameters of GetEpisode.
-type GetEpisodeOperationOptions struct {
-	SeriesId           *int
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetEpisodeResponse) Answered() bool { return r.Answer != nil }
+
+// GetEpisodeOptions holds the query and header parameters of GetEpisode.
+type GetEpisodeOptions struct {
+	SeriesId           SeriesID
 	SeasonNumber       *int
-	EpisodeIds         []int
-	EpisodeFileId      *int
+	EpisodeIds         []EpisodeID
+	EpisodeFileId      EpisodeFileID
 	IncludeSeries      *bool
 	IncludeEpisodeFile *bool
 	IncludeImages      *bool
 }
 
 // ToHeaders returns the header parameters the options set.
-func (o GetEpisodeOperationOptions) ToHeaders() *client.Headers {
+func (o GetEpisodeOptions) ToHeaders() *client.Headers {
 	out := client.Headers{}
 	return &out
 }
 
 // ToQuery returns the query parameters the options set.
-func (o GetEpisodeOperationOptions) ToQuery() *client.QueryParams {
+func (o GetEpisodeOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
-	if o.SeriesId != nil {
-		out.Append("seriesId", strconv.Itoa(*o.SeriesId))
+	if o.SeriesId != 0 {
+		out.Append("seriesId", strconv.Itoa(int(o.SeriesId)))
 	}
 	if o.SeasonNumber != nil {
 		out.Append("seasonNumber", strconv.Itoa(*o.SeasonNumber))
 	}
 	for _, v := range o.EpisodeIds {
-		out.Append("episodeIds", strconv.Itoa(v))
+		out.Append("episodeIds", strconv.Itoa(int(v)))
 	}
-	if o.EpisodeFileId != nil {
-		out.Append("episodeFileId", strconv.Itoa(*o.EpisodeFileId))
+	if o.EpisodeFileId != 0 {
+		out.Append("episodeFileId", strconv.Itoa(int(o.EpisodeFileId)))
 	}
 	if o.IncludeSeries != nil {
 		out.Append("includeSeries", strconv.FormatBool(*o.IncludeSeries))
@@ -61,13 +66,23 @@ func (o GetEpisodeOperationOptions) ToQuery() *client.QueryParams {
 }
 
 // GetEpisode calls GET /api/v3/episode.
-func (c Client) GetEpisode(ctx context.Context, options GetEpisodeOperationOptions) (result GetEpisodeOperationResponse, err error) {
+func (c Client) GetEpisode(ctx context.Context, options ...GetEpisodeOptions) (result GetEpisodeResponse, err error) {
+	if len(options) > 1 {
+		err = fmt.Errorf("GetEpisode takes one options struct at most, not %d", len(options))
+		return
+	}
+	var option GetEpisodeOptions
+	if len(options) == 1 {
+		option = options[0]
+	}
+
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod:    http.MethodGet,
-		OptionsObject: options,
+		Operation:     "GetEpisode",
+		OptionsObject: option,
 		Path:          "/api/v3/episode",
 	}
 
@@ -85,7 +100,7 @@ func (c Client) GetEpisode(ctx context.Context, options GetEpisodeOperationOptio
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

@@ -11,7 +11,8 @@
           "Name": "seriesId",
           "Argument": "seriesId",
           "Type": {
-            "Type": "Integer"
+            "Type": "ID",
+            "ReferenceName": "SeriesID"
           }
         },
         {

@@ -10,18 +10,19 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// PostSystemBackupRestoreByIdOperationResponse is the result of PostSystemBackupRestoreById.
-type PostSystemBackupRestoreByIdOperationResponse struct {
+// PostSystemBackupRestoreByIdResponse is the result of PostSystemBackupRestoreById.
+type PostSystemBackupRestoreByIdResponse struct {
 	HttpResponse *http.Response
 }
 
 // PostSystemBackupRestoreById calls POST /api/v3/system/backup/restore/{id}.
-func (c Client) PostSystemBackupRestoreById(ctx context.Context, id int) (result PostSystemBackupRestoreByIdOperationResponse, err error) {
+func (c Client) PostSystemBackupRestoreById(ctx context.Context, id int) (result PostSystemBackupRestoreByIdResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodPost,
+		Operation:  "PostSystemBackupRestoreById",
 		Path:       fmt.Sprintf("/api/v3/system/backup/restore/%d", id),
 	}
 

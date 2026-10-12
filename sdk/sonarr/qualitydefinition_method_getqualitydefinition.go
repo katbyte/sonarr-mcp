@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetQualityDefinitionOperationResponse is the result of GetQualityDefinition.
-type GetQualityDefinitionOperationResponse struct {
+// GetQualityDefinitionResponse is the result of GetQualityDefinition.
+type GetQualityDefinitionResponse struct {
 	HttpResponse *http.Response
-	Model        []QualityDefinitionResource
+	Answer       []QualityDefinitionResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetQualityDefinitionResponse) Answered() bool { return r.Answer != nil }
+
 // GetQualityDefinition calls GET /api/v3/qualitydefinition.
-func (c Client) GetQualityDefinition(ctx context.Context) (result GetQualityDefinitionOperationResponse, err error) {
+func (c Client) GetQualityDefinition(ctx context.Context) (result GetQualityDefinitionResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetQualityDefinition",
 		Path:       "/api/v3/qualitydefinition",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetQualityDefinition(ctx context.Context) (result GetQualityDefi
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 

@@ -12,3 +12,9 @@ type AutoTaggingSpecificationSchema struct {
 	Negate             *bool   `json:"negate,omitempty"`
 	Required           *bool   `json:"required,omitempty"`
 }
+
+// GetName is the record's Name, for code that handles records of several types alike.
+func (m AutoTaggingSpecificationSchema) GetName() string { return m.Name }
+
+// GetId is the record's Id, for code that handles records of several types alike.
+func (m AutoTaggingSpecificationSchema) GetId() int { return m.Id }

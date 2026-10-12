@@ -10,18 +10,13 @@ Sonarr publishes an OpenAPI document for its v3 API (which v4 still serves), ven
 |---|---|---|
 | `sonarr-openapi-4.0.20.3014.json` | `src/Sonarr.Api.V3/openapi.json` in Sonarr's source, at the release's tag: <https://raw.githubusercontent.com/Sonarr/Sonarr/v4.0.20.3014/src/Sonarr.Api.V3/openapi.json> | Sonarr 4.0.20.3014 - 162 paths, 234 operations, of which 6 serve the web interface and are dropped, leaving 228 |
 
-The file is named by the Sonarr release it was taken from, not by the version the document gives itself, which is 3.0.0 for every release: the generated package has both, as `DocumentVersion` and `APIVersion`. It is written by Swashbuckle from the controllers each release, so the copy to vendor is the one at the tag matching the container image the live suites run (`SONARR_TEST_IMAGE` in `scripts/testenv.sh`). To refresh: vendor the new tag's file beside the old one under its own version, run `make generate`, read `go run ./sdk/pandorest diff -old api-defs/sonarr-<old> -new api-defs/sonarr-<new>` to see what changed in API terms (breaking changes are marked), and delete the old pair once the new one is in. A workaround whose bug the new document fixes fails the import and names itself; delete it.
+The file is named by the Sonarr release it was taken from, not by the version the document gives itself, which is 3.0.0 for every release: the generated package has both, as `DocumentVersion` and `APIVersion`. It is written by Swashbuckle from the controllers each release, so the copy to vendor is the one at the tag matching the container image the live suites run (`SONARR_TEST_IMAGE` in `.scripts/testenv.sh`). To refresh: vendor the new tag's file beside the old one under its own version, run `make generate`, read `go run ./sdk/pandorest diff -old api-defs/sonarr-<old> -new api-defs/sonarr-<new>` to see what changed in API terms (breaking changes are marked), and delete the old pair once the new one is in. A workaround whose bug the new document fixes fails the import and names itself; delete it.
 
-The spec is documentation of intent, not of behaviour: the live suites
-(`integration/`, `acceptance/`) are what prove the shapes against a real
-Sonarr, and the quirks they found are recorded below.
+The spec is documentation of intent, not of behaviour: the live suites (`acceptance/sonarr`, `acceptance/tools`) are what prove the shapes against a real Sonarr, and the quirks they found are recorded below.
 
 ## Where the spec is wrong
 
-These are shape bugs, fixed in the generated client by the importer's
-workarounds (`sdk/pandorest/workarounds/sonarr.go`, listed in
-`api-defs/sonarr-<version>/Service.json`). Each checks its bug is still in the
-document and fails the import once it is not.
+These are shape bugs, fixed in the generated client by the importer's workarounds (`sdk/pandorest/workarounds/`, listed in `api-defs/sonarr-<version>/Service.json`). Each checks its bug is still in the document and fails the import once it is not.
 
 - **The web interface's routes are in it.** `/`, `/{path}`, `/content/{path}`,
   `/login` and `/logout` answer HTML to a browser. They are dropped.
@@ -39,10 +34,10 @@ document and fails the import once it is not.
   series, reprocessing a manual import and grabbing a release all answer the
   records they changed; those answers are declared, so a tool can report what
   Sonarr did rather than what it asked for.
-- **A command's own fields have nowhere to go.** `POST /api/v3/command` is
-  documented as taking the command resource, but Sonarr reads the command's
-  own fields (`seriesId`, `episodeIds`, `files`...) from the top level of the
-  body. The body is left open so a command can carry them.
+- **A command's own fields have nowhere to go.** `POST /api/v3/command` is documented as taking the command resource, but Sonarr reads the command's own fields (`seriesId`, `episodeIds`, `files`...) from the top level of the body. The body is left open so a command can carry them.
+- **Nothing says what a command is called or which fields it reads.** Every command goes through that one open body. The eleven the tools queue are declared (`sdk/pandorest/workarounds/commands.go`), each with the fields Sonarr's own command reads, so the client has a method for each that names the command and takes its fields, and a form of it that waits for the command to end. Any other command is still posted by name.
+- **An update's id is typed as text.** The `{id}` of a PUT path is a string in the document, and a number on the GET and DELETE of the same path. It is a number in every one.
+- **An id says nothing of what it is the id of.** Every id is an `integer`, so a series' id and an episode's are the same type. Seven kinds that travel between calls are declared (`sdk/pandorest/workarounds/ids.go`): a series, an episode, an episode file, a tag, a quality profile, a command and TheTVDB's id of a series. The import fails when a declaration names nothing in the document.
 - **Testing every provider answers each result, and a 400 when any fails.**
   `POST .../testall` is documented as answering nothing; it answers the
   result for each indexer, download client or other provider, as a 400 when

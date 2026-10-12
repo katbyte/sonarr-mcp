@@ -39,28 +39,28 @@ func projectMedia(m *sonarr.MediaInfoResource) *mediaRow {
 
 // fileRow is an episode file in full.
 type fileRow struct {
-	ID                int       `json:"id"`
-	Episodes          string    `json:"episodes"                jsonschema:"the episodes the file holds, S01E02 or S01E02-E03"`
-	RelativePath      string    `json:"relative_path"`
-	Size              string    `json:"size"`
-	Quality           string    `json:"quality"`
-	CutoffNotMet      bool      `json:"below_cutoff"`
-	Languages         []string  `json:"languages"`
-	ReleaseGroup      string    `json:"release_group,omitempty"`
-	CustomFormats     []string  `json:"custom_formats"`
-	CustomFormatScore int       `json:"custom_format_score"`
-	Added             string    `json:"added"`
-	Media             *mediaRow `json:"media,omitempty"`
+	ID                sonarr.EpisodeFileID `json:"id"`
+	Episodes          string               `json:"episodes"                jsonschema:"the episodes the file holds, S01E02 or S01E02-E03"`
+	RelativePath      string               `json:"relative_path"`
+	Size              string               `json:"size"`
+	Quality           string               `json:"quality"`
+	CutoffNotMet      bool                 `json:"below_cutoff"`
+	Languages         []string             `json:"languages"`
+	ReleaseGroup      string               `json:"release_group,omitempty"`
+	CustomFormats     []string             `json:"custom_formats"`
+	CustomFormatScore int                  `json:"custom_format_score"`
+	Added             string               `json:"added"`
+	Media             *mediaRow            `json:"media,omitempty"`
 }
 
 // fileEpisodes maps each file of a series to the episode numbers it holds:
 // the file resource has the season, the episodes are on the episode side.
-func (r *registry) fileEpisodes(ctx context.Context, seriesID int) (map[int][]int, error) {
+func (r *registry) fileEpisodes(ctx context.Context, seriesID sonarr.SeriesID) (map[sonarr.EpisodeFileID][]int, error) {
 	eps, err := r.episodesOf(ctx, seriesID, nil, false)
 	if err != nil {
 		return nil, err
 	}
-	out := map[int][]int{}
+	out := map[sonarr.EpisodeFileID][]int{}
 	for _, e := range eps {
 		if e.EpisodeFileId > 0 {
 			out[e.EpisodeFileId] = append(out[e.EpisodeFileId], e.EpisodeNumber)
@@ -84,8 +84,8 @@ func projectFile(f *sonarr.EpisodeFileResource, episodes []int) fileRow {
 }
 
 // seriesFiles reads a series' files, with their episodes, in episode order.
-func (r *registry) seriesFiles(ctx context.Context, seriesID int) ([]sonarr.EpisodeFileResource, map[int][]int, error) {
-	res, err := r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOperationOptions{SeriesId: new(seriesID)})
+func (r *registry) seriesFiles(ctx context.Context, seriesID sonarr.SeriesID) ([]sonarr.EpisodeFileResource, map[sonarr.EpisodeFileID][]int, error) {
+	res, err := r.client.GetEpisodeFile(ctx, sonarr.GetEpisodeFileOptions{SeriesId: seriesID})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -93,7 +93,7 @@ func (r *registry) seriesFiles(ctx context.Context, seriesID int) ([]sonarr.Epis
 	if err != nil {
 		return nil, nil, err
 	}
-	files := res.Model
+	files := res.Answer
 	first := func(f *sonarr.EpisodeFileResource) int {
 		if eps := byFile[f.Id]; len(eps) > 0 {
 			return slices.Min(eps)
@@ -150,10 +150,10 @@ func registerFileTools(r *registry) {
 	})
 
 	type editIn struct {
-		FileIDs      []int    `json:"file_ids"                jsonschema:"the episode files to change, as file_list numbers them"`
-		Quality      string   `json:"quality,omitempty"       jsonschema:"the quality to record, by Sonarr's name for it, e.g. HDTV-720p, WEBDL-1080p, Bluray-2160p"`
-		Languages    []string `json:"languages,omitempty"     jsonschema:"the languages to record, by name, e.g. English, Japanese"`
-		ReleaseGroup string   `json:"release_group,omitempty"`
+		FileIDs      []sonarr.EpisodeFileID `json:"file_ids"                jsonschema:"the episode files to change, as file_list numbers them"`
+		Quality      string                 `json:"quality,omitempty"       jsonschema:"the quality to record, by Sonarr's name for it, e.g. HDTV-720p, WEBDL-1080p, Bluray-2160p"`
+		Languages    []string               `json:"languages,omitempty"     jsonschema:"the languages to record, by name, e.g. English, Japanese"`
+		ReleaseGroup string                 `json:"release_group,omitempty"`
 	}
 	type editOut struct {
 		Files []fileRow `json:"files" jsonschema:"the files as Sonarr now records them"`
@@ -192,30 +192,30 @@ func registerFileTools(r *registry) {
 			return nil, editOut{}, err
 		}
 		out := editOut{}
-		if len(res.Model) == 0 {
+		if len(res.Answer) == 0 {
 			return nil, out, nil
 		}
-		byFile, err := r.fileEpisodes(ctx, res.Model[0].SeriesId)
+		byFile, err := r.fileEpisodes(ctx, res.Answer[0].SeriesId)
 		if err != nil {
 			return nil, editOut{}, err
 		}
-		for i := range res.Model {
-			out.Files = append(out.Files, projectFile(&res.Model[i], byFile[res.Model[i].Id]))
+		for i := range res.Answer {
+			out.Files = append(out.Files, projectFile(&res.Answer[i], byFile[res.Answer[i].Id]))
 		}
 
 		return nil, out, nil
 	})
 
 	type deleteIn struct {
-		FileIDs []int `json:"file_ids"          jsonschema:"the ids of the episode files to delete from disk"`
-		Confirm bool  `json:"confirm,omitempty" jsonschema:"true to delete; without it nothing changes and the answer lists what a confirmed call would delete"`
+		FileIDs []sonarr.EpisodeFileID `json:"file_ids"          jsonschema:"the ids of the episode files to delete from disk"`
+		Confirm bool                   `json:"confirm,omitempty" jsonschema:"true to delete; without it nothing changes and the answer lists what a confirmed call would delete"`
 	}
 	type deleteRow struct {
-		ID        int    `json:"id"`
-		Path      string `json:"path"`
-		Size      string `json:"size"`
-		Episodes  string `json:"episodes"  jsonschema:"every episode the file holds, S01E02 or S01E02-E03: each of them loses it"`
-		Monitored bool   `json:"monitored" jsonschema:"Sonarr is still monitoring an episode the file holds"`
+		ID        sonarr.EpisodeFileID `json:"id"`
+		Path      string               `json:"path"`
+		Size      string               `json:"size"`
+		Episodes  string               `json:"episodes"  jsonschema:"every episode the file holds, S01E02 or S01E02-E03: each of them loses it"`
+		Monitored bool                 `json:"monitored" jsonschema:"Sonarr is still monitoring an episode the file holds"`
 	}
 	type deleteOut struct {
 		Deleted     []string    `json:"deleted"                jsonschema:"the paths deleted"`
@@ -241,7 +241,7 @@ func registerFileTools(r *registry) {
 			case err != nil:
 				return nil, deleteOut{}, err
 			}
-			files = append(files, res.Model)
+			files = append(files, res.Answer)
 		}
 
 		// a file can hold two episodes, and deleting it takes both; and an
@@ -249,7 +249,7 @@ func registerFileTools(r *registry) {
 		// said of each file is read from its episodes' own flags
 		out := deleteOut{}
 		paths := make([]string, 0, len(files))
-		episodes := map[int][]sonarr.EpisodeResource{}
+		episodes := map[sonarr.SeriesID][]sonarr.EpisodeResource{}
 		var wanted []string
 		for _, f := range files {
 			if _, read := episodes[f.SeriesId]; !read {
@@ -284,7 +284,7 @@ func registerFileTools(r *registry) {
 				return nil, deleteOut{}, err
 			}
 			out.Warning = fmt.Sprintf("Sonarr still monitors %s, so it downloads them again once their files are gone. To keep them gone, unmonitor them first with episode_monitor.", strings.Join(wanted, ", "))
-			if boolv(media.Model.AutoUnmonitorPreviouslyDownloadedEpisodes) {
+			if media.Answer.AutoUnmonitorPreviouslyDownloadedEpisodes {
 				out.Warning = fmt.Sprintf("Sonarr's Unmonitor Deleted Episodes setting is on, so it stops monitoring %s when their files go and does not download them again. To have them back, monitor them again with episode_monitor.", strings.Join(wanted, ", "))
 			}
 		}
@@ -312,7 +312,7 @@ func (r *registry) resolveQuality(ctx context.Context, name string) (*sonarr.Qua
 		return nil, err
 	}
 	var names []string
-	for _, d := range res.Model {
+	for _, d := range res.Answer {
 		if d.Quality == nil {
 			continue
 		}
@@ -333,15 +333,15 @@ func (r *registry) resolveLanguages(ctx context.Context, names []string) ([]sona
 	}
 	var out []sonarr.Language
 	for _, name := range names {
-		i := slices.IndexFunc(res.Model, func(l sonarr.LanguageResource) bool { return strings.EqualFold(l.Name, strings.TrimSpace(name)) })
+		i := slices.IndexFunc(res.Answer, func(l sonarr.LanguageResource) bool { return strings.EqualFold(l.Name, strings.TrimSpace(name)) })
 		if i < 0 {
 			var have []string
-			for _, l := range res.Model {
+			for _, l := range res.Answer {
 				have = append(have, l.Name)
 			}
 			return nil, fmt.Errorf("no language %q (have: %s)", name, strings.Join(have, ", "))
 		}
-		out = append(out, sonarr.Language{Id: res.Model[i].Id, Name: res.Model[i].Name})
+		out = append(out, sonarr.Language{Id: res.Answer[i].Id, Name: res.Answer[i].Name})
 	}
 
 	return out, nil

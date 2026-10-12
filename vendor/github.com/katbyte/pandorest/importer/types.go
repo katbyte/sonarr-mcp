@@ -64,12 +64,9 @@ func (im *importer) typeRef(s *openapi.Schema, owner, field string) definitions.
 
 	switch s.Type {
 	case openapi.TypeString:
-		return definitions.TypeRef{Type: definitions.String}
+		return im.stringType(s)
 	case openapi.TypeInteger:
-		if s.Format == "int64" {
-			return definitions.TypeRef{Type: definitions.Integer64}
-		}
-		return definitions.TypeRef{Type: definitions.Integer}
+		return integerType(s)
 	case openapi.TypeNumber:
 		if s.Format == "float" {
 			return definitions.TypeRef{Type: definitions.Float}
@@ -205,7 +202,7 @@ func (im *importer) constant(name, schemaName string, s *openapi.Schema) *defini
 	c := &definitions.Constant{Name: name, SchemaName: schemaName, Description: cleanText(s.Description)}
 	seen := map[string]string{}
 	for _, v := range s.EnumValues() {
-		cname := name + camel(v)
+		cname := name + openapi.Camel(v)
 		if prev, ok := seen[cname]; ok {
 			im.warn(fmt.Sprintf("%s: values %q and %q are both %s; %q skipped", name, prev, v, cname, v))
 			continue
@@ -230,4 +227,33 @@ func unionModel(name, schemaName string, s *openapi.Schema) *definitions.Model {
 	}
 
 	return m
+}
+
+// integerType is an integer schema as the SDK holds it: a date a workaround
+// declared in seconds or milliseconds since 1970 as Unix or UnixMilli, an
+// int64 or an int otherwise.
+func integerType(s *openapi.Schema) definitions.TypeRef {
+	switch s.Format {
+	case openapi.FormatUnixSeconds:
+		return definitions.TypeRef{Type: definitions.UnixSeconds}
+	case openapi.FormatUnixMillis:
+		return definitions.TypeRef{Type: definitions.UnixMillis}
+	case "int64":
+		return definitions.TypeRef{Type: definitions.Integer64}
+	}
+
+	return definitions.TypeRef{Type: definitions.Integer}
+}
+
+// stringType is a string schema as the SDK holds it: a date-time or a date
+// as Time or Day when the service gives the layouts, a string otherwise.
+func (im *importer) stringType(s *openapi.Schema) definitions.TypeRef {
+	switch {
+	case s.Format == "date-time" && im.cfg.Dates.Send != "":
+		return definitions.TypeRef{Type: definitions.DateTime}
+	case s.Format == "date" && im.cfg.Days.Send != "":
+		return definitions.TypeRef{Type: definitions.Date}
+	}
+
+	return definitions.TypeRef{Type: definitions.String}
 }

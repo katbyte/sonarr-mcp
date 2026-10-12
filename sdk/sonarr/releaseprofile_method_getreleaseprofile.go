@@ -9,19 +9,24 @@ import (
 	"github.com/katbyte/pandorest/client"
 )
 
-// GetReleaseProfileOperationResponse is the result of GetReleaseProfile.
-type GetReleaseProfileOperationResponse struct {
+// GetReleaseProfileResponse is the result of GetReleaseProfile.
+type GetReleaseProfileResponse struct {
 	HttpResponse *http.Response
-	Model        []ReleaseProfileResource
+	Answer       []ReleaseProfileResource
 }
 
+// Answered reports whether the server answered with a body that was decoded:
+// false for a 204, or a call that failed before one came.
+func (r GetReleaseProfileResponse) Answered() bool { return r.Answer != nil }
+
 // GetReleaseProfile calls GET /api/v3/releaseprofile.
-func (c Client) GetReleaseProfile(ctx context.Context) (result GetReleaseProfileOperationResponse, err error) {
+func (c Client) GetReleaseProfile(ctx context.Context) (result GetReleaseProfileResponse, err error) {
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
 		},
 		HTTPMethod: http.MethodGet,
+		Operation:  "GetReleaseProfile",
 		Path:       "/api/v3/releaseprofile",
 	}
 
@@ -39,7 +44,7 @@ func (c Client) GetReleaseProfile(ctx context.Context) (result GetReleaseProfile
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Model); err != nil {
+	if err = resp.Unmarshal(&result.Answer); err != nil {
 		return
 	}
 
