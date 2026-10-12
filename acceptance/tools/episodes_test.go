@@ -1,0 +1,177 @@
+//go:build acceptance
+
+package tools_test
+
+import (
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/katbyte/go-kt/mcp/acctest"
+)
+
+func TestEpisodeList(t *testing.T) {
+	out := call(t, "episode_list", map[string]any{"series": firefly.Title, "season": 1})
+
+	eps := acctest.Rows(t, out["episodes"], "episodes")
+	if acctest.Str(out["series"]) != firefly.Title || len(eps) != 14 || acctest.Num(t, out["total"], "total") != 14 {
+		t.Fatalf("Firefly season 1 = %d episodes: %v", len(eps), out)
+	}
+	e01 := findRow(t, eps, "episode", "S01E01")
+	file := acctest.Object(t, e01["file"], "file")
+	if acctest.Str(e01["title"]) != "The Train Job" || !acctest.BoolOf(e01["has_file"]) || !acctest.BoolOf(e01["aired"]) || acctest.Str(e01["air_date"]) != "2002-09-20" ||
+		acctest.Str(file["quality"]) != "WEBDL-1080p" || !acctest.IsBool(file["below_cutoff"], false) || !strings.HasPrefix(acctest.Str(file["relative_path"]), "Season 1/") {
+		t.Errorf("S01E01 = %v", e01)
+	}
+	if e06 := findRow(t, eps, "episode", "S01E06"); !acctest.BoolOf(acctest.Object(t, e06["file"], "file")["below_cutoff"]) {
+		t.Errorf("S01E06 (SDTV) = %v", e06)
+	}
+	if e07 := findRow(t, eps, "episode", "S01E07"); !acctest.IsBool(e07["has_file"], false) || e07["file"] != nil {
+		t.Errorf("S01E07 = %v", e07)
+	}
+
+	// the missing ones are the aired, monitored ones with no file
+	missing := call(t, "episode_list", map[string]any{"series": firefly.Title, "missing": true})
+	if n := acctest.Num(t, missing["total"], "total"); n != 8 {
+		t.Errorf("Firefly missing = %d, want E07-E14", n)
+	}
+	// the specials are season 0, asked for like any other season
+	specials := call(t, "episode_list", map[string]any{"series": firefly.Title, "season": 0})
+	for _, e := range acctest.Rows(t, specials["episodes"], "episodes") {
+		if !strings.HasPrefix(acctest.Str(e["episode"]), "S00") {
+			t.Errorf("a special is %v", e["episode"])
+		}
+	}
+	if len(acctest.RowsOf(specials["episodes"])) == 0 {
+		t.Error("Firefly has specials, and none came back")
+	}
+	// and a limit caps the list, not the count
+	capped := call(t, "episode_list", map[string]any{"series": breakingBad.Title, "limit": 3})
+	if len(acctest.Rows(t, capped["episodes"], "episodes")) != 3 || acctest.Num(t, capped["total"], "total") < 60 {
+		t.Errorf("capped = %v of %v", len(acctest.RowsOf(capped["episodes"])), capped["total"])
+	}
+}
+
+func TestEpisodeAndSeasonMonitor(t *testing.T) {
+	// unmonitor two of Breaking Bad's episodes, by label and by 1x form
+	out := call(t, "episode_monitor", map[string]any{"series": breakingBad.Title, "episodes": []any{"S01E01", "1x02"}, "monitored": false})
+	eps := acctest.Rows(t, out["episodes"], "episodes")
+	if len(eps) != 2 {
+		t.Fatalf("episode_monitor = %v", out)
+	}
+	for _, e := range eps {
+		if !acctest.IsBool(e["monitored"], false) {
+			t.Errorf("%v is still monitored", e["episode"])
+		}
+	}
+	t.Cleanup(func() {
+		call(t, "episode_monitor", map[string]any{"series": breakingBad.Title, "episodes": []any{"S01E01", "S01E02"}, "monitored": true})
+	})
+	missing := call(t, "episode_list", map[string]any{"series": breakingBad.Title, "season": 1, "missing": true})
+	if n := acctest.Num(t, missing["total"], "total"); n != 5 {
+		t.Errorf("season 1 missing after unmonitoring two = %d, want 5", n)
+	}
+	for _, bad := range []any{"S09E01", "episode two", ""} {
+		callErr(t, "episode_monitor", map[string]any{"series": breakingBad.Title, "episodes": []any{bad}, "monitored": true})
+	}
+
+	// a whole season, and every episode in it follows
+	season := call(t, "season_monitor", map[string]any{"series": breakingBad.Title, "seasons": []any{5}, "monitored": false})
+	if changed := acctest.Strs(t, season["changed"], "changed"); len(changed) != 1 || changed[0] != "season 5: monitored false" {
+		t.Errorf("season_monitor = %v", season)
+	}
+	t.Cleanup(func() {
+		call(t, "season_monitor", map[string]any{"series": breakingBad.Title, "seasons": []any{5}, "monitored": true})
+	})
+	five := call(t, "episode_list", map[string]any{"series": breakingBad.Title, "season": 5})
+	for _, e := range acctest.Rows(t, five["episodes"], "episodes") {
+		if !acctest.IsBool(e["monitored"], false) {
+			t.Errorf("%v is still monitored after its season was unmonitored", e["episode"])
+		}
+	}
+	// the audit sees the season go
+	if f := findings(t, call(t, "audit_missing_episodes", map[string]any{"series": breakingBad.Title}), "subject", "season 5"); len(f) != 0 {
+		t.Errorf("season 5 is still missing after unmonitoring it: %v", f)
+	}
+	// changing nothing changes nothing
+	if again := call(t, "season_monitor", map[string]any{"series": breakingBad.Title, "seasons": []any{5}, "monitored": false}); len(acctest.RowsOf(again["changed"])) != 0 {
+		t.Errorf("a no-op season_monitor changed %v", again["changed"])
+	}
+
+	// a season's flag is its own: monitoring two of its episodes leaves the
+	// season saying unmonitored, and Sonarr goes on wanting them. Asked to
+	// unmonitor the season again, the tool unmonitors those two rather than
+	// finding nothing to do.
+	call(t, "episode_monitor", map[string]any{"series": breakingBad.Title, "episodes": []any{"S05E01", "S05E02"}, "monitored": true})
+	missed := call(t, "season_monitor", map[string]any{"series": breakingBad.Title, "seasons": []any{5}, "monitored": false})
+	if changed := acctest.Strs(t, missed["changed"], "changed"); len(changed) != 1 || !strings.Contains(changed[0], "season 5: 2 episodes monitored false") {
+		t.Errorf("a season saying unmonitored with two monitored episodes in it = %v", missed)
+	}
+	five = call(t, "episode_list", map[string]any{"series": breakingBad.Title, "season": 5})
+	for _, e := range acctest.Rows(t, five["episodes"], "episodes") {
+		if !acctest.IsBool(e["monitored"], false) {
+			t.Errorf("%v is still monitored after its season was unmonitored a second time", e["episode"])
+		}
+	}
+
+	// a season the series does not have is refused, naming the ones it has
+	if msg := callErr(t, "season_monitor", map[string]any{"series": breakingBad.Title, "seasons": []any{9}, "monitored": true}); !strings.Contains(msg, "no season 9") || !strings.Contains(msg, "it has: ") {
+		t.Errorf("a season it does not have = %s", msg)
+	}
+	callErr(t, "season_monitor", map[string]any{"series": breakingBad.Title, "seasons": []any{}, "monitored": true})
+
+	// the same season across several series goes as one season pass
+	bulk := call(t, "season_bulk_monitor", map[string]any{"series": []any{firefly.Title, "tvdb:" + itoa(cowboyBebop.TvdbID)}, "seasons": []any{1}, "monitored": false})
+	t.Cleanup(func() {
+		call(t, "season_bulk_monitor", map[string]any{"series": []any{firefly.Title, cowboyBebop.Title}, "seasons": []any{1}, "monitored": true})
+	})
+	if rows := acctest.Rows(t, bulk["series"], "series"); len(rows) != 2 || acctest.Str(rows[1]["series"]) != cowboyBebop.Title {
+		t.Errorf("season_bulk_monitor = %v", bulk)
+	}
+	for _, title := range []string{firefly.Title, cowboyBebop.Title} {
+		seasons := acctest.Rows(t, call(t, "series_get", map[string]any{"series": title})["seasons"], "seasons")
+		at := slices.IndexFunc(seasons, func(s map[string]any) bool { return acctest.NumOr0(s["season"]) == 1 })
+		if at < 0 || !acctest.IsBool(seasons[at]["monitored"], false) {
+			t.Errorf("%s season 1 after the season pass = %v", title, seasons)
+		}
+	}
+	if msg := callErr(t, "season_bulk_monitor", map[string]any{"series": []any{firefly.Title, chernobyl.Title}, "seasons": []any{3}, "monitored": true}); !strings.Contains(msg, "has no season 3") {
+		t.Errorf("a season one of them lacks = %s", msg)
+	}
+}
+
+func TestCalendarList(t *testing.T) {
+	// the seeded series all aired years ago; a window reaching back over
+	// Severance's second season finds it
+	out := call(t, "calendar_list", map[string]any{"days": 1, "past_days": 3000})
+
+	eps := acctest.Rows(t, out["episodes"], "episodes")
+	if len(eps) == 0 || acctest.Str(out["from"]) == "" || acctest.Str(out["to"]) == "" {
+		t.Fatalf("calendar = %v", out)
+	}
+	found := false
+	for _, e := range eps {
+		if acctest.Str(e["series"]) == severance.Title && strings.HasPrefix(acctest.Str(e["episode"]), "S02") {
+			found = true
+		}
+		if acctest.Str(e["air_date_utc"]) == "" || acctest.NumOr0(e["series_id"]) == 0 {
+			t.Errorf("a calendar row lacks its date or series: %v", e)
+		}
+	}
+	if !found {
+		t.Errorf("Severance's second season is not on the calendar: %v", eps)
+	}
+	// in air order
+	for i := 1; i < len(eps); i++ {
+		if acctest.Str(eps[i]["air_date_utc"]) < acctest.Str(eps[i-1]["air_date_utc"]) {
+			t.Fatalf("not in air order at %d: %v then %v", i, eps[i-1]["air_date_utc"], eps[i]["air_date_utc"])
+		}
+	}
+
+	// the default window is the week ahead
+	week := call(t, "calendar_list", nil)
+	if acctest.Str(week["from"]) >= acctest.Str(week["to"]) {
+		t.Errorf("default window = %v to %v", week["from"], week["to"])
+	}
+	call(t, "calendar_list", map[string]any{"include_unmonitored": true, "days": 30})
+}

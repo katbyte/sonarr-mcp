@@ -6,8 +6,7 @@
 .tools/npm
 dist
 docs
-acceptance/testdata
-integration/testdata
+acceptance/*/testdata
 sonarr-mcp
 *.md
 docker-compose.yml

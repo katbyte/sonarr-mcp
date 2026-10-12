@@ -53,6 +53,8 @@
 - over HTTP, a session its client stopped using is closed after half an hour, and stopping the server no longer waits out a connected client
 - serving, the tool registry and the live suites' recording proxy are go-kt's, shared with embyfin-mcp, abs-mcp and technitium-mcp
 - the Docker image and the release build take their base images from Google's mirror of Docker Hub, and from Docker Hub itself when the mirror gives nothing
+- every test that runs against a real Sonarr is under `acceptance/`, behind the `acceptance` build tag, where there were two folders behind `integration`: the Go client's suite is `acceptance/sonarr` (`make testacc-sdk`, was `integration/` and `make testacc-integration`) and the tools' is `acceptance/tools` (`make testacc-tools`, was `make testacc-acceptance`). The lint reads both, which it never had
+- the helper scripts are in `.scripts/`, where they were in `scripts/`: the test environment is `.scripts/testenv.sh`
 
 ### Fixed
 

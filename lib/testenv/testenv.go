@@ -1,12 +1,12 @@
 // Package testenv is what the two live suites share that is this
-// application's own: the environment scripts/testenv.sh hands them, how the
+// application's own: the environment .scripts/testenv.sh hands them, how the
 // record/replay proxy Sonarr's provider calls go through is set up, the fake
 // indexer and download client Sonarr searches and downloads with, and the
 // container, which is started here once those are listening. The machinery is
 // go-kt's (test/env, test/replayproxy and the stand-ins under test/services).
 //
-// The acceptance suite (../../acceptance) drives the tools over MCP and the
-// integration suite (../../integration) drives the generated SDK; each runs
+// The tool suite (../../acceptance/tools) drives the tools over MCP and the
+// SDK suite (../../acceptance/sonarr) drives the generated SDK; each runs
 // against a container, a library and ports of its own.
 package testenv
 
@@ -30,12 +30,12 @@ import (
 	"github.com/katbyte/sonarr-mcp/internal/cassettes"
 )
 
-// sonarr is the environment scripts/testenv.sh writes, every variable of
+// sonarr is the environment .scripts/testenv.sh writes, every variable of
 // which begins SONARR_.
 var sonarr = env.New("SONARR")
 
 // NotConfigured is what a test says when it skips for want of a container.
-const NotConfigured = "SONARR_SERVER, SONARR_TOKEN and SONARR_TEST_CONTAINER are not set; run: eval \"$(scripts/testenv.sh up)\""
+const NotConfigured = "SONARR_SERVER, SONARR_TOKEN and SONARR_TEST_CONTAINER are not set; run: eval \"$(.scripts/testenv.sh up)\""
 
 // FakeKey is the API key both fakes demand, so a Sonarr that sent none would
 // be caught.
@@ -62,7 +62,7 @@ func Recording() bool { return sonarr.Recording() }
 func DataDir(elem ...string) string { return sonarr.DataDir(elem...) }
 
 // Host is how the container reaches this process: the name or address
-// scripts/testenv.sh pointed its proxy settings at (SONARR_TEST_HOST).
+// .scripts/testenv.sh pointed its proxy settings at (SONARR_TEST_HOST).
 func Host() string { return sonarr.Host() }
 
 // Ports are the defaults a suite's fake indexer and download client listen
@@ -77,7 +77,7 @@ type Ports struct {
 type Proxy = env.Proxy
 
 // ListenProxy brings up the record/replay proxy the container's HTTPS_PROXY
-// already points at, signing with the CA scripts/testenv.sh minted and
+// already points at, signing with the CA .scripts/testenv.sh minted and
 // mounted into the container, with its cassettes under the suite's testdata.
 // Of the providers' lists of every show they know, a recording keeps only the
 // series with these TheTVDB ids (internal/cassettes).
@@ -135,7 +135,7 @@ func OfferUpdates(extra ...arrserver.Update) {
 	Updates.Offer(append([]arrserver.Update{{Version: SonarrVersion(), Fixed: []string{"the release running in the test container"}}}, extra...)...)
 }
 
-// defaultVersion is the Sonarr release scripts/testenv.sh runs unless
+// defaultVersion is the Sonarr release .scripts/testenv.sh runs unless
 // SONARR_TEST_IMAGE names another.
 const defaultVersion = "4.0.20.3014"
 
@@ -176,7 +176,7 @@ type port struct {
 }
 
 // StartFakes starts the fake indexer, offering releases, and the fake
-// download client, on the ports scripts/testenv.sh told the container about
+// download client, on the ports .scripts/testenv.sh told the container about
 // (SONARR_TEST_INDEXER_PORT and SONARR_TEST_SAB_PORT, or the suite's
 // defaults), and waits for both to answer.
 func StartFakes(defaults Ports, releases []newznab.Release) (*Fakes, error) {
@@ -311,7 +311,17 @@ func WaitHTTP(url string) error {
 	return last
 }
 
-// StartContainer starts the container scripts/testenv.sh created, now that
+// Answered is the record a call answered with. A call that worked always carries one, so an answer without it is a fault in the client and stops the
+// run, rather than let a suite go on with an empty record and write that back.
+func Answered[T any](record *T) T {
+	if record == nil {
+		panic("the call answered with no record")
+	}
+
+	return *record
+}
+
+// StartContainer starts the container .scripts/testenv.sh created, now that
 // the proxy and the fakes are listening, and proves from inside it that
 // Sonarr can reach each of them. One it cannot reach fails every lookup,
 // search and download with a timeout of its own, which reads as dozens of

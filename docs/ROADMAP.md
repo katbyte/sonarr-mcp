@@ -18,7 +18,7 @@ Design rules, in priority order:
    deletes series or files is disabled unless the operator sets `--enable-delete`.
 7. **Every audit names its fix, and every kind of finding is tested.** A finding says which
    tool fixes it; the live suite has to report every kind of finding an audit can make, or
-   name the reason it cannot (`acceptance/coverage_test.go`), and where the fix is a tool it
+   name the reason it cannot (`acceptance/tools/coverage_test.go`), and where the fix is a tool it
    runs the fix and the audit again.
 8. **One way to page.** Every list takes `limit` and `offset` and answers `total`, `offset` and `next_offset`, whatever it lists and whether Sonarr pages it or the tool does. A test holds every `_list` tool to it.
 9. **`confirm` before what cannot be put back.** A tool that deletes a series or files changes nothing without `confirm`, and says what it would do: `would_delete`. The same test holds every delete tool to it.

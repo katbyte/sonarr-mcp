@@ -323,7 +323,7 @@ func excludedPath(root, p string) bool {
 // The kinds of finding the audits report: a finding's Problem, a short fixed
 // phrase a worklist can be grouped by. Each is named here and listed in
 // AuditProblems, so the live suite can check the library it seeds produces
-// every one of them (acceptance/coverage_test.go).
+// every one of them (acceptance/tools/coverage_test.go).
 const (
 	// audit_missing_episodes
 	problemEpisodesMissing    = "episodes missing"
@@ -400,7 +400,7 @@ const (
 
 // AuditProblems is every kind of finding each audit can report. A run of the
 // live suite fails when one of them is never reported, so an audit's branch
-// cannot go untested (acceptance/coverage_test.go); audit_health's kinds are
+// cannot go untested (acceptance/tools/coverage_test.go); audit_health's kinds are
 // the prefix of a finding that ends in the check's own level.
 var AuditProblems = map[string][]string{
 	"audit_missing_episodes": {problemEpisodesMissing, problemWholeSeasonMissing},

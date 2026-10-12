@@ -6,6 +6,8 @@ version: "2"
 run:
   timeout: 60m
   modules-download-mode: vendor
+  build-tags:
+    - acceptance # the suites under acceptance/ are behind this tag; without it none of their files are linted
 
 issues:
   max-issues-per-linter: 0
@@ -82,9 +84,14 @@ linters:
           - goconst
       # tool names, query keys, API parameters and fixture titles repeat the same short words by
       # design in the tools, the SDK and the suites; constants would only add indirection
-      - path: '(tools|sdk/sonarr|lib/testenv|acceptance|integration)/.*\.go'
+      - path: '(tools|sdk/sonarr|lib/testenv|acceptance)/.*\.go'
         linters:
           - goconst
+      # the acceptance tests share one real Sonarr and run in the order written: each leaves the
+      # library as the next expects it, so none can run beside another
+      - path: 'acceptance/.*\.go'
+        linters:
+          - paralleltest
       # the service's settings and its workarounds repeat the document's own words
       - path: 'sdk/pandorest/.*\.go'
         linters:

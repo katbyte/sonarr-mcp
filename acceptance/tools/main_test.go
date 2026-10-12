@@ -1,0 +1,28 @@
+//go:build acceptance
+
+// Package tools_test covers every tool against a real Sonarr running in
+// Docker - the reads, the writes and the audits alike - so response shapes,
+// query encoding, status codes and Sonarr's own behaviour are checked against
+// the thing sonarr-mcp actually talks to rather than a stub.
+//
+// The library is built through the tools themselves (rootfolder_add,
+// series_import, series_add, series_edit), so the setup is part of the
+// coverage. Sonarr's calls out to SkyHook and services.sonarr.tv go through a
+// record/replay proxy (go-kt's test/replayproxy), and the indexer and download
+// client it searches and downloads with are fakes this suite runs (go-kt's
+// test/services), so a run needs no network and every download is one the
+// suite chose.
+//
+//	make testacc-tools                                  # container started and torn down
+//
+//	eval "$(.scripts/testenv.sh up)"                     # or drive it by hand
+//	go test -tags acceptance ./acceptance/tools/
+//	.scripts/testenv.sh down
+package tools_test
+
+import (
+	"os"
+	"testing"
+)
+
+func TestMain(m *testing.M) { os.Exit(runSuite(m)) }

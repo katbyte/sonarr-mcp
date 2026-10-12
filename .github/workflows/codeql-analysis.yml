@@ -64,16 +64,15 @@ jobs:
               - vendor
 
       # autobuild only reaches what `go build ./...` builds, which leaves the
-      # integration/ and acceptance/ suites out entirely: every file there is
-      # behind //go:build integration, so `go list ./...` does not even report
+      # suites under acceptance/ out entirely: every file there is
+      # behind //go:build acceptance, so `go list ./...` does not even report
       # the packages. Compiling the test binaries and throwing them away puts
       # those in front of the extractor.
       - name: Build
         if: matrix.language == 'go'
         run: |
           go build ./...
-          go test -c -o /dev/null -tags integration ./integration/
-          go test -c -o /dev/null -tags integration ./acceptance/
+          for suite in sonarr tools; do go test -c -o /dev/null -tags acceptance "./acceptance/$suite/"; done
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2

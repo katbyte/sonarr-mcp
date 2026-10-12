@@ -103,3 +103,19 @@ func TestWaitHTTP(t *testing.T) {
 		t.Errorf("a server that answers = %v", err)
 	}
 }
+
+// A record that came back is handed over as it is, and an answer with none stops the run rather than go on empty.
+func TestAnswered(t *testing.T) {
+	t.Parallel()
+
+	if got := Answered(new(7)); got != 7 {
+		t.Errorf("a record that came back = %d", got)
+	}
+
+	defer func() {
+		if recover() == nil {
+			t.Error("an answer with no record went on")
+		}
+	}()
+	Answered[int](nil)
+}

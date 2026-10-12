@@ -4,7 +4,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/katbyte/sonarr-mcp?color=00ADD8)](https://github.com/katbyte/sonarr-mcp/blob/main/go.mod)
 [![License](https://img.shields.io/github/license/katbyte/sonarr-mcp?color=blue)](https://github.com/katbyte/sonarr-mcp/blob/main/LICENSE)
 ![build](https://github.com/katbyte/sonarr-mcp/actions/workflows/build.yaml/badge.svg)
-![tests](https://github.com/katbyte/sonarr-mcp/actions/workflows/pr-integration.yaml/badge.svg)
+![tests](https://github.com/katbyte/sonarr-mcp/actions/workflows/pr-acceptance.yaml/badge.svg)
 ![lint](https://github.com/katbyte/sonarr-mcp/actions/workflows/pr-golangci-lint.yaml/badge.svg)
 [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/katbyte/sonarr-mcp/badges/coverage.json)](https://github.com/katbyte/sonarr-mcp/actions/workflows/coverage.yaml)
 
@@ -298,7 +298,7 @@ missing, err := c.GetWantedMissingComplete(ctx, sonarr.GetWantedMissingOperation
 for _, e := range missing.Items { ... }
 ```
 
-It is generated from Sonarr's own OpenAPI document (`api-defs/`, see [api-defs/README.md](api-defs/README.md)) by [pandorest](https://github.com/katbyte/pandorest), the generator the katbyte MCP servers share, modelled on [hashicorp/pandora](https://github.com/hashicorp/pandora): an importer normalises the spec into checked-in definitions (`api-defs/sonarr-<version>/`, one file per tag) through named workarounds for the spec's known bugs, a differ reports what a spec refresh changes, and a generator writes one file per operation and model from the definitions. What is this repository's own is in `sdk/pandorest`, the service's settings and the workarounds for its document, and in `sdk/sonarr/service.go`, the one hand-written file beside the generated ones: how Sonarr's refusals read and what is known of them. That is **a method for every one of Sonarr's 228 operations**, each with typed options, a typed body, a `{Model, HttpResponse}` result, the status codes the operation answers with (anything else is an error), and a `Complete` pager on every paged list. `make apicheck` proves the coverage claim against the spec, `make gencheck` (and the unit tests) fail when the generated code is stale, and the integration suite proves the shapes **against a running Sonarr** - which is the only thing that catches the server answering differently from what its spec says.
+It is generated from Sonarr's own OpenAPI document (`api-defs/`, see [api-defs/README.md](api-defs/README.md)) by [pandorest](https://github.com/katbyte/pandorest), the generator the katbyte MCP servers share, modelled on [hashicorp/pandora](https://github.com/hashicorp/pandora): an importer normalises the spec into checked-in definitions (`api-defs/sonarr-<version>/`, one file per tag) through named workarounds for the spec's known bugs, a differ reports what a spec refresh changes, and a generator writes one file per operation and model from the definitions. What is this repository's own is in `sdk/pandorest`, the service's settings and the workarounds for its document, and in `sdk/sonarr/service.go`, the one hand-written file beside the generated ones: how Sonarr's refusals read and what is known of them. That is **a method for every one of Sonarr's 228 operations**, each with typed options, a typed body, a `{Model, HttpResponse}` result, the status codes the operation answers with (anything else is an error), and a `Complete` pager on every paged list. `make apicheck` proves the coverage claim against the spec, `make gencheck` (and the unit tests) fail when the generated code is stale, and the SDK suite (`acceptance/sonarr`) proves the shapes **against a running Sonarr** - which is the only thing that catches the server answering differently from what its spec says.
 
 ## Development
 
@@ -316,31 +316,24 @@ and the generated client build and the answers they decode. It also re-imports t
 regenerates the SDK to check the checked-in code is current, and applies every importer
 workaround twice to prove each one notices when its bug is fixed.
 
-Everything else runs against **a real Sonarr in Docker**, because a stub can only confirm what
-you already believed. Two suites, each in its own container:
+Everything else runs against **a real Sonarr in Docker**, because a stub can only confirm what you already believed. Every such test lives under `acceptance/`, behind the `acceptance` build tag: two suites, each in its own container.
 
 | | Covers | Command |
 |---|---|---|
-| `integration/` | the `sdk/sonarr` client: every one of its operations is called against the server - all but the four that restart, stop or restore Sonarr, which are named with the reason - checking that each request is one Sonarr accepts and each answer decodes with its fields populated, and a run that leaves an operation neither called nor explained fails | `make testacc-integration` |
-| `acceptance/` | the tools: name resolution, projections, every audit against a library seeded with what it exists to find, searches that grab from the fake indexer and downloads the fake SABnzbd completes, imports, renames; every kind of settings record added, changed and deleted, with a notification that really sends to a hook the suite answers; journeys that chain them (an audit's finding, the fix it names, the audit again to see it gone; a stuck download blocklisted and replaced from a second indexer; a file below cutoff upgraded and replaced; a torrent found on a Torznab indexer, handed to a torrent blackhole and imported, with no usenet in it); and the one journey every server in the family has, a setup built from nothing with the tools alone in the order a person would - tag, custom format and profile, delay and release profiles, tracker, download client, webhook, import list and exclusion, a series, a grab and an import, a backup - made the naive way so the audits find what is wrong with it (the format scored nowhere, the tag scoping nothing, the file below cutoff), each fixed with the tool the finding names, the audits clean, then taken down with the tools and Sonarr compared to the state recorded before it started; and the built binary itself over stdio and HTTP (flags and environment reaching the server, the bearer check, refusing to start without a key or a token) | `make testacc-acceptance` |
+| `acceptance/sonarr/` | the `sdk/sonarr` client: every one of its operations is called against the server - all but the four that restart, stop or restore Sonarr, which are named with the reason - checking that each request is one Sonarr accepts and each answer decodes with its fields populated, and a run that leaves an operation neither called nor explained fails | `make testacc-sdk` |
+| `acceptance/tools/` | the tools: name resolution, projections, every audit against a library seeded with what it exists to find, searches that grab from the fake indexer and downloads the fake SABnzbd completes, imports, renames; every kind of settings record added, changed and deleted, with a notification that really sends to a hook the suite answers; journeys that chain them (an audit's finding, the fix it names, the audit again to see it gone; a stuck download blocklisted and replaced from a second indexer; a file below cutoff upgraded and replaced; a torrent found on a Torznab indexer, handed to a torrent blackhole and imported, with no usenet in it); and the one journey every server in the family has, a setup built from nothing with the tools alone in the order a person would - tag, custom format and profile, delay and release profiles, tracker, download client, webhook, import list and exclusion, a series, a grab and an import, a backup - made the naive way so the audits find what is wrong with it (the format scored nowhere, the tag scoping nothing, the file below cutoff), each fixed with the tool the finding names, the audits clean, then taken down with the tools and Sonarr compared to the state recorded before it started; and the built binary itself over stdio and HTTP (flags and environment reaching the server, the bearer check, refusing to start without a key or a token) | `make testacc-tools` |
 
 ```bash
 make testacc              # both suites, each in a throwaway container
-make testacc-acceptance   # one suite
+make testacc-tools        # one suite
 make check-all            # build + unit + live suites + every linter
 make cover                # every suite merged into one coverage number
 ```
 
-Coverage has to span every suite or it lies: `go test -cover ./...` reports a fraction for
-`tools/`, because almost everything real happens in the live suites behind the `integration`
-tag. `make cover` runs each into its own binary coverage directory and merges them with
-`go tool covdata` - stdlib tooling, no third-party merger - which is what the badge reports.
-The generated `sdk/sonarr` is left out of the number and reported on a line of its own: it is
-one mechanical method per operation, and what proves it is that the integration suite calls
-224 of its 228 operations against a real Sonarr, not a line count.
+Coverage has to span every suite or it lies: `go test -cover ./...` reports a fraction for `tools/`, because almost everything real happens in the live suites behind the `acceptance` tag. `make cover` runs each into its own binary coverage directory and merges them with `go tool covdata` - stdlib tooling, no third-party merger - which is what the badge reports. The generated `sdk/sonarr` is left out of the number and reported on a line of its own: it is one mechanical method per operation, and what proves it is that the SDK suite calls 224 of its 228 operations against a real Sonarr, not a line count.
 
 **Every tool is exercised, and every audit's findings with it.** Coverage is enforced rather
-than claimed: the acceptance suite records every tool it calls and fails if the server
+than claimed: the tool suite records every tool it calls and fails if the server
 registered one nothing called, so a new tool cannot ship untested. The same goes for what the
 audits report - each audit declares the kinds of finding it can make, and a run fails if the
 seeded library never produces one of them and nothing says why. The few that a real Sonarr
@@ -364,7 +357,7 @@ vanished fields, changed types - and ignores values, so it goes red when a provi
 contract rather than when an air date moves. The recordings keep only the suite's own series
 out of the lists of every show a provider knows (the scene names alone are 1.6 MB).
 
-Fixtures are generated, never committed: `scripts/testenv.sh` writes tiny videos with `ffmpeg`
+Fixtures are generated, never committed: `.scripts/testenv.sh` writes tiny videos with `ffmpeg`
 (black frames and a silent audio track, about half a megabyte for a 45 minute episode, so
 Sonarr reads a real resolution, codec, runtime and language from each) under
 `~/.cache/sonarr-mcp` (`SONARR_TEST_DATA` to move them - not `$TMPDIR`, which a Docker VM does
@@ -376,7 +369,7 @@ Sonarr's back, a file copied in by hand, a folder Sonarr does not know, a 360p f
 1080p, five minutes of video standing in for a 45 minute episode, a German dub, an anime typed
 standard, a continuing series ignoring new seasons, a tag nothing uses - and each audit has a
 test against it.
-`scripts/testenv.sh fixtures` writes just the media tree if you want to look at the layout.
+`.scripts/testenv.sh fixtures` writes just the media tree if you want to look at the layout.
 Requires docker (or Colima), ffmpeg, jq and openssl; the suites skip when `SONARR_SERVER` and
 `SONARR_TOKEN` are unset, so they never fail for want of a daemon.
 

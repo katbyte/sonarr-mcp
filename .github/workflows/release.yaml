@@ -77,7 +77,7 @@ jobs:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
         # invoked through bash rather than as ./script so a missing execute bit
         # cannot fail the release
-        run: bash ./scripts/update-homebrew-formula.sh
+        run: bash ./.scripts/update-homebrew-formula.sh
 
   # the binary scan (main-binary-scan.yaml) goes red on main when the published release has a known
   # vulnerability, and only a release can clear it. rerun the failed jobs of the scan runs on main's head so

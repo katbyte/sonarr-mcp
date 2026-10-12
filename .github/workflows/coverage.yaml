@@ -11,7 +11,7 @@ on:
       - 'go.sum'
       - 'vendor/**'
       - 'makefile'
-      - 'scripts/testenv.sh'
+      - '.scripts/testenv.sh'
       - '.github/workflows/coverage.yaml'
   workflow_dispatch:
 
@@ -69,12 +69,12 @@ jobs:
           # the checkout persists no credentials, so the push is given the
           # job's own token (the job asks for contents: write above)
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash ./scripts/publish-coverage-badge.sh
+        run: bash ./.scripts/publish-coverage-badge.sh
 
       - name: Tear down
         if: always()
         run: |
-          for s in integration acceptance; do
+          for s in sdk tools; do
             SONARR_TEST_CONTAINER=sonarr-mcp-$s \
-              SONARR_TEST_DATA="$HOME/.cache/sonarr-mcp/testenv/$s" scripts/testenv.sh down || true
+              SONARR_TEST_DATA="$HOME/.cache/sonarr-mcp/testenv/$s" .scripts/testenv.sh down || true
           done

@@ -15,7 +15,7 @@ import (
 // every operation is documented as a 200, and an action returning object or
 // IActionResult is documented as answering nothing. What follows was read off
 // the controllers (Sonarr.Api.V3, Sonarr.Http) and confirmed by the
-// integration suite against the same release.
+// SDK suite (acceptance/sonarr) against the same release.
 
 const sonarr = Service
 

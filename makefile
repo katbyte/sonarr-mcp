@@ -167,7 +167,7 @@ yamllint: $(YAMLLINT) ## Check YAML files with yamllint (config in .yamllint.yml
 
 shellcheck: $(SHELLCHECK) ## Check shell scripts with shellcheck
 	@echo "==> Checking shell scripts with shellcheck..."
-	@$(SHELLCHECK) scripts/*.sh
+	@$(SHELLCHECK) .scripts/*.sh
 
 zizmor: $(ZIZMOR) ## Audit GitHub workflows for security issues with zizmor
 	@echo "==> Auditing workflows with zizmor..."
@@ -227,60 +227,63 @@ depscheck: ## Check that go.mod/go.sum and vendor/ are in sync
 test: build ## Run the unit tests
 	go test ./... -timeout ${TEST_TIMEOUT}
 
-test-integration: ## Run the SDK tests (sdk/sonarr) against an already-running Sonarr
+test-sdk: ## Run the SDK tests (acceptance/sonarr) against an already-running Sonarr
 	@[ -n "${SONARR_SERVER}" ] && [ -n "${SONARR_TOKEN}" ] && [ -n "${SONARR_TEST_CONTAINER}" ] || \
-		(echo 'SONARR_SERVER, SONARR_TOKEN and SONARR_TEST_CONTAINER must be set: eval "$$(scripts/testenv.sh up)"; or use "make testacc"'; exit 1)
-	go test -tags integration -count=1 ./integration/... -timeout ${TEST_TIMEOUT} -v
+		(echo 'SONARR_SERVER, SONARR_TOKEN and SONARR_TEST_CONTAINER must be set: eval "$$(.scripts/testenv.sh up)"; or use "make testacc"'; exit 1)
+	go test -tags acceptance -count=1 ./acceptance/sonarr/ -timeout ${TEST_TIMEOUT} -v
 
-test-acceptance: ## Run the tool tests (reads, writes, audits) against an already-running Sonarr
+test-tools: ## Run the tool tests (acceptance/tools: reads, writes, audits) against an already-running Sonarr
 	@[ -n "${SONARR_SERVER}" ] && [ -n "${SONARR_TOKEN}" ] && [ -n "${SONARR_TEST_CONTAINER}" ] || \
-		(echo 'SONARR_SERVER, SONARR_TOKEN and SONARR_TEST_CONTAINER must be set: eval "$$(scripts/testenv.sh up)"; or use "make testacc"'; exit 1)
-	go test -tags integration -count=1 ./acceptance/... -timeout ${TEST_TIMEOUT} -v
+		(echo 'SONARR_SERVER, SONARR_TOKEN and SONARR_TEST_CONTAINER must be set: eval "$$(.scripts/testenv.sh up)"; or use "make testacc"'; exit 1)
+	go test -tags acceptance -count=1 ./acceptance/tools/ -timeout ${TEST_TIMEOUT} -v
 
-# each suite gets its own container: the SDK tests add and delete series, profiles and
-# providers of their own, which would trample the tool suite's library. The SDK suite's
-# container and fakes sit on ports of their own, so the two can run side by side.
-# live SUITE [EXTRA ENV] [TEST ARGS] - create a container, run one suite, tear it down
+# every suite under acceptance/ runs against a real Sonarr, and each gets its own container: the
+# SDK tests add and delete series, profiles and providers of their own, which would trample the
+# tool suite's library. The SDK suite's container and fakes sit on ports of their own, so the two
+# can run side by side.
+# SUITEDIR is the folder of a suite under acceptance/: the SDK's is named for the SDK
+SUITEDIR=$(if $(filter sdk,$(1)),sonarr,$(1))
+# live SUITE [EXTRA ENV] [TEST ARGS] - create a container, run one suite (sdk or tools), tear it down
 define live
 	@echo "==> $(1)..."
 	@set -e; \
 		env=".testenv-$(1).sh"; \
 		export SONARR_TEST_CONTAINER=sonarr-mcp-$(1) SONARR_TEST_DATA=$${HOME}/.cache/sonarr-mcp/testenv/$(1) $(2); \
-		[ "$(1)" = "integration" ] && export SONARR_TEST_PORT=19089 SONARR_TEST_PROXY_PORT=18180 \
+		[ "$(1)" = "sdk" ] && export SONARR_TEST_PORT=19089 SONARR_TEST_PROXY_PORT=18180 \
 			SONARR_TEST_INDEXER_PORT=18181 SONARR_TEST_SAB_PORT=18182 || true; \
-		scripts/testenv.sh up | grep '^export' > "$$env"; \
-		trap 'st=$$?; [ $$st -eq 0 ] || scripts/testenv.sh logs; \
-			scripts/testenv.sh down; rm -f '"$$env"'; exit $$st' EXIT; \
+		.scripts/testenv.sh up | grep '^export' > "$$env"; \
+		trap 'st=$$?; [ $$st -eq 0 ] || .scripts/testenv.sh logs; \
+			.scripts/testenv.sh down; rm -f '"$$env"'; exit $$st' EXIT; \
 		. ./"$$env"; \
-		go test -tags integration -count=1 ./$(1)/... -timeout ${TEST_TIMEOUT} -v $(3)
+		go test -tags acceptance -count=1 ./acceptance/$(call SUITEDIR,$(1))/ -timeout ${TEST_TIMEOUT} -v $(3)
 endef
 
-testacc-integration: ## SDK tests in a throwaway container
-	$(call live,integration)
+testacc-sdk: ## SDK tests in a throwaway container
+	$(call live,sdk)
 
-testacc-acceptance: ## Tool tests in a throwaway container
-	$(call live,acceptance)
+testacc-tools: ## Tool tests in a throwaway container
+	$(call live,tools)
 
-testacc: testacc-integration testacc-acceptance ## Run both live suites, each in its own container
+testacc: testacc-sdk testacc-tools ## Run both live suites, each in its own container
 
 # Coverage has to span all three suites or it lies: the unit tests alone report
 # a fraction for tools/, because almost everything real happens in the live
-# suites behind the integration tag. Each writes binary coverage into its own
+# suites behind the acceptance tag. Each writes binary coverage into its own
 # directory and covdata merges them, which is stdlib tooling rather than a
 # third-party merger.
 COVERDIR?=.coverage
 COVERPKG=./tools/...,./sdk/...,./lib/...,./cli/...,./internal/...
 SDK=/sdk/sonarr/
-COVERDIRS=$(COVERDIR)/unit,$(COVERDIR)/integration,$(COVERDIR)/acceptance
+COVERDIRS=$(COVERDIR)/unit,$(COVERDIR)/sdk,$(COVERDIR)/tools
 
 cover: ## Run every suite with coverage and report the total
 	@rm -rf $(COVERDIR)
-	@mkdir -p $(COVERDIR)/unit $(COVERDIR)/integration $(COVERDIR)/acceptance
+	@mkdir -p $(COVERDIR)/unit $(COVERDIR)/sdk $(COVERDIR)/tools
 	@echo "==> unit..."
 	@go test -count=1 -coverpkg=$(COVERPKG) ./tools/ ./cli/ ./sdk/... ./lib/... ./internal/... \
 		-args -test.gocoverdir=$(CURDIR)/$(COVERDIR)/unit >/dev/null
-	@$(MAKE) --no-print-directory cover-integration
-	@$(MAKE) --no-print-directory cover-acceptance
+	@$(MAKE) --no-print-directory cover-sdk
+	@$(MAKE) --no-print-directory cover-tools
 	@go tool covdata textfmt -i=$(COVERDIRS) -o=$(COVERDIR)/coverage.all
 	@# sdk/sonarr is generated, one mechanical method per operation (228 of them);
 	@# the suites exercise the ones the tools rely on, so the total is for the
@@ -294,11 +297,11 @@ cover: ## Run every suite with coverage and report the total
 	@echo "==> per package"
 	@go tool covdata percent -i=$(COVERDIRS)
 
-cover-integration:
-	$(call live,integration,,-coverpkg=$(COVERPKG) -args -test.gocoverdir=$(CURDIR)/$(COVERDIR)/integration)
+cover-sdk:
+	$(call live,sdk,,-coverpkg=$(COVERPKG) -args -test.gocoverdir=$(CURDIR)/$(COVERDIR)/sdk)
 
-cover-acceptance:
-	$(call live,acceptance,,-coverpkg=$(COVERPKG) -args -test.gocoverdir=$(CURDIR)/$(COVERDIR)/acceptance)
+cover-tools:
+	$(call live,tools,,-coverpkg=$(COVERPKG) -args -test.gocoverdir=$(CURDIR)/$(COVERDIR)/tools)
 
 cover-html: cover ## Run every suite with coverage and open the HTML report
 	@go tool cover -html=$(COVERDIR)/coverage.out
@@ -307,20 +310,20 @@ record: ## Re-record the provider cassettes against the real SkyHook and service
 	@echo "==> recording against the real providers (this hits the network)..."
 	@# a recording only adds what a cassette lacks, so start from none: a
 	@# re-record should hold what the providers answer now, nothing older
-	rm -f acceptance/testdata/cassettes/*.json integration/testdata/cassettes/*.json
-	$(call live,acceptance,SONARR_TEST_RECORD=1)
-	$(call live,integration,SONARR_TEST_RECORD=1)
+	rm -f acceptance/tools/testdata/cassettes/*.json acceptance/sonarr/testdata/cassettes/*.json
+	$(call live,tools,SONARR_TEST_RECORD=1)
+	$(call live,sdk,SONARR_TEST_RECORD=1)
 
 record-check: ## Check the provider cassettes still match the real APIs, without rewriting them
 	@echo "==> verifying cassettes against the real providers (this hits the network)..."
-	$(call live,acceptance,SONARR_TEST_VERIFY=1)
+	$(call live,tools,SONARR_TEST_VERIFY=1)
 
 testenv-up: ## Create a throwaway Sonarr and its library (eval "$$(make -s testenv-up)")
-	@scripts/testenv.sh up
+	@.scripts/testenv.sh up
 
 testenv-down: ## Remove the throwaway Sonarr and its library
-	@scripts/testenv.sh down
+	@.scripts/testenv.sh down
 
 check-all: build test testacc lint actionlint yamllint shellcheck typos markdownlint linkcheck-local depscheck gencheck apicheck ## Run build + tests (incl. live) + all linters + depscheck
 
-.PHONY: default all help fmt goimports build docker generate pandorest-import pandorest-generate pandorest-diff lint lint-fix actionlint yamllint shellcheck zizmor typos typos-fix markdownlint linkcheck linkcheck-local linkcheck-external gencheck apicheck depscheck check-all install tools test test-integration test-acceptance testacc testacc-integration testacc-acceptance cover cover-html cover-integration cover-acceptance record record-check testenv-up testenv-down
+.PHONY: default all help fmt goimports build docker generate pandorest-import pandorest-generate pandorest-diff lint lint-fix actionlint yamllint shellcheck zizmor typos typos-fix markdownlint linkcheck linkcheck-local linkcheck-external gencheck apicheck depscheck check-all install tools test test-sdk test-tools testacc testacc-sdk testacc-tools cover cover-html cover-sdk cover-tools record record-check testenv-up testenv-down
