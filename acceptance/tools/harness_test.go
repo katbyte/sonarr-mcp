@@ -21,6 +21,7 @@ import (
 	"github.com/katbyte/go-kt/mcp/acctest"
 	"github.com/katbyte/go-kt/test/services/newznab"
 	"github.com/katbyte/go-kt/test/services/sabnzbd"
+	"github.com/katbyte/pandorest/client"
 	"github.com/katbyte/sonarr-mcp/lib/testenv"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/katbyte/sonarr-mcp/tools"
@@ -81,6 +82,12 @@ func runSuite(m *testing.M) int {
 	// and download client, or one a test gave it
 	if leaks := suite.LeakReport(); leaks != "" {
 		fmt.Fprint(os.Stderr, leaks)
+		code = 1
+	}
+
+	// a tool that changes nothing called nothing that changes Sonarr, whichever test called it
+	if report := readOnlyReport(); report != "" {
+		fmt.Fprint(os.Stderr, report)
 		code = 1
 	}
 
@@ -152,11 +159,14 @@ func start() error {
 		return err
 	}
 
-	c, err := sonarr.New(testenv.Server(), testenv.Token())
+	c, err := sonarr.New(testenv.Server(), testenv.Token(), client.WithCalls(&readOnly.calls))
 	if err != nil {
 		return err
 	}
 	api = c
+	if err := learnReadOnly(); err != nil {
+		return err
+	}
 	if err := waitForSonarr(); err != nil {
 		return err
 	}
@@ -196,9 +206,12 @@ func waitForSonarr() error {
 }
 
 // invoke calls a tool and returns its structured result. Every tool call in
-// the suite comes through here: go-kt's suite counts it towards coverage, and
-// an audit's answer is read for the kinds of finding it reported.
+// the suite comes through here: go-kt's suite counts it towards coverage, an
+// audit's answer is read for the kinds of finding it reported, and what a
+// read-only tool sent Sonarr is checked to change nothing.
 func invoke(name string, args map[string]any) (map[string]any, error) {
+	defer checkReadOnly(name, sentSoFar())
+
 	out, err := suite.Invoke(name, args)
 	if err != nil {
 		return nil, err

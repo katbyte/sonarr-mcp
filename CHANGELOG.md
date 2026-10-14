@@ -21,7 +21,7 @@ Found by running the audits against a real library of 6,000 series.
 
 - **`audit_no_files`** names every series with no files at all, one finding each. No audit said so before: such a series showed as a list of missing seasons, as loose files in a folder, or not at all. It says which each is: wanted and never fetched, with nothing of it monitored so nothing ever will be, with video files in its own folder that Sonarr tracks none of, with no episode Sonarr knows of, or with nothing aired. `audit_all` counts it.
 - `server_updates` marks the release that is running (`running`), apart from the ones that once were (`installed`).
-- The Go client has `sonarr.Operations`, a table of every operation with its method, its path and whether it changes nothing.
+- The Go client has `sonarr.Operations`, a table of every operation with its method, its path and whether it changes nothing. The tool suite uses it to check that no tool that changes nothing calls anything that changes Sonarr.
 
 ### Changed
 
