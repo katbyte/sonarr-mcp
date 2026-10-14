@@ -17,6 +17,10 @@ Found by running the audits against a real library of 6,000 series.
 - **`audit_no_files`** names every series with no files at all, one finding each. No audit said so before: such a series showed as a list of missing seasons, as loose files in a folder, or not at all. It says which each is: wanted and never fetched, with nothing of it monitored so nothing ever will be, with video files in its own folder that Sonarr tracks none of, with no episode Sonarr knows of, or with nothing aired. `audit_all` counts it.
 - `server_updates` marks the release that is running (`running`), apart from the ones that once were (`installed`).
 
+### Changed
+
+- The README is a short front page. What each audit looks for, every tool, choosing which tools load, the Go client and the tests each have a page of their own under `docs/`.
+
 ## 0.2.0 (2026-10-12)
 
 Sonarr itself can now be set up and run through the tools, not only its library: 141 tools, up from 69. Every delete waits to be confirmed, and credentials are kept out of what the tools say.

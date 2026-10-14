@@ -285,8 +285,8 @@ cover: ## Run every suite with coverage and report the total
 	@$(MAKE) --no-print-directory cover-sdk
 	@$(MAKE) --no-print-directory cover-tools
 	@go tool covdata textfmt -i=$(COVERDIRS) -o=$(COVERDIR)/coverage.all
-	@# sdk/sonarr is generated, one mechanical method per operation (228 of them);
-	@# the suites exercise the ones the tools rely on, so the total is for the
+	@# sdk/sonarr is generated, one mechanical method per operation (239 of them);
+	@# what proves it is the client suite calling them, so the total is for the
 	@# hand-written code and the SDK gets a line of its own (the per-package
 	@# figures below include it)
 	@grep -v '$(SDK)' $(COVERDIR)/coverage.all > $(COVERDIR)/coverage.out

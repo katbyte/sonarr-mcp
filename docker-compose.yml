@@ -34,4 +34,4 @@ services:
       - "SONARR_LOG=INFO"
       # - "SONARR_TOOLSETS=curation"  # the audits and everything that fixes what they find; default core
       # - "SONARR_READ_ONLY=true"     # only register tools that never change Sonarr's state
-      # - "SONARR_ENABLE_DELETE=true" # opt in to series_delete and file_delete
+      # - "SONARR_ENABLE_DELETE=true" # opt in to the tools that delete

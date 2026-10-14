@@ -2,26 +2,15 @@
 
 Design rules, in priority order:
 
-1. **Wrap judgment, not plumbing.** A tool exists only where a model has a decision to
-   make. Backups, updates, the UI settings and notification plumbing stay unwrapped.
-2. **Trim every response.** Tools return the fields a decision needs, never raw resources
-   (Sonarr's series resource is 45 fields with the seasons, statistics and images nested
-   inside; `series_list` rows carry what a list needs).
-3. **Composite over chatty.** If a task always takes N calls (search → wait for the grab →
-   check the queue), it is one tool, not N.
-4. **Names, not just ids.** Every tool that takes a series, quality profile, tag, indexer,
-   download client or root folder resolves a name, and one that fits several says which.
-5. **Resource-first names** (`series_*`, `episode_*`, `queue_*`, `audit_*`) so tools group
-   by what they act on.
-6. **Reads are cheap, writes are explicit, destructive is opt-in.** Every tool carries MCP
-   annotations; anything that changes Sonarr says so in its description; anything that
-   deletes series or files is disabled unless the operator sets `--enable-delete`.
-7. **Every audit names its fix, and every kind of finding is tested.** A finding says which
-   tool fixes it; the live suite has to report every kind of finding an audit can make, or
-   name the reason it cannot (`acceptance/tools/coverage_test.go`), and where the fix is a tool it
-   runs the fix and the audit again.
+1. **Cover what a person would do.** Every operation of Sonarr's API has a tool, or a reason below for having none.
+2. **Trim every response.** Tools return the fields a decision needs, never raw resources (Sonarr's series resource is 45 fields with the seasons, statistics and images nested inside; `series_list` rows carry what a list needs).
+3. **Composite over chatty.** If a task always takes N calls (search → wait for the grab → check the queue), it is one tool, not N.
+4. **Names, not just ids.** Every tool that takes a series, quality profile, tag, indexer, download client or root folder resolves a name, and one that fits several says which.
+5. **Resource-first names** (`series_*`, `episode_*`, `queue_*`, `audit_*`) so tools group by what they act on.
+6. **Reads are cheap, writes are explicit, destructive is opt-in.** Every tool carries MCP annotations; anything that changes Sonarr says so in its description; anything that deletes is disabled unless the operator sets `--enable-delete`.
+7. **Every audit names its fix, and every kind of finding is tested.** A finding says which tool fixes it; the live suite has to report every kind of finding an audit can make, or name the reason it cannot (`acceptance/tools/coverage_test.go`), and where the fix is a tool it runs the fix and the audit again.
 8. **One way to page.** Every list takes `limit` and `offset` and answers `total`, `offset` and `next_offset`, whatever it lists and whether Sonarr pages it or the tool does. A test holds every `_list` tool to it.
-9. **`confirm` before what cannot be put back.** A tool that deletes a series or files changes nothing without `confirm`, and says what it would do: `would_delete`. The same test holds every delete tool to it.
+9. **`confirm` before what cannot be put back.** A tool that deletes changes nothing without `confirm`, and says what it would do: `would_delete`. The same test holds every delete tool to it.
 10. **Nothing hidden in an answer.** Text that came from outside - a release's name, a title, a message - is cleaned of what does not show and cut to a length, once, around every tool, so a new tool cannot forget to. What a later call hands back (a path, a guid, a download's id) is left as Sonarr holds it, and a test holds that list to fields the answers really have.
 
 ## Done
@@ -29,7 +18,7 @@ Design rules, in priority order:
 | Area | Tools | Answers |
 |---|---|---|
 | know the library | `server_info`, `series_list`, `series_get`, `episode_list`, `calendar_list`, `file_list`, `profile_list`, `customformat_list`, `tag_list`, `rootfolder_list`, `config_get` | "what do I have, and how is it set up" |
-| curation | `audit_all` + 17 audits, `release_parse`, `file_edit`, `series_edit`, `series_bulk_edit`, `season_monitor`, `episode_monitor`, `series_rename`, `series_rescan`, `series_refresh`, `import_scan` → `import_apply`, `series_import`, `tag_create`, `tag_delete` | "what is wrong, and fix it" |
+| curation | `audit_all` + 18 audits, `release_parse`, `file_edit`, `series_edit`, `series_bulk_edit`, `season_monitor`, `episode_monitor`, `series_rename`, `series_rescan`, `series_refresh`, `import_scan` → `import_apply`, `series_import`, `tag_create`, `tag_delete` | "what is wrong, and fix it" |
 | getting episodes | `episode_search`, `season_search`, `series_search`, `wanted_search`, `release_search` → `release_grab`, `queue_list`, `queue_grab`, `queue_remove`, `history_list`, `history_mark_failed`, `blocklist_list`, `blocklist_remove` | "go and get what is missing, and see it arrive" |
 | growing the library | `series_lookup`, `series_add`, `rootfolder_add`, `rootfolder_remove` | "add this show" |
 | admin | `server_health`, `server_disk_space`, `server_updates`, `server_restart`, `server_shutdown`, `task_list`, `task_run`, `command_list`, `command_cancel`, `log_list`, `logfile_list`, `logfile_read`, `filesystem_list`, `backup_list`, `backup_create`, `backup_restore`, `backup_delete`, `indexer_list`, `indexer_test`, `downloadclient_list`, `downloadclient_test`, `series_delete`, `file_delete` | "keep it healthy" |

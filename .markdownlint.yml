@@ -23,8 +23,5 @@ no-duplicate-heading:
 # MD013: maximum line length - one line per paragraph and per bullet here, however long
 line-length: false
 
-# MD001: headings must increment one level at a time - the README's opening uses a smaller heading on purpose
-heading-increment: false
-
 # MD060: table pipes must be padded or aligned - tables here are written compact
 table-column-style: false
