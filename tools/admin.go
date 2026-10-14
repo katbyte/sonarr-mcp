@@ -769,6 +769,7 @@ func registerSystemTools(r *registry) {
 		Version     string   `json:"version"`
 		Branch      string   `json:"branch,omitempty"`
 		Released    string   `json:"released,omitempty"`
+		Running     bool     `json:"running"            jsonschema:"this is the version running now"`
 		Installed   bool     `json:"installed"          jsonschema:"this is, or has been, the version running"`
 		Latest      bool     `json:"latest"`
 		Installable bool     `json:"installable"        jsonschema:"Sonarr can install it itself; false in a container, which is updated by replacing its image"`
@@ -790,7 +791,7 @@ func registerSystemTools(r *registry) {
 		updates, paged := pageRows(res.Answer, in)
 		out := updatesOut{pageOut: paged, Updates: make([]updateRow, 0, len(updates))}
 		for _, u := range updates {
-			row := updateRow{Version: u.Version, Branch: u.Branch, Released: day(u.ReleaseDate), Installed: u.Installed || u.InstalledOn != "", Latest: u.Latest, Installable: u.Installable}
+			row := updateRow{Version: u.Version, Branch: u.Branch, Released: day(u.ReleaseDate), Running: u.Installed, Installed: u.Installed || u.InstalledOn != "", Latest: u.Latest, Installable: u.Installable}
 			if u.Changes != nil {
 				row.New, row.Fixed = u.Changes.New, u.Changes.Fixed
 			}

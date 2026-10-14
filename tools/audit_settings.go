@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/katbyte/go-kt/parallel"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
@@ -74,13 +75,61 @@ func looksAnime(s *sonarr.SeriesResource) bool {
 	return hasGenre(s, "anime") || japanese && hasGenre(s, "animation")
 }
 
+// formatOffMany is how many series folders have to be off the series folder format, and more than half of them, before it is the format that is
+// said to be off: a handful are folders to rename, a library of them is a setting to change.
+const formatOffMany = 10
+
 // auditSeriesSettings finds series whose own settings look wrong for them.
 func (r *registry) auditSeriesSettings(ctx context.Context, s *snapshot, limit int) (auditOut, error) {
 	roots, err := r.client.GetRootFolder(ctx)
 	if err != nil {
 		return auditOut{}, err
 	}
+	// the folder Sonarr's format makes for each series is one question a series, asked a few at a time
+	formatted := make([]string, len(s.series))
+	if err := parallel.Each(ctx, len(s.series), auditWorkers, func(ctx context.Context, i int) error {
+		res, err := r.client.GetSeriesByIdFolder(ctx, s.series[i].Id)
+		if err != nil {
+			return err
+		}
+		var want struct {
+			Folder string `json:"folder"`
+		}
+		if err := unmarshalRaw(res.Answer, &want); err != nil {
+			return err
+		}
+		formatted[i] = want.Folder
+
+		return nil
+	}); err != nil {
+		return auditOut{}, err
+	}
+
+	// the folders off the format are worked out before anything is listed, to tell a few folders to rename from a format most of the library does
+	// not follow, which is said once and first
+	off := map[int]finding{}
+	withYear := 0
+	for i := range s.series {
+		series := &s.series[i]
+		have, want := path.Base(strings.TrimRight(series.Path, "/")), formatted[i]
+		if want == "" || have == want {
+			continue
+		}
+		off[i] = finding{
+			Series: series.Title, SeriesID: series.Id, Subject: series.Path, Problem: problemFolderOffFormat,
+			Detail: fmt.Sprintf("the folder is %q, the series folder format makes %q", have, want),
+			Fix:    fmt.Sprintf("series_edit path %s with move_files", path.Join(path.Dir(strings.TrimRight(series.Path, "/")), want)),
+		}
+		if have == fmt.Sprintf("%s (%d)", want, series.Year) {
+			withYear++
+		}
+	}
+
 	out := auditOut{Scanned: len(s.series)}
+	formatIsOff := !s.named && len(off) >= formatOffMany && len(off)*2 > len(s.series)
+	if formatIsOff {
+		out.report(limit, formatOff(off[slices.Min(slices.Collect(maps.Keys(off)))], len(off), withYear, len(s.series)))
+	}
 	for i := range s.series {
 		series := &s.series[i]
 		base := finding{Series: series.Title, SeriesID: series.Id}
@@ -108,27 +157,27 @@ func (r *registry) auditSeriesSettings(ctx context.Context, s *snapshot, limit i
 			out.report(limit, f)
 		}
 
-		res, err := r.client.GetSeriesByIdFolder(ctx, series.Id)
-		if err != nil {
-			return auditOut{}, err
-		}
-		var want struct {
-			Folder string `json:"folder"`
-		}
-		if err := unmarshalRaw(res.Answer, &want); err != nil {
-			return auditOut{}, err
-		}
-		if have := path.Base(strings.TrimRight(series.Path, "/")); want.Folder != "" && have != want.Folder {
-			f := base
-			f.Subject = series.Path
-			f.Problem = problemFolderOffFormat
-			f.Detail = fmt.Sprintf("the folder is %q, the series folder format makes %q", have, want.Folder)
-			f.Fix = fmt.Sprintf("series_edit path %s with move_files", path.Join(path.Dir(strings.TrimRight(series.Path, "/")), want.Folder))
+		if f, isOff := off[i]; isOff && !formatIsOff {
 			out.report(limit, f)
 		}
 	}
 
 	return out, nil
+}
+
+// formatOff is the one finding for a library most of whose folders are not what the series folder format makes: the format is what to change, and
+// a finding a folder would say the same thing thousands of times.
+func formatOff(example finding, off, withYear, series int) finding {
+	f := finding{
+		Subject: "series folder format", Problem: problemFolderOffFormat,
+		Detail: fmt.Sprintf("%d of %d series are in a folder the series folder format would name otherwise; for %s, %s. With most of the library off it, it is the format to change and not the folders", off, series, example.Series, example.Detail),
+		Fix:    "config_edit (in the settings toolset) section naming with seriesFolderFormat set to how the folders are named; config_naming_preview shows what a format makes first. What is still off afterwards is listed series by series",
+	}
+	if withYear*2 > off {
+		f.Fix = fmt.Sprintf(`config_edit (in the settings toolset) section naming with seriesFolderFormat "{Series TitleYear}": %d of them are the title with its year after it, which that format makes, and config_naming_preview shows it first. What is still off afterwards is listed series by series`, withYear)
+	}
+
+	return f
 }
 
 // auditProfiles finds settings that apply to nothing.
@@ -335,6 +384,14 @@ func (r *registry) auditServer(ctx context.Context, _ *snapshot, limit int) (aud
 	if err != nil {
 		return auditOut{}, err
 	}
+	status, err := r.client.GetSystemStatus(ctx)
+	if err != nil {
+		return auditOut{}, err
+	}
+	running, err := status.Record()
+	if err != nil {
+		return auditOut{}, err
+	}
 	errors, err := r.client.GetLog(ctx, sonarr.GetLogOptions{Page: new(1), PageSize: new(logErrorsPage), SortKey: "time", SortDirection: sonarr.SortDirectionDescending, Level: "error"})
 	if err != nil {
 		return auditOut{}, err
@@ -355,16 +412,22 @@ func (r *registry) auditServer(ctx context.Context, _ *snapshot, limit int) (aud
 	}
 
 	for _, u := range updates.Answer {
-		if !u.Latest || u.Installed || u.InstalledOn != "" {
+		// the newest release, unless it is the one running. Which that is comes from Sonarr itself: its list also marks every release it once
+		// installed, so the list alone names an old one
+		if !u.Latest || u.Installed || u.Version == running.Version {
 			continue
 		}
+
 		fix := "server_updates lists what it changes"
-		if u.Installable {
-			fix += "; Sonarr installs it from its own System page, or on its schedule when Updates are set to automatic in the host section"
-		} else {
+		switch {
+		case running.IsDocker:
 			fix += "; this Sonarr runs in a container, so it is updated by replacing the image"
+		case u.Installable:
+			fix += "; Sonarr installs it from its own System page, or on its schedule when Updates are set to automatic in the host section"
+		default:
+			fix += "; Sonarr cannot install it itself, so it is updated the way it was installed"
 		}
-		out.report(limit, finding{Subject: u.Version, Problem: problemUpdateAvailable, Detail: fmt.Sprintf("%s was released %s; %s is running", u.Version, day(u.ReleaseDate), runningVersion(updates.Answer)), Fix: fix})
+		out.report(limit, finding{Subject: u.Version, Problem: problemUpdateAvailable, Detail: fmt.Sprintf("%s was released %s; %s is running", u.Version, day(u.ReleaseDate), running.Version), Fix: fix})
 	}
 
 	type logged struct {
@@ -399,16 +462,3 @@ func (r *registry) auditServer(ctx context.Context, _ *snapshot, limit int) (aud
 // logErrorsPage is how many of the newest errors the audit reads: enough
 // for a day of them, and a page Sonarr answers at once.
 const logErrorsPage = 500
-
-// runningVersion is the version an update list says is installed, or
-// words for one it does not name.
-func runningVersion(updates []sonarr.UpdateResource) string {
-	running := "an older release"
-	for _, u := range updates {
-		if u.Installed || u.InstalledOn != "" {
-			running = u.Version
-		}
-	}
-
-	return running
-}

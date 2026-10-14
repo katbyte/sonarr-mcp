@@ -278,6 +278,13 @@ func (r *registry) auditUntrackedFiles(ctx context.Context, s *snapshot, limit i
 		if len(untracked) == 0 {
 			continue
 		}
+		// past the limit a file is counted and not asked about: to say why it tracks none of them Sonarr parses the whole folder, which is the
+		// slow part, and a library can have thousands of such folders
+		if len(out.Findings) >= limitOr(limit, 100) {
+			out.Found += len(untracked)
+
+			continue
+		}
 		// only a folder with something untracked is worth Sonarr parsing
 		scanned, err := r.scanFolder(ctx, series.Path)
 		if err != nil {

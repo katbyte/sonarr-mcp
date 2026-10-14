@@ -111,6 +111,8 @@ func (*registry) auditRuntime(ctx context.Context, s *snapshot, limit, tolerance
 		return auditOut{}, err
 	}
 	out := auditOut{Scanned: len(s.series)}
+	// a file that runs long is as often the right file as not, so those are listed after the ones cut short or unreadable, which never are
+	var long []finding
 	for i := range s.series {
 		series := &s.series[i]
 		if !hasFiles(series) {
@@ -163,16 +165,24 @@ func (*registry) auditRuntime(ctx context.Context, s *snapshot, limit, tolerance
 			if pct <= tolerance || diff < minRuntimeDiffMinutes {
 				continue
 			}
-			problem := problemRuntimeShort
 			if actual > float64(expected) {
-				problem = problemRuntimeLong
+				long = append(long, finding{
+					Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: problemRuntimeLong,
+					Detail: fmt.Sprintf("runs %.0f minutes, the episode is %d (%d%% off): it may hold more than this episode, two parts in one file or an extended cut, or be the wrong file", actual, expected, pct),
+					Fix:    "check it before replacing it: a file that holds two episodes is the right file, and a search would fetch the same again; release_search replaces one that is wrong",
+				})
+
+				continue
 			}
 			out.report(limit, finding{
-				Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: problem,
+				Series: series.Title, SeriesID: series.Id, Subject: subject, Problem: problemRuntimeShort,
 				Detail: fmt.Sprintf("runs %.0f minutes, the episode is %d (%d%% off): a truncated download, a sample, or the wrong file", actual, expected, pct),
 				Fix:    "release_search for the episode and grab a replacement",
 			})
 		}
+	}
+	for _, f := range long {
+		out.report(limit, f)
 	}
 
 	return out, nil
@@ -306,7 +316,7 @@ func registerMediaAudits(r *registry) {
 	add(r, readTool, &mcp.Tool{
 		Name: "audit_runtime",
 		Description: "Episode files whose running time is far off the episode's - a truncated download, a sample imported as the episode, the wrong episode entirely - or that have no running time at all. " +
-			"A file holding several episodes is held to their total; the specials are left out. Fix with release_search to replace one.",
+			"A file holding several episodes is held to their total; the specials are left out. The files cut short come first: one that runs long may be the right file, two parts in one or an extended cut, so check it before replacing it. Fix with release_search to replace one.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runtimeIn) (*mcp.CallToolResult, auditOut, error) {
 		s, err := r.snap(ctx, in.Series)
 		if err != nil {

@@ -82,6 +82,51 @@ func TestAuditMissingEpisodes(t *testing.T) {
 	none(t, one, "series", firefly.Title)
 }
 
+// Breaking Bad was added with no files: wanted and never fetched as seeded, then not wanted at all, then with a file of its own copied into its
+// folder, each of which is put right a different way.
+func TestAuditNoFiles(t *testing.T) {
+	out := audit(t, "audit_no_files", nil)
+
+	f := only(t, out, "series", breakingBad.Title)
+	folder := acctest.Str(f["subject"])
+	if acctest.Str(f["problem"]) != "no files" || !strings.Contains(acctest.Str(f["detail"]), "that aired and has a file for none") || !strings.HasPrefix(folder, "/tv/") || !strings.Contains(acctest.Str(f["fix"]), "series_search") {
+		t.Errorf("Breaking Bad = %v", f)
+	}
+	// a series with some of its files is the missing episodes audit's, however many it lacks
+	for _, s := range importedSeed {
+		none(t, out, "series", s.Title)
+	}
+	if n := acctest.Num(t, out["total_findings"], "total_findings"); n != 1 {
+		t.Errorf("audit_no_files found %d, want Breaking Bad alone", n)
+	}
+
+	// not monitored, nothing of it will ever be fetched
+	call(t, "series_edit", map[string]any{"series": breakingBad.Title, "monitored": false})
+	t.Cleanup(func() { call(t, "series_edit", map[string]any{"series": breakingBad.Title, "monitored": true}) })
+	off := only(t, audit(t, "audit_no_files", map[string]any{"series": breakingBad.Title}), "series", breakingBad.Title)
+	if acctest.Str(off["problem"]) != "no files and nothing wanted" || !strings.Contains(acctest.Str(off["detail"]), "the series is not monitored") || !strings.Contains(acctest.Str(off["fix"]), "series_edit monitored true") {
+		t.Errorf("Breaking Bad unmonitored = %v", off)
+	}
+	call(t, "series_edit", map[string]any{"series": breakingBad.Title, "monitored": true})
+
+	// an episode copied into its folder by hand is there to be imported, not fetched again
+	season := filepath.Join(hostPath(folder), "Season 1")
+	copied := filepath.Join(season, "Breaking.Bad.S01E01.Pilot.1080p.WEB-DL.DD5.1.H.264-FAKE.mkv")
+	t.Cleanup(func() {
+		// the folders only when they are left empty: the series had none until this made them
+		_ = os.Remove(copied)
+		_ = os.Remove(season)
+		_ = os.Remove(hostPath(folder))
+	})
+	if err := fakeVideo(copied, 1, "1920x1080"); err != nil {
+		t.Fatal(err)
+	}
+	there := only(t, audit(t, "audit_no_files", map[string]any{"series": breakingBad.Title}), "series", breakingBad.Title)
+	if acctest.Str(there["problem"]) != "files in the folder, none tracked" || !strings.Contains(acctest.Str(there["detail"]), "holds 1 video file") || !strings.Contains(acctest.Str(there["fix"]), "import_apply") {
+		t.Errorf("Breaking Bad with a file copied in = %v", there)
+	}
+}
+
 func TestAuditCutoffUnmet(t *testing.T) {
 	out := audit(t, "audit_cutoff_unmet", nil)
 

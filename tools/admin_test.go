@@ -2,6 +2,8 @@ package tools
 
 import (
 	"encoding/json"
+	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -247,8 +249,11 @@ func TestAuditServer(t *testing.T) {
 	f.answer(t, "GET /api/v3/system/backup", []any{map[string]any{"id": 1, "name": "sonarr_backup_v4.0.20.3014_2026.09.01.zip", "type": "scheduled", "size": 1 << 20, "time": ago(30 * 24 * time.Hour)}})
 	f.answer(t, "GET /api/v3/update", []any{
 		map[string]any{"version": "4.0.21.3100", "branch": "main", "releaseDate": "2026-10-01T00:00:00Z", "latest": true, "installed": false, "installable": false, "changes": map[string]any{"new": []any{"a thing"}, "fixed": []any{}}},
-		map[string]any{"version": "4.0.20.3014", "branch": "main", "releaseDate": "2026-09-16T00:00:00Z", "latest": false, "installed": true, "installable": false},
+		map[string]any{"version": "4.0.20.3014", "branch": "main", "releaseDate": "2026-09-16T00:00:00Z", "latest": false, "installed": true, "installedOn": "2026-09-20T00:00:00Z", "installable": false},
+		// Sonarr marks a release it once installed too, so the list alone does not say which is running
+		map[string]any{"version": "4.0.16.2944", "branch": "main", "releaseDate": "2025-11-05T00:00:00Z", "latest": false, "installed": false, "installedOn": "2026-02-11T00:00:00Z", "installable": false},
 	})
+	f.answer(t, "GET /api/v3/system/status", map[string]any{"version": "4.0.20.3014", "isDocker": true})
 	f.answer(t, "GET /api/v3/log", page(
 		map[string]any{"id": 3, "time": ago(time.Hour), "level": "error", "logger": "Newznab", "message": "An error occurred while processing feed", "exception": "HttpException: 500\n   at ..."},
 		map[string]any{"id": 2, "time": ago(2 * time.Hour), "level": "error", "logger": "Newznab", "message": "An error occurred while processing feed"},
@@ -274,11 +279,21 @@ func TestAuditServer(t *testing.T) {
 		t.Errorf("the log was read with %v, want the errors alone", q)
 	}
 
+	// the list of releases says which is running, apart from the ones that once were
+	marks := map[string]string{}
+	for _, u := range rowsOf(mustCall(t, cs, "server_updates", nil)["updates"]) {
+		marks[text(u["version"])] = fmt.Sprintf("running %v, installed %v", u["running"], u["installed"])
+	}
+	if want := map[string]string{"4.0.21.3100": "running false, installed false", "4.0.20.3014": "running true, installed true", "4.0.16.2944": "running false, installed true"}; !maps.Equal(marks, want) {
+		t.Errorf("server_updates marks %v, want %v", marks, want)
+	}
+
 	// nothing wrong: a fresh backup, the newest release running, no errors
 	g := newFakeServer(t)
 	library(t, g)
 	g.answer(t, "GET /api/v3/system/backup", []any{map[string]any{"id": 1, "name": "fresh.zip", "type": "scheduled", "size": 1 << 20, "time": ago(time.Hour)}})
 	g.answer(t, "GET /api/v3/update", []any{map[string]any{"version": "4.0.20.3014", "latest": true, "installed": true}})
+	g.answer(t, "GET /api/v3/system/status", map[string]any{"version": "4.0.20.3014"})
 	g.answer(t, "GET /api/v3/log", page())
 	if out := mustCall(t, session(t, g, Options{}), "audit_server", nil); number(out["total_findings"]) != 0 {
 		t.Errorf("a server with nothing wrong = %v", out)

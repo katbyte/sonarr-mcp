@@ -750,11 +750,11 @@ func TestSystemTools(t *testing.T) {
 
 	// the releases the stand-in update server lists, the one running among them
 	updates := acctest.Rows(t, call(t, "server_updates", nil)["updates"], "updates")
-	at := slices.IndexFunc(updates, func(u map[string]any) bool { return acctest.BoolOf(u["installed"]) })
+	at := slices.IndexFunc(updates, func(u map[string]any) bool { return acctest.BoolOf(u["running"]) })
 	if at < 0 {
 		t.Fatalf("no release is said to be the one running: %v", updates)
 	}
-	if running := updates[at]; acctest.Str(running["version"]) == "" || acctest.Str(running["released"]) == "" || len(acctest.Strs(t, running["fixed"], "fixed")) == 0 {
+	if running := updates[at]; acctest.Str(running["version"]) != testenv.SonarrVersion() || !acctest.BoolOf(running["installed"]) || acctest.Str(running["released"]) == "" || len(acctest.Strs(t, running["fixed"], "fixed")) == 0 {
 		t.Errorf("the release running = %v", running)
 	}
 

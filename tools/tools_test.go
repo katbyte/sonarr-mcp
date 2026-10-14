@@ -104,8 +104,8 @@ func TestSurfaceSize(t *testing.T) {
 	for _, kind := range kinds(t) {
 		count[kind]++
 	}
-	if total := count["read"] + count["write"] + count["delete"]; total != 141 || count["read"] != 68 || count["write"] != 58 || count["delete"] != 15 {
-		t.Errorf("surface = %d tools: %v, want 141 with 68 read, 58 write, 15 delete", total, count)
+	if total := count["read"] + count["write"] + count["delete"]; total != 142 || count["read"] != 69 || count["write"] != 58 || count["delete"] != 15 {
+		t.Errorf("surface = %d tools: %v, want 142 with 69 read, 58 write, 15 delete", total, count)
 	}
 	for _, want := range []string{"series_list", "series_get", "calendar_list", "queue_list", "series_search"} {
 		if !slices.Contains(EssentialTools, want) {
@@ -519,12 +519,12 @@ var notWrapped = map[string]string{
 	"GetRemotePathMappingById": "remotepathmapping_list", "GetRootFolderById": "rootfolder_list", "GetSystemTaskById": "task_list", "GetTagById": "tag_list", "GetTagDetailById": "tag_list",
 	"GetConfigDownloadClientById": "config_get", "GetConfigHostById": "config_get", "GetConfigImportListById": "config_get", "GetConfigIndexerById": "config_get",
 	"GetConfigMediaManagementById": "config_get", "GetConfigNamingById": "config_get", "GetConfigUiById": "config_get",
-	"GetWantedCutoff": "audit_cutoff_unmet reads the episodes and files themselves", "GetWantedCutoffById": "audit_cutoff_unmet", "GetWantedMissing": "audit_missing_episodes", "GetWantedMissingById": "audit_missing_episodes",
+	"GetWantedCutoff": wantedWhole, "GetWantedCutoffById": "audit_cutoff_unmet", "GetWantedCutoffComplete": wantedWhole, "GetWantedMissing": wantedWhole, "GetWantedMissingById": "audit_missing_episodes", "GetWantedMissingComplete": wantedWhole,
 	"GetImportListExclusion": "exclusion_list reads the paged form", "GetImportListExclusionPaged": "exclusion_list reads the paged form by another name",
 	"GetHistoryComplete": "history_list pages", "GetHistorySeries": "history_list takes a series", "GetLogComplete": "log_list pages", "GetQueue": "queue_list reads the paged form with details", "GetQueueStatus": "queue_list counts",
 	// a list read whole has no use for the form that stops part way, and the log is read a page at a time
 	"GetBlocklistEach": "blocklist_list reads the whole list", "GetImportListExclusionPagedEach": "exclusion_list reads the whole list", "GetQueueEach": "queue_list reads the whole queue",
-	"GetWantedMissingEach": "audit_missing_episodes reads the whole list", "GetWantedCutoffEach": "audit_cutoff_unmet reads the whole list", "GetLogEach": "log_list reads the pages it was asked for",
+	"GetWantedMissingEach": wantedWhole, "GetWantedCutoffEach": wantedWhole, "GetLogEach": "log_list reads the pages it was asked for",
 	"GetBlocklist": "blocklist_list reads the paged form by another name", "GetFileSystemType": "filesystem_list says what each entry is",
 	// what the server answers about itself that a tool has no use for
 	"GetApi": "server_info reads the status", "GetPing": "server_info reads the status", "GetIndexerFlag": "a fixed list of flag names a release carries", "GetQualityDefinitionLimits": "the bounds a size may be set within; Sonarr refuses one outside them",
@@ -572,6 +572,10 @@ func TestAToolThatTakesNoArgumentsRefusesOne(t *testing.T) {
 		t.Error("the refused call reached Sonarr")
 	}
 }
+
+// wantedWhole is why no tool reads Sonarr's own lists of what is wanted: each is every such episode in the library, hundreds of thousands of rows on
+// a big one, where the audits need a count and a page.
+const wantedWhole = "audit_missing_episodes works from the counts Sonarr keeps for each season, and audit_cutoff_unmet from each series' own files: neither reads the whole list"
 
 // waitsItself is why no tool calls a command's AndWait form: a command still running when the wait ends is an answer for a tool, and an error from AndWait.
 const waitsItself = "the tool queues the command with its own method and waits itself, so one still running when the wait ends is answered as it stands"

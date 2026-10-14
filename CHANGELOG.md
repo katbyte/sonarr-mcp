@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+Found by running the audits against a real library of 6,000 series.
+
+### Fixed
+
+- **Three audits did not finish on a big library.** `audit_missing_episodes` and `audit_cutoff_unmet` each read Sonarr's whole list of wanted episodes, tens or hundreds of thousands of rows, and `audit_all` waited on both. On 6,000 series they now answer in about 10 and 35 seconds. `audit_cutoff_unmet` counts files where it counted episodes, so a file holding two episodes is one.
+- `audit_untracked_files` asks Sonarr why a file is not tracked only for the files it lists. Past `limit` they are counted, which is the quick part.
+- `audit_server` named the oldest release Sonarr had ever installed as the one running. It now asks Sonarr which is running, and tells a Sonarr in a container to update by replacing its image.
+- `audit_runtime` called a file that runs long a truncated download. Long files are now listed after the short ones, and described as what they more often are: two parts in one file, or an extended cut.
+- `audit_series_settings` listed every series when most folders did not match the folder format. It now says so once, first, and names the format to set.
+
+### Added
+
+- **`audit_no_files`** names every series with no files at all, one finding each. No audit said so before: such a series showed as a list of missing seasons, as loose files in a folder, or not at all. It says which each is: wanted and never fetched, with nothing of it monitored so nothing ever will be, with video files in its own folder that Sonarr tracks none of, with no episode Sonarr knows of, or with nothing aired. `audit_all` counts it.
+- `server_updates` marks the release that is running (`running`), apart from the ones that once were (`installed`).
+
 ## 0.2.0 (2026-10-12)
 
 Sonarr itself can now be set up and run through the tools, not only its library: 141 tools, up from 69. Every delete waits to be confirmed, and credentials are kept out of what the tools say.

@@ -252,7 +252,7 @@ define live
 		[ "$(1)" = "sdk" ] && export SONARR_TEST_PORT=19089 SONARR_TEST_PROXY_PORT=18180 \
 			SONARR_TEST_INDEXER_PORT=18181 SONARR_TEST_SAB_PORT=18182 || true; \
 		.scripts/testenv.sh up | grep '^export' > "$$env"; \
-		trap 'st=$$?; [ $$st -eq 0 ] || .scripts/testenv.sh logs; \
+		trap 'st=$$?; [ $$st -eq 0 ] || .scripts/testenv.sh logs || true; \
 			.scripts/testenv.sh down; rm -f '"$$env"'; exit $$st' EXIT; \
 		. ./"$$env"; \
 		go test -tags acceptance -count=1 ./acceptance/$(call SUITEDIR,$(1))/ -timeout ${TEST_TIMEOUT} -v $(3)

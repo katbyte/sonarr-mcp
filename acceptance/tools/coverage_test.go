@@ -35,6 +35,8 @@ var notReported = map[string]string{
 	"audit_series_settings: daily show not typed daily": "no fixture series is a talk show or the news; TestAuditSeriesSettingsDaily covers it",
 	"audit_untracked_files: file not tracked":           "Sonarr's scan accounts for every video file in a series folder, so one it will not account for cannot be arranged; TestAuditUntrackedFileSonarrIgnores covers it",
 	"audit_language: language unknown":                  "Sonarr records a language for every fixture file, and this is a file it could not tell; TestAuditLanguageEdges covers it",
+	"audit_no_files: no episodes known":                 "TheTVDB lists episodes for every fixture series, and this is a show it lists none for; TestAuditNoFilesSaysWhich covers it",
+	"audit_no_files: nothing has aired":                 "every fixture series aired years ago; TestAuditNoFilesSaysWhich covers it",
 	// what Sonarr 4 does not do
 	"audit_stuck_downloads: download failed": "Sonarr blocklists a failed download and drops it from the queue as it handles it, even with the client told to keep the download, so the queue never holds one; TestStuckProblem covers it",
 	// what would break the rest of the run

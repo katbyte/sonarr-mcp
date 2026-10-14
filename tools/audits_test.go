@@ -3,6 +3,7 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -827,6 +828,8 @@ func TestAuditAllKeepsWhatRanAndNamesWhatDidNot(t *testing.T) {
 		switch p := strings.TrimPrefix(r.URL.Path, "/api/v3/"); {
 		case strings.HasPrefix(p, "config/"):
 			writeJSON(t, w, map[string]any{"id": 1})
+		case p == "system/status":
+			writeJSON(t, w, map[string]any{"version": "4.0.20.3014"})
 		case p == "queue" || p == "history" || p == "blocklist" || p == "log" || strings.HasPrefix(p, "wanted/"):
 			writeJSON(t, w, page())
 		default:
@@ -876,15 +879,15 @@ func TestAuditProblemsCoverTheAudits(t *testing.T) {
 	}
 }
 
-// The runtime audit against files the seeded library cannot hold: one far
-// longer than its episode, and one Sonarr could read no running time from.
+// The runtime audit against files the seeded library cannot hold: one far longer than its episode, one cut short, and one Sonarr could read no
+// running time from. The long one is listed last and is not called a truncated download: it is as often the right file, two parts in one.
 func TestAuditRuntimeEdges(t *testing.T) {
 	t.Parallel()
 
 	f := newFakeServer(t)
 	library(t, f, map[string]any{
 		"id": 1, "title": "Firefly", "year": 2002, "path": "/tv/Firefly", "runtime": 45,
-		"statistics": map[string]any{"episodeFileCount": 3},
+		"statistics": map[string]any{"episodeFileCount": 4},
 	})
 	file := func(id, episode int, runTime string) map[string]any {
 		return map[string]any{
@@ -893,25 +896,33 @@ func TestAuditRuntimeEdges(t *testing.T) {
 		}
 	}
 	f.answer(t, "GET /api/v3/episodefile", []map[string]any{
-		file(11, 1, "00:45:03"), file(12, 2, "01:31:00"), file(13, 3, ""),
+		file(11, 1, "00:45:03"), file(12, 2, "01:31:00"), file(13, 3, ""), file(14, 4, "00:10:00"),
 	})
 	f.answer(t, "GET /api/v3/episode", []map[string]any{
 		{"id": 1, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 1, "episodeFileId": 11, "runtime": 45, "hasFile": true},
 		{"id": 2, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 2, "episodeFileId": 12, "runtime": 45, "hasFile": true},
 		{"id": 3, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 3, "episodeFileId": 13, "runtime": 45, "hasFile": true},
+		{"id": 4, "seriesId": 1, "seasonNumber": 1, "episodeNumber": 4, "episodeFileId": 14, "runtime": 45, "hasFile": true},
 	})
 	cs := session(t, f, Options{})
 
 	out := mustCall(t, cs, "audit_runtime", nil)
-	if got := problems(out); !slices.Equal(got, []string{"longer than it should be", "no running time"}) {
-		t.Fatalf("audit_runtime = %v", out)
-	}
 	rows := rowsOf(out["findings"])
-	if !strings.Contains(text(rows[0]["detail"]), "runs 91 minutes, the episode is 45") {
-		t.Errorf("the long file = %v", rows[0]["detail"])
+	order := make([]string, 0, len(rows))
+	for _, row := range rows {
+		order = append(order, text(row["problem"]))
 	}
-	if !strings.Contains(text(rows[1]["detail"]), "could not read a running time") {
-		t.Errorf("the file with no runtime = %v", rows[1]["detail"])
+	if !slices.Equal(order, []string{"no running time", "shorter than it should be", "longer than it should be"}) {
+		t.Fatalf("audit_runtime lists %v, want the long file after the others: %v", order, out)
+	}
+	if !strings.Contains(text(rows[0]["detail"]), "could not read a running time") {
+		t.Errorf("the file with no runtime = %v", rows[0]["detail"])
+	}
+	if short := rows[1]; !strings.Contains(text(short["detail"]), "runs 10 minutes, the episode is 45") || !strings.Contains(text(short["detail"]), "truncated download") || !strings.HasPrefix(text(short["fix"]), "release_search") {
+		t.Errorf("the short file = %v", short)
+	}
+	if long := rows[2]; !strings.Contains(text(long["detail"]), "runs 91 minutes, the episode is 45") || !strings.Contains(text(long["detail"]), "may hold more than this episode") || strings.Contains(text(long["detail"]), "truncated") || !strings.HasPrefix(text(long["fix"]), "check it before replacing it") {
+		t.Errorf("the long file = %v", long)
 	}
 }
 
@@ -942,6 +953,34 @@ func TestAuditUntrackedFileSonarrIgnores(t *testing.T) {
 	}
 	if row := rowsOf(out["findings"])[0]; text(row["subject"]) != "stray.mkv" || !strings.Contains(text(row["fix"]), "import_scan") {
 		t.Errorf("the file Sonarr ignores = %v", row)
+	}
+}
+
+// Sonarr parses a whole folder to say why it tracks none of the files in it, which is the slow part of this audit: a folder is asked about only
+// while its findings will be listed, and past the limit its untracked files are counted without asking.
+func TestAuditUntrackedFilesAsksOnlyAboutWhatItLists(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f,
+		map[string]any{"id": 1, "title": "Firefly", "year": 2002, "path": "/tv/Firefly"},
+		map[string]any{"id": 2, "title": "Zorro", "year": 1957, "path": "/tv/Zorro"},
+		map[string]any{"id": 3, "title": "Zulu", "year": 1964, "path": "/tv/Zulu"},
+	)
+	f.mux.HandleFunc("GET /api/v3/filesystem/mediafiles", func(w http.ResponseWriter, r *http.Request) {
+		folder := r.URL.Query().Get("path")
+		writeJSON(t, w, []map[string]any{{"path": folder + "/stray one.mkv"}, {"path": folder + "/stray two.mkv"}})
+	})
+	f.answer(t, "GET /api/v3/episodefile", []any{})
+	f.answer(t, "GET /api/v3/manualimport", []any{})
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "audit_untracked_files", map[string]any{"limit": 2})
+	if rows := rowsOf(out["findings"]); len(rows) != 2 || text(rows[0]["series"]) != "Firefly" || number(out["total_findings"]) != 6 {
+		t.Fatalf("audit_untracked_files = %v, want the first folder's two files listed and all six counted", out)
+	}
+	if asked := f.requests("/api/v3/manualimport"); len(asked) != 1 || !strings.Contains(asked[0].Query, "Firefly") {
+		t.Errorf("Sonarr was asked to parse %d folders, want only the one whose files are listed: %v", len(asked), asked)
 	}
 }
 
@@ -977,6 +1016,126 @@ func TestAuditSeriesSettingsDaily(t *testing.T) {
 	}
 	if row := rowsOf(out["findings"])[0]; text(row["series"]) != "The Daily Show" || !strings.Contains(text(row["fix"]), "series_edit series_type daily") {
 		t.Errorf("the talk show = %v", row)
+	}
+}
+
+// The seasons with episodes missing come from the counts Sonarr keeps for each season, and the episodes are read only for the seasons listed: a
+// library with tens of thousands of episodes missing is answered without reading them all. A gap is told from a whole season, a series that is not
+// monitored is passed over as Sonarr's own wanted list passes it over, and a season past the limit is counted and not read.
+func TestAuditMissingEpisodesReadsOnlyTheSeasonsItLists(t *testing.T) {
+	t.Parallel()
+
+	season := func(number, wanted, have int) map[string]any {
+		return map[string]any{"seasonNumber": number, "monitored": true, "statistics": map[string]any{"episodeCount": wanted, "episodeFileCount": have, "totalEpisodeCount": wanted + 1}}
+	}
+	episode := func(id, series, season, number int, more map[string]any) map[string]any {
+		e := map[string]any{"id": id, "seriesId": series, "seasonNumber": season, "episodeNumber": number, "monitored": true, "airDate": "2002-09-20", "airDateUtc": fmt.Sprintf("2002-09-%02dT01:00:00Z", 10+number)}
+		maps.Copy(e, more)
+
+		return e
+	}
+	episodes := map[string][]map[string]any{
+		"1": {
+			episode(11, 1, 1, 1, map[string]any{"hasFile": true, "episodeFileId": 5}), episode(12, 1, 1, 2, map[string]any{"lastSearchTime": ago(time.Hour)}), episode(13, 1, 1, 3, nil),
+			episode(14, 1, 1, 4, map[string]any{"airDateUtc": "2999-01-01T00:00:00Z"}), episode(15, 1, 1, 5, map[string]any{"monitored": false}),
+			episode(21, 1, 2, 1, nil), episode(22, 1, 2, 2, nil),
+		},
+		"2": {episode(31, 2, 1, 1, nil)},
+		"3": {episode(41, 3, 1, 1, nil)},
+	}
+
+	f := newFakeServer(t)
+	library(t, f,
+		map[string]any{"id": 1, "title": "Firefly", "year": 2002, "monitored": true, "seasons": []any{season(1, 3, 1), season(2, 2, 0), season(3, 4, 4)}},
+		map[string]any{"id": 2, "title": "Not Watched", "year": 2000, "monitored": false, "seasons": []any{season(1, 1, 0)}},
+		map[string]any{"id": 3, "title": "Zorro", "year": 1957, "monitored": true, "seasons": []any{season(1, 1, 0)}},
+	)
+	f.mux.HandleFunc("GET /api/v3/episode", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, episodes[r.URL.Query().Get("seriesId")])
+	})
+	f.answer(t, "GET /api/v3/queue", page(map[string]any{"id": 9, "seriesId": 1, "episodeId": 13, "status": "downloading"}))
+	cs := session(t, f, Options{Toolsets: []string{"all"}})
+
+	out := mustCall(t, cs, "audit_missing_episodes", map[string]any{"limit": 2})
+	rows := rowsOf(out["findings"])
+	if len(rows) != 2 || number(out["total_findings"]) != 3 {
+		t.Fatalf("audit_missing_episodes = %v, want two seasons listed of the three with episodes missing", out)
+	}
+	if gap := rows[0]; text(gap["series"]) != "Firefly" || text(gap["subject"]) != "season 1" || text(gap["problem"]) != "episodes missing" || !strings.HasPrefix(text(gap["detail"]), "2 missing: S01E02, S01E03; oldest aired 2002-09-20") || !strings.Contains(text(gap["detail"]), "1 already downloading, 1 searched for and not found") {
+		t.Errorf("the season with a gap = %v", gap)
+	}
+	if whole := rows[1]; text(whole["subject"]) != "season 2" || text(whole["problem"]) != "whole season missing" || !strings.Contains(text(whole["fix"]), "season_search 2") {
+		t.Errorf("the season with nothing = %v", whole)
+	}
+	for _, asked := range f.requests("/api/v3/episode") {
+		if !strings.Contains(asked.Query, "seriesId=1") {
+			t.Errorf("episodes were read with %q, want only those of the series listed", asked.Query)
+		}
+	}
+	if len(f.requests("/api/v3/wanted/missing")) != 0 {
+		t.Error("Sonarr's whole wanted list was read")
+	}
+
+	// one series asked about alone is read the same way
+	one := mustCall(t, cs, "audit_missing_episodes", map[string]any{"series": "Zorro"})
+	if rows := rowsOf(one["findings"]); len(rows) != 1 || text(rows[0]["series"]) != "Zorro" || number(one["total_findings"]) != 1 {
+		t.Errorf("one series asked about = %v", one)
+	}
+}
+
+// A library whose folders carry the year under a format that does not: the audit says so once and names the format that makes them, where a finding
+// a folder said the same of every series. A few folders off the format are still listed one by one, and so is a series asked about on its own.
+func TestAuditSeriesSettingsFormatOffAcrossTheLibrary(t *testing.T) {
+	t.Parallel()
+
+	// a library of twelve, the first off of them in a folder named otherwise than the format's "Show N"
+	audit := func(off int, named func(n int) string, args map[string]any) map[string]any {
+		f := newFakeServer(t)
+		series := make([]map[string]any, 0, 12)
+		for n := 1; n <= 12; n++ {
+			folder := fmt.Sprintf("Show %d", n)
+			if n <= off {
+				folder = named(n)
+			}
+			series = append(series, map[string]any{"id": n, "title": fmt.Sprintf("Show %d", n), "year": 2000 + n, "path": "/tv/" + folder, "seriesType": "standard"})
+		}
+		// and one with something else wrong with it, to see where the format's finding is listed
+		series[11]["genres"] = []string{"Talk Show"}
+		library(t, f, series...)
+		rootFolder(t, f, "/tv", true)
+		f.mux.HandleFunc("GET /api/v3/series/{id}/folder", func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(t, w, map[string]any{"folder": "Show " + r.PathValue("id")})
+		})
+
+		return mustCall(t, session(t, f, Options{}), "audit_series_settings", args)
+	}
+	withYear := func(n int) string { return fmt.Sprintf("Show %d (%d)", n, 2000+n) }
+
+	out := audit(12, withYear, nil)
+	rows := rowsOf(out["findings"])
+	if len(rows) != 2 || number(out["total_findings"]) != 2 || text(rows[1]["problem"]) != "daily show not typed daily" {
+		t.Fatalf("a library all off the format = %v, want it said once and first, before the one series with something else wrong", out)
+	}
+	if row := rows[0]; text(row["subject"]) != "series folder format" || text(row["problem"]) != "folder not named to the format" || !strings.Contains(text(row["detail"]), "12 of 12 series") || !strings.Contains(text(row["detail"]), `"Show 1 (2001)"`) || !strings.Contains(text(row["fix"]), `seriesFolderFormat "{Series TitleYear}"`) {
+		t.Errorf("the one finding = %v, want the count, an example and the format that adds the year", row)
+	}
+
+	// off in a way no format is known for: still once, with the setting named and no format guessed
+	other := rowsOf(audit(12, func(n int) string { return fmt.Sprintf("show.%d", n) }, nil)["findings"])
+	if len(other) != 2 || strings.Contains(text(other[0]["fix"]), "TitleYear") || !strings.Contains(text(other[0]["fix"]), "seriesFolderFormat set to how the folders are named") {
+		t.Errorf("folders off the format another way = %v", other)
+	}
+
+	// a few folders are folders to rename, each with its own fix, listed with whatever else is wrong with its series (which are read by title)
+	few := rowsOf(audit(3, withYear, nil)["findings"])
+	if len(few) != 4 || text(few[0]["series"]) != "Show 1" || !strings.Contains(text(few[0]["fix"]), "series_edit path /tv/Show 1 with move_files") || text(few[1]["series"]) != "Show 12" || text(few[1]["problem"]) != "daily show not typed daily" {
+		t.Errorf("three folders off the format = %v, want each listed", few)
+	}
+
+	// and so is one series asked about alone, whatever the rest of the library does
+	one := rowsOf(audit(12, withYear, map[string]any{"series": "Show 2"})["findings"])
+	if len(one) != 1 || text(one[0]["series"]) != "Show 2" || !strings.Contains(text(one[0]["fix"]), "series_edit path /tv/Show 2 with move_files") {
+		t.Errorf("one series asked about = %v, want its own finding", one)
 	}
 }
 
@@ -1025,6 +1184,59 @@ func TestAuditLanguageEdges(t *testing.T) {
 	}
 }
 
+// The files below their profile's quality cutoff are found in each series' own files, where Sonarr marks each one, and not in Sonarr's Cutoff Unmet
+// list, which is every such episode in the library with its file. What that list leaves out is left out here too: a series that is not monitored,
+// and a file whose episodes are not; and a file holding two episodes is one file.
+func TestAuditCutoffReadsEachSeriesFiles(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f,
+		map[string]any{"id": 1, "title": "Firefly", "year": 2002, "path": "/tv/Firefly", "qualityProfileId": 4, "monitored": true, "statistics": map[string]any{"episodeFileCount": 4}},
+		map[string]any{"id": 2, "title": "Not Watched", "year": 2000, "path": "/tv/Not Watched", "qualityProfileId": 4, "monitored": false, "statistics": map[string]any{"episodeFileCount": 1}},
+		map[string]any{"id": 3, "title": "No Files", "year": 2001, "path": "/tv/No Files", "qualityProfileId": 4, "monitored": true, "statistics": map[string]any{"episodeFileCount": 0}},
+	)
+	f.answer(t, "GET /api/v3/qualityprofile", []map[string]any{{
+		"id": 4, "name": "HD-1080p", "upgradeAllowed": true, "cutoff": 3,
+		"items": []map[string]any{{"quality": map[string]any{"id": 1, "name": "SDTV"}, "allowed": true}, {"quality": map[string]any{"id": 3, "name": "WEBDL-1080p"}, "allowed": true}},
+	}})
+	file := func(id, series int, quality string, below bool) map[string]any {
+		return map[string]any{"id": id, "seriesId": series, "seasonNumber": 1, "path": fmt.Sprintf("/tv/%d/%d.mkv", series, id), "qualityCutoffNotMet": below, "quality": map[string]any{"quality": map[string]any{"name": quality}}}
+	}
+	episode := func(id, series, number, fileID int, monitored bool) map[string]any {
+		return map[string]any{"id": id, "seriesId": series, "seasonNumber": 1, "episodeNumber": number, "episodeFileId": fileID, "monitored": monitored, "hasFile": true}
+	}
+	files := map[string][]map[string]any{
+		"1": {file(11, 1, "SDTV", true), file(12, 1, "SDTV", true), file(13, 1, "WEBDL-1080p", false), file(14, 1, "SDTV", true)},
+		"2": {file(21, 2, "SDTV", true)},
+	}
+	episodes := map[string][]map[string]any{
+		// a file of two episodes, one at the cutoff already, and one below it whose episode is not monitored
+		"1": {episode(1, 1, 1, 11, true), episode(2, 1, 2, 12, true), episode(3, 1, 3, 12, true), episode(4, 1, 4, 13, true), episode(5, 1, 5, 14, false)},
+		"2": {episode(6, 2, 1, 21, true)},
+	}
+	f.mux.HandleFunc("GET /api/v3/episodefile", func(w http.ResponseWriter, r *http.Request) { writeJSON(t, w, files[r.URL.Query().Get("seriesId")]) })
+	f.mux.HandleFunc("GET /api/v3/episode", func(w http.ResponseWriter, r *http.Request) { writeJSON(t, w, episodes[r.URL.Query().Get("seriesId")]) })
+	cs := session(t, f, Options{})
+
+	out := mustCall(t, cs, "audit_cutoff_unmet", nil)
+	rows := rowsOf(out["findings"])
+	if len(rows) != 1 || number(out["total_findings"]) != 1 {
+		t.Fatalf("audit_cutoff_unmet = %v, want the one monitored series with files below cutoff", out)
+	}
+	if row := rows[0]; text(row["series"]) != "Firefly" || text(row["subject"]) != "2 files" || text(row["problem"]) != "below quality cutoff" || !strings.Contains(text(row["detail"]), "2 below HD-1080p's cutoff of WEBDL-1080p (2 SDTV): S01E01 SDTV, S01E02-E03 SDTV") || !strings.HasPrefix(text(row["fix"]), "series_search") {
+		t.Errorf("the series below cutoff = %v", row)
+	}
+	if len(f.requests("/api/v3/wanted/cutoff")) != 0 {
+		t.Error("Sonarr's whole Cutoff Unmet list was read")
+	}
+	for _, asked := range append(f.requests("/api/v3/episodefile"), f.requests("/api/v3/episode")...) {
+		if !strings.Contains(asked.Query, "seriesId=1") {
+			t.Errorf("a read was made with %q, want only the monitored series with files", asked.Query)
+		}
+	}
+}
+
 // A file good enough on quality and short of the custom format score its
 // profile upgrades until: Sonarr's own Cutoff Unmet list is quality alone,
 // so the audit sweeps for these itself.
@@ -1033,15 +1245,13 @@ func TestAuditCutoffFormatScore(t *testing.T) {
 
 	f := newFakeServer(t)
 	library(t, f, map[string]any{
-		"id": 1, "title": "Chernobyl", "year": 2019, "path": "/tv/Chernobyl", "qualityProfileId": 4,
+		"id": 1, "title": "Chernobyl", "year": 2019, "path": "/tv/Chernobyl", "qualityProfileId": 4, "monitored": true,
 		"statistics": map[string]any{"episodeFileCount": 2},
 	})
 	f.answer(t, "GET /api/v3/qualityprofile", []map[string]any{{
 		"id": 4, "name": "HD-1080p", "upgradeAllowed": false, "cutoff": 3, "cutoffFormatScore": 10,
 		"items": []map[string]any{{"quality": map[string]any{"id": 3, "name": "WEBDL-1080p"}, "allowed": true}},
 	}})
-	// Sonarr lists nothing as cutoff unmet: both files are 1080p
-	f.answer(t, "GET /api/v3/wanted/cutoff", page())
 	f.answer(t, "GET /api/v3/episodefile", []map[string]any{
 		{"id": 11, "seriesId": 1, "seasonNumber": 1, "path": "/tv/Chernobyl/S01E01.mkv", "customFormatScore": 0, "qualityCutoffNotMet": false, "quality": map[string]any{"quality": map[string]any{"id": 3, "name": "WEBDL-1080p"}}},
 		{"id": 12, "seriesId": 1, "seasonNumber": 1, "path": "/tv/Chernobyl/S01E02.mkv", "customFormatScore": 25, "qualityCutoffNotMet": false, "quality": map[string]any{"quality": map[string]any{"id": 3, "name": "WEBDL-1080p"}}},
@@ -1063,5 +1273,142 @@ func TestAuditCutoffFormatScore(t *testing.T) {
 	}
 	if !strings.Contains(text(row["detail"]), "Upgrades Allowed off") || !strings.Contains(text(row["fix"]), "series_search") {
 		t.Errorf("the finding = %v", row)
+	}
+}
+
+// A series with no files is one of five things, each put right a different way: wanted and never fetched, with nothing of it monitored, with files
+// in its folder Sonarr does not track, with no episode Sonarr knows of, or with nothing aired. A series with files is not this audit's business.
+func TestAuditNoFilesSaysWhich(t *testing.T) {
+	t.Parallel()
+
+	episode := func(id, series, season, number int, more map[string]any) map[string]any {
+		e := map[string]any{"id": id, "seriesId": series, "seasonNumber": season, "episodeNumber": number, "monitored": true, "airDateUtc": "2002-09-20T01:00:00Z"}
+		maps.Copy(e, more)
+
+		return e
+	}
+	later, off, undated := map[string]any{"airDateUtc": "2999-01-01T00:00:00Z"}, map[string]any{"monitored": false}, map[string]any{"airDateUtc": ""}
+	episodes := map[string][]map[string]any{
+		// a special that aired ahead of the show, which nobody monitors, is not the show having aired
+		"1":  {episode(11, 1, 1, 1, map[string]any{"airDateUtc": "2999-02-01T00:00:00Z"}), episode(12, 1, 1, 2, later), episode(13, 1, 0, 1, off)},
+		"2":  {episode(21, 2, 1, 1, later)},
+		"10": {episode(101, 10, 1, 1, undated), episode(102, 10, 1, 2, undated)},
+		"11": {episode(111, 11, 0, 1, off), episode(112, 11, 0, 2, off)},
+		"4":  {episode(41, 4, 1, 1, nil)},
+		"6":  {episode(61, 6, 1, 1, nil), episode(62, 6, 1, 2, nil)},
+		"7":  {episode(71, 7, 1, 1, nil), episode(72, 7, 1, 2, nil), episode(73, 7, 1, 3, nil), episode(74, 7, 1, 4, off), episode(75, 7, 1, 5, later), episode(76, 7, 0, 1, off)},
+		"8":  {episode(81, 8, 1, 1, nil), episode(82, 8, 1, 2, nil)},
+		"9":  {episode(91, 9, 1, 1, off), episode(92, 9, 1, 2, off)},
+	}
+
+	f := newFakeServer(t)
+	library(t, f,
+		map[string]any{"id": 1, "title": "Airing Later", "path": "/tv/Airing Later", "monitored": true, "status": "upcoming"},
+		map[string]any{"id": 2, "title": "Airing Unwatched", "path": "/tv/Airing Unwatched", "monitored": false},
+		map[string]any{"id": 3, "title": "Complete", "path": "/tv/Complete", "monitored": true, "statistics": map[string]any{"episodeFileCount": 3}},
+		map[string]any{"id": 4, "title": "Copied In", "path": "/tv/Copied In", "monitored": true},
+		map[string]any{"id": 5, "title": "Empty", "path": "/tv/Empty", "monitored": true, "status": "deleted"},
+		map[string]any{"id": 6, "title": "Every One Coming", "path": "/tv/Every One Coming", "monitored": true},
+		map[string]any{"id": 7, "title": "Never Fetched", "path": "/tv/Never Fetched", "monitored": true, "added": "2023-04-01T10:00:00Z", "statistics": map[string]any{"episodeCount": 3}},
+		map[string]any{"id": 8, "title": "Not Watched", "path": "/tv/Not Watched", "monitored": false},
+		map[string]any{"id": 9, "title": "Seasons Off", "path": "/tv/Seasons Off", "monitored": true},
+		map[string]any{"id": 10, "title": "Undated", "path": "/tv/Undated", "monitored": true, "status": "ended"},
+		map[string]any{"id": 11, "title": "Specials Only", "path": "/tv/Specials Only", "monitored": true},
+		map[string]any{"id": 12, "title": "Empty With Files", "path": "/tv/Empty With Files", "monitored": true},
+	)
+	f.mux.HandleFunc("GET /api/v3/episode", func(w http.ResponseWriter, r *http.Request) {
+		eps := episodes[r.URL.Query().Get("seriesId")]
+		if eps == nil {
+			eps = []map[string]any{}
+		}
+		writeJSON(t, w, eps)
+	})
+	f.mux.HandleFunc("GET /api/v3/filesystem/mediafiles", func(w http.ResponseWriter, r *http.Request) {
+		files := []map[string]any{}
+		if folder := r.URL.Query().Get("path"); folder == "/tv/Copied In" || folder == "/tv/Empty With Files" {
+			files = append(files, map[string]any{"path": folder + "/S01E01.mkv"}, map[string]any{"path": folder + "/S01E02.mkv"}, map[string]any{"path": folder + "/extras/making of.mkv"})
+		}
+		writeJSON(t, w, files)
+	})
+	f.answer(t, "GET /api/v3/queue", page(
+		map[string]any{"id": 1, "seriesId": 6, "episodeId": 61}, map[string]any{"id": 2, "seriesId": 6, "episodeId": 62}, map[string]any{"id": 3, "seriesId": 7, "episodeId": 72},
+	))
+	cs := session(t, f, Options{Toolsets: []string{"all"}})
+
+	out := mustCall(t, cs, "audit_no_files", nil)
+	want := []struct{ series, problem, detail, fix string }{
+		{"Airing Later", "nothing has aired", "none of its 2 episodes has aired; the first airs 2999-01-01", "nothing yet"},
+		{"Airing Unwatched", "nothing has aired", "none of its 1 episode has aired", "series_edit monitored true"},
+		{"Copied In", "files in the folder, none tracked", "holds 2 video files, and Sonarr tracks none", "import_apply"},
+		{"Empty", "no episodes known", "lists no episode of it, so there is nothing for it to fetch; TheTVDB has removed the show", "if it stays empty, series_delete"},
+		{"Empty With Files", "no episodes known", "its folder holds 2 video files, which Sonarr has no episode to match to", "series_import adds the folder as the right one"},
+		{"Every One Coming", "no files", "wants 2 episodes that aired and has a file for none, 2 downloading now", "nothing yet: every one is downloading"},
+		{"Never Fetched", "no files", "wants 3 episodes that aired and has a file for none, 1 downloading now; added 2023-04-01", "series_search"},
+		{"Not Watched", "no files and nothing wanted", "2 episodes aired and Sonarr will fetch none: the series is not monitored", "series_edit monitored true, then series_search; or series_delete"},
+		{"Seasons Off", "no files and nothing wanted", "2 episodes aired and Sonarr will fetch none: not one is monitored", "season_monitor the seasons wanted"},
+		// a show that is all specials has aired when they have
+		{"Specials Only", "no files and nothing wanted", "2 episodes aired and Sonarr will fetch none: not one is monitored", "season_monitor the seasons wanted"},
+		{"Undated", "nothing has aired", "an air date for none of its 2 episodes, so it never looks for one", "series_refresh"},
+	}
+	rows := rowsOf(out["findings"])
+	if len(rows) != len(want) || number(out["total_findings"]) != len(want) || number(out["scanned"]) != 12 {
+		t.Fatalf("audit_no_files = %v, want the %d series with no files of the 12", out, len(want))
+	}
+	for i, w := range want {
+		row := rows[i]
+		if text(row["series"]) != w.series || text(row["problem"]) != w.problem || !strings.Contains(text(row["detail"]), w.detail) || !strings.Contains(text(row["fix"]), w.fix) {
+			t.Errorf("finding %d = %v, want %s as %q with %q and %q", i, row, w.series, w.problem, w.detail, w.fix)
+		}
+		if text(row["subject"]) != "/tv/"+w.series {
+			t.Errorf("%s is about %q, want its folder", w.series, row["subject"])
+		}
+	}
+	for _, asked := range f.requests("/api/v3/episode") {
+		if strings.Contains(asked.Query, "seriesId=3") {
+			t.Error("the episodes of a series with files were read")
+		}
+	}
+
+	// one series asked about alone, with files and without
+	if one := mustCall(t, cs, "audit_no_files", map[string]any{"series": "Complete"}); number(one["total_findings"]) != 0 {
+		t.Errorf("a series with files = %v, want nothing", one)
+	}
+	if one := mustCall(t, cs, "audit_no_files", map[string]any{"series": "Not Watched"}); !slices.Equal(problems(one), []string{"no files and nothing wanted"}) {
+		t.Errorf("one series with no files = %v", one)
+	}
+}
+
+// Which series have no files is in the series list, so every one is counted, and only the ones listed have their episodes and folder read.
+func TestAuditNoFilesReadsOnlyTheSeriesItLists(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f,
+		map[string]any{"id": 1, "title": "Firefly", "path": "/tv/Firefly", "monitored": true},
+		map[string]any{"id": 2, "title": "Has Files", "path": "/tv/Has Files", "monitored": true, "statistics": map[string]any{"episodeFileCount": 1}},
+		map[string]any{"id": 3, "title": "Zorro", "path": "/tv/Zorro", "monitored": true},
+		map[string]any{"id": 4, "title": "Zulu", "path": "/tv/Zulu", "monitored": true},
+	)
+	f.answer(t, "GET /api/v3/episode", []map[string]any{{"id": 11, "seasonNumber": 1, "episodeNumber": 1, "monitored": true, "airDateUtc": "2002-09-20T01:00:00Z"}})
+	f.answer(t, "GET /api/v3/filesystem/mediafiles", []any{})
+	f.answer(t, "GET /api/v3/queue", page())
+	cs := session(t, f, Options{Toolsets: []string{"all"}})
+
+	out := mustCall(t, cs, "audit_no_files", map[string]any{"limit": 1})
+	if rows := rowsOf(out["findings"]); len(rows) != 1 || text(rows[0]["series"]) != "Firefly" || number(out["total_findings"]) != 3 {
+		t.Fatalf("audit_no_files = %v, want the first listed and all three counted", out)
+	}
+	if asked := f.requests("/api/v3/episode"); len(asked) != 1 || !strings.Contains(asked[0].Query, "seriesId=1") {
+		t.Errorf("episodes were read %d times, want once, for the series listed: %v", len(asked), asked)
+	}
+	if asked := f.requests("/api/v3/filesystem/mediafiles"); len(asked) != 1 || !strings.Contains(asked[0].Query, "Firefly") {
+		t.Errorf("folders were read %d times, want once, for the series listed: %v", len(asked), asked)
+	}
+
+	// and a library where every series has files is not asked anything more
+	full := newFakeServer(t)
+	library(t, full, map[string]any{"id": 1, "title": "Has Files", "path": "/tv/Has Files", "statistics": map[string]any{"episodeFileCount": 1}})
+	if out := mustCall(t, session(t, full, Options{Toolsets: []string{"all"}}), "audit_no_files", nil); number(out["total_findings"]) != 0 || number(out["scanned"]) != 1 {
+		t.Errorf("a library with no series short of files = %v", out)
 	}
 }

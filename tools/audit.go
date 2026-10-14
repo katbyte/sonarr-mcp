@@ -328,6 +328,12 @@ const (
 	// audit_missing_episodes
 	problemEpisodesMissing    = "episodes missing"
 	problemWholeSeasonMissing = "whole season missing"
+	// audit_no_files
+	problemNoFiles         = "no files"
+	problemNoFilesUnwanted = "no files and nothing wanted"
+	problemNoneTracked     = "files in the folder, none tracked"
+	problemNoEpisodes      = "no episodes known"
+	problemNothingAired    = "nothing has aired"
 	// audit_cutoff_unmet
 	problemBelowQualityCutoff = "below quality cutoff"
 	problemBelowFormatCutoff  = "below custom format cutoff"
@@ -404,6 +410,7 @@ const (
 // the prefix of a finding that ends in the check's own level.
 var AuditProblems = map[string][]string{
 	"audit_missing_episodes": {problemEpisodesMissing, problemWholeSeasonMissing},
+	"audit_no_files":         {problemNoFiles, problemNoFilesUnwanted, problemNoneTracked, problemNoEpisodes, problemNothingAired},
 	"audit_cutoff_unmet":     {problemBelowQualityCutoff, problemBelowFormatCutoff},
 	"audit_stuck_downloads": {
 		problemCannotImport, problemDownloadFailed, problemWaitingToImport, problemClientUnreachable,
@@ -450,6 +457,10 @@ func (r *registry) auditSpecs() []auditSpec {
 			description: "Monitored episodes that have aired and have no file, grouped by series and season, saying which are already downloading and which Sonarr has searched for and not found. Fix with episode_search, season_search or series_search, or wanted_search for the whole library.",
 		},
 		{
+			name: "audit_no_files", run: r.auditNoFiles,
+			description: "Series Sonarr records no file for at all, one finding each with its folder, saying which it is: wanted and never fetched, with nothing of it monitored so nothing ever will be, with video files in its folder that Sonarr does not track, with no episode Sonarr knows of, or with nothing aired. A series with some of its files is audit_missing_episodes' finding. Fix with series_search, series_edit or season_monitor, import_apply or series_refresh; a series that is not wanted is removed with the admin toolset.",
+		},
+		{
 			name: "audit_cutoff_unmet", run: r.auditCutoffUnmet,
 			description: "Monitored episode files below their quality profile's cutoff, grouped by series with each file's current quality: below the cutoff quality, or below the custom format score the profile upgrades until - which Sonarr's own Cutoff Unmet list does not count. Says when a profile has Upgrades Allowed off, which Sonarr's own default profiles do, so nothing is replaced by itself. Fix with series_search or episode_search, or wanted_search kind cutoff; profile_list shows the cutoffs.",
 		},
@@ -491,7 +502,7 @@ func (r *registry) auditSpecs() []auditSpec {
 		},
 		{
 			name: "audit_series_settings", run: r.auditSeriesSettings,
-			description: "Series settings that look wrong: anime not typed as anime (so absolute numbering fails), daily shows not typed as daily, a folder name that does not match the naming format, and series outside every root folder. Fix with series_edit.",
+			description: "Series settings that look wrong: anime not typed as anime (so absolute numbering fails), daily shows not typed as daily, a folder name that does not match the naming format, and series outside every root folder. Fix with series_edit. When most of the library's folders are off the format it is said once, with the format to set instead.",
 		},
 		{
 			name: "audit_profiles", run: r.auditProfiles,
@@ -550,7 +561,7 @@ func registerAuditAll(r *registry) {
 	}
 	add(r, readTool, &mcp.Tool{
 		Name: "audit_all",
-		Description: "Run every audit and report only the counts, so one call says where the library needs work: missing episodes, files below cutoff, stuck and failing downloads, folders and files Sonarr has lost track of or thinks it has, naming, quality labels, runtimes, languages, monitoring gaps, dead settings, and Sonarr's health. " +
+		Description: "Run every audit and report only the counts, so one call says where the library needs work: missing episodes, series with no files, files below cutoff, stuck and failing downloads, folders and files Sonarr has lost track of or thinks it has, naming, quality labels, runtimes, languages, monitoring gaps, dead settings, and Sonarr's health. " +
 			"Start here, then call the audit whose count is not zero for its worklist. An audit that could not run is listed under failed with its error and has no count: that is unknown, not none.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in allIn) (*mcp.CallToolResult, auditAllOut, error) {
 		s, err := r.snap(ctx, in.Series)

@@ -108,8 +108,8 @@ The Expanse|1|2|The Expanse - S01E02 - The Big Empty WEBDL-1080p|44|1920x1080|'
 #   Cowboy Bebop      imported as a standard series, though it is anime (audit_series_settings)
 #   Severance         imported; still airing, and set not to monitor new seasons (audit_monitoring)
 #   The Expanse       left unmapped (audit_unmapped_folders), for series_import to take in
-#   Breaking Bad      added with no files, the one the downloads are for: searches, grabs, the
-#                     queue, imports, failures
+#   Breaking Bad      added with no files (audit_no_files), the one the downloads are for:
+#                     searches, grabs, the queue, imports, failures
 
 # wipe_data removes the data directory. The container writes its config and
 # database as its own user, and on Linux those land in the bind mount owned
@@ -204,7 +204,8 @@ logs() {
   for f in "${DATA}"/config/logs/sonarr.txt "${DATA}"/config/logs/sonarr.debug.txt; do
     [ -f "$f" ] || continue
     echo "==> ${f} (errors)" >&2
-    grep -iE '\|(Error|Warn|Fatal)\||exception' "$f" | tail -60 >&2
+    # a log with none of these is not a failure: without the || true the script stops here, and a failed run's container is never taken down
+    grep -iE '\|(Error|Warn|Fatal)\||exception' "$f" | tail -60 >&2 || true
     echo "==> ${f} (tail)" >&2
     tail -40 "$f" >&2
   done
