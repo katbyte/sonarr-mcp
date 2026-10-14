@@ -4,7 +4,7 @@ package sonarr
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -14,17 +14,35 @@ import (
 )
 
 // GetSeriesByIdFolderResponse is the result of GetSeriesByIdFolder.
+//
+// Answer is the SeriesFolderResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
 type GetSeriesByIdFolderResponse struct {
 	HttpResponse *http.Response
-	Answer       json.RawMessage
+	Answer       *SeriesFolderResource
+	*SeriesFolderResource
 }
 
 // Answered reports whether the server answered with a body that was decoded:
 // false for a 204, or a call that failed before one came.
 func (r GetSeriesByIdFolderResponse) Answered() bool { return r.Answer != nil }
 
+// Record is the SeriesFolderResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetSeriesByIdFolderResponse) Record() (SeriesFolderResource, error) {
+	if r.Answer == nil {
+		return SeriesFolderResource{}, errors.New("GetSeriesByIdFolder answered no SeriesFolderResource")
+	}
+
+	return *r.Answer, nil
+}
+
 // GetSeriesByIdFolder calls GET /api/v3/series/{id}/folder.
 func (c Client) GetSeriesByIdFolder(ctx context.Context, id SeriesID) (result GetSeriesByIdFolderResponse, err error) {
+	result.SeriesFolderResource = &SeriesFolderResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
@@ -48,9 +66,12 @@ func (c Client) GetSeriesByIdFolder(ctx context.Context, id SeriesID) (result Ge
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
+	var answer SeriesFolderResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.SeriesFolderResource = result.Answer
 
 	return
 }

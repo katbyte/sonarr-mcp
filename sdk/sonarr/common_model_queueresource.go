@@ -4,7 +4,7 @@ package sonarr
 
 // QueueResource is the "QueueResource" schema.
 type QueueResource struct {
-	Added                               string                         `json:"added,omitempty"`
+	Added                               Time                           `json:"added,omitzero"`
 	CustomFormatScore                   int                            `json:"customFormatScore,omitempty"`
 	CustomFormats                       []CustomFormatResource         `json:"customFormats,omitzero"`
 	DownloadClient                      string                         `json:"downloadClient,omitempty"`
@@ -14,7 +14,7 @@ type QueueResource struct {
 	EpisodeHasFile                      bool                           `json:"episodeHasFile"`
 	EpisodeId                           EpisodeID                      `json:"episodeId,omitempty"`
 	ErrorMessage                        string                         `json:"errorMessage,omitempty"`
-	EstimatedCompletionTime             string                         `json:"estimatedCompletionTime,omitempty"`
+	EstimatedCompletionTime             Time                           `json:"estimatedCompletionTime,omitzero"`
 	Id                                  int                            `json:"id,omitempty"`
 	Indexer                             string                         `json:"indexer,omitempty"`
 	Languages                           []Language                     `json:"languages,omitzero"`

@@ -8,7 +8,7 @@ type ReleaseResource struct {
 	Age                          int                      `json:"age,omitempty"`
 	AgeHours                     float64                  `json:"ageHours,omitempty"`
 	AgeMinutes                   float64                  `json:"ageMinutes,omitempty"`
-	AirDate                      string                   `json:"airDate,omitempty"`
+	AirDate                      Day                      `json:"airDate,omitzero"`
 	Approved                     *bool                    `json:"approved,omitempty"`
 	CommentUrl                   string                   `json:"commentUrl,omitempty"`
 	CustomFormatScore            int                      `json:"customFormatScore,omitempty"`
@@ -43,7 +43,7 @@ type ReleaseResource struct {
 	MappedSeasonNumber           int                      `json:"mappedSeasonNumber,omitempty"`
 	MappedSeriesId               SeriesID                 `json:"mappedSeriesId,omitempty"`
 	Protocol                     DownloadProtocol         `json:"protocol,omitempty"`
-	PublishDate                  string                   `json:"publishDate,omitempty"`
+	PublishDate                  Time                     `json:"publishDate,omitzero"`
 	Quality                      *QualityModel            `json:"quality,omitempty"`
 	QualityWeight                int                      `json:"qualityWeight,omitempty"`
 	Rejected                     *bool                    `json:"rejected,omitempty"`

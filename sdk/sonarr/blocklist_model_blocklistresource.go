@@ -5,7 +5,7 @@ package sonarr
 // BlocklistResource is the "BlocklistResource" schema.
 type BlocklistResource struct {
 	CustomFormats []CustomFormatResource `json:"customFormats,omitzero"`
-	Date          string                 `json:"date,omitempty"`
+	Date          Time                   `json:"date,omitzero"`
 	EpisodeIds    []EpisodeID            `json:"episodeIds,omitzero"`
 	Id            int                    `json:"id,omitempty"`
 	Indexer       string                 `json:"indexer,omitempty"`

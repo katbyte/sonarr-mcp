@@ -43,7 +43,7 @@ func projectQueue(q *sonarr.QueueResource) queueRow {
 		ID: q.Id, SeriesID: q.SeriesId, Season: q.SeasonNumber, Title: q.Title,
 		Status: string(q.Status), State: string(q.TrackedDownloadState), Health: string(q.TrackedDownloadStatus),
 		Error: q.ErrorMessage, Size: humanSize(int64(q.Size)), TimeLeft: q.Timeleft, Quality: qualityName(q.Quality),
-		Protocol: string(q.Protocol), DownloadClient: q.DownloadClient, Indexer: q.Indexer, Added: q.Added,
+		Protocol: string(q.Protocol), DownloadClient: q.DownloadClient, Indexer: q.Indexer, Added: stamp(q.Added.Time),
 		OutputPath: q.OutputPath, DownloadID: q.DownloadId,
 	}
 	if q.Size > 0 {
@@ -174,7 +174,7 @@ type historyRow struct {
 
 func projectHistory(h *sonarr.HistoryResource) historyRow {
 	row := historyRow{
-		ID: h.Id, Date: h.Date, Event: string(h.EventType), SourceTitle: h.SourceTitle, Quality: qualityName(h.Quality),
+		ID: h.Id, Date: stamp(h.Date.Time), Event: string(h.EventType), SourceTitle: h.SourceTitle, Quality: qualityName(h.Quality),
 		Indexer: h.Data["indexer"], Client: h.Data["downloadClientName"], DownloadID: h.DownloadId,
 	}
 	// downloadClient is the client's kind (SABnzbd), downloadClientName the
@@ -249,7 +249,7 @@ func registerQueueTools(r *registry) {
 			}
 			// needing attention is what the stuck downloads audit says it is,
 			// so the two never disagree about a download
-			if problem, _ := stuckProblem(q, now.Sub(parseTime(q.Added))); in.Issues && problem == "" {
+			if problem, _ := stuckProblem(q, now.Sub(q.Added.Time)); in.Issues && problem == "" {
 				continue
 			}
 			rows = append(rows, projectQueue(q))
@@ -420,7 +420,7 @@ func registerHistoryTools(r *registry) {
 			if err != nil {
 				return nil, listOut{}, err
 			}
-			if parseTime(h.Date).Before(cutoff) {
+			if h.Date.Before(cutoff) {
 				break
 			}
 			rows = append(rows, projectHistory(&h))
@@ -491,7 +491,7 @@ func registerHistoryTools(r *registry) {
 		out := blockOut{pageOut: paged, Entries: make([]blocklistRow, 0, len(items))}
 		for _, b := range items {
 			out.Entries = append(out.Entries, blocklistRow{
-				ID: b.Id, Date: b.Date, Series: titles[b.SeriesId], SourceTitle: b.SourceTitle, Quality: qualityName(b.Quality),
+				ID: b.Id, Date: stamp(b.Date.Time), Series: titles[b.SeriesId], SourceTitle: b.SourceTitle, Quality: qualityName(b.Quality),
 				Indexer: b.Indexer, Protocol: string(b.Protocol), Message: b.Message,
 			})
 		}

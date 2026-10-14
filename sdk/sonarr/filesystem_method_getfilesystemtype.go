@@ -4,7 +4,7 @@ package sonarr
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -12,14 +12,31 @@ import (
 )
 
 // GetFileSystemTypeResponse is the result of GetFileSystemType.
+//
+// Answer is the FileSystemTypeResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
 type GetFileSystemTypeResponse struct {
 	HttpResponse *http.Response
-	Answer       json.RawMessage
+	Answer       *FileSystemTypeResource
+	*FileSystemTypeResource
 }
 
 // Answered reports whether the server answered with a body that was decoded:
 // false for a 204, or a call that failed before one came.
 func (r GetFileSystemTypeResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the FileSystemTypeResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetFileSystemTypeResponse) Record() (FileSystemTypeResource, error) {
+	if r.Answer == nil {
+		return FileSystemTypeResource{}, errors.New("GetFileSystemType answered no FileSystemTypeResource")
+	}
+
+	return *r.Answer, nil
+}
 
 // GetFileSystemTypeOptions holds the query and header parameters of GetFileSystemType.
 type GetFileSystemTypeOptions struct {
@@ -52,6 +69,7 @@ func (c Client) GetFileSystemType(ctx context.Context, options ...GetFileSystemT
 		option = options[0]
 	}
 
+	result.FileSystemTypeResource = &FileSystemTypeResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
@@ -76,9 +94,12 @@ func (c Client) GetFileSystemType(ctx context.Context, options ...GetFileSystemT
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
+	var answer FileSystemTypeResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.FileSystemTypeResource = result.Answer
 
 	return
 }

@@ -41,6 +41,9 @@ const undocumentedStatus = http.StatusTeapot
 // operation tests share, the paged one a service with lists has, and New's
 // validation.
 func (g *gen) testHelpersFile() string {
+	if g.calls() {
+		return g.callTestHelpersFile()
+	}
 	helpers := operationServerHelpers
 	if g.opts.Grouped {
 		// a tag's client is made on a base client, not by New
@@ -243,6 +246,9 @@ const newTest = `func TestNew(t *testing.T) {
 
 // testFile renders the test of one operation.
 func (g *gen) testFile(o *definitions.Operation) string {
+	if o.Call != nil {
+		return g.callTestFile(o)
+	}
 	var b strings.Builder
 	call := g.testCall(o)
 
@@ -406,11 +412,18 @@ func (g *gen) testCall(o *definitions.Operation) testCallInfo {
 
 	if len(o.Options) > 0 {
 		var fields []string
+		placed := map[string]bool{}
 		for _, opt := range o.Options {
 			expr, wire, ok := g.sampleOption(opt)
 			if !ok {
 				continue
 			}
+			// a joined list is sent under its string's name (JoinedLists adds UserIdList beside UserId), and setting both sends both, so
+			// the test sets the first form alone and expects that one; the list's joining is proven where a list is the only form
+			if placed[opt.In+" "+opt.Name] {
+				continue
+			}
+			placed[opt.In+" "+opt.Name] = true
 			info.optNames[opt.Field] = opt.Name
 			fields = append(fields, opt.Field+": "+expr)
 			switch {
@@ -559,7 +572,7 @@ func (g *gen) sampleBody(t definitions.TypeRef) string {
 		if c := g.constants[t.ReferenceName]; c != nil && len(c.Values) > 0 {
 			return g.typeName(c.Values[0].Name)
 		}
-		if m := g.models[t.ReferenceName]; m != nil && len(m.Union) > 0 {
+		if m := g.models[t.ReferenceName]; m != nil && len(m.Union) > 0 && len(m.Members) == 0 {
 			return g.typeName(t.ReferenceName) + `("{}")`
 		}
 		return g.typeName(t.ReferenceName) + "{}"
@@ -610,6 +623,10 @@ func (g *gen) sampleJSON(t definitions.TypeRef) string {
 	case definitions.String:
 		return `"s"`
 	case definitions.DateTime:
+		if g.svc.Dates[0] == dateObjectMillis {
+			return fmt.Sprintf(`{"$date":%d}`, sampleTime.UnixMilli())
+		}
+
 		return strconv.Quote(sampleTime.Format(g.svc.Dates[0]))
 	case definitions.Date:
 		return strconv.Quote(sampleTime.Format(g.svc.Days[0]))

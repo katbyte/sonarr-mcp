@@ -99,6 +99,7 @@ func (g *gen) enter(pkg, qual string) {
 	g.pkg, g.qual = pkg, qual
 	g.declared = map[string]string{}
 	g.imports = nil
+	g.grp = nil
 }
 
 // typesDir is the directory of the types package under Dir, with a slash,
@@ -157,6 +158,9 @@ func (g *gen) renderGrouped(add func(name, src string) error) error {
 	if err := add(root+"helpers.go", g.helpersFile()); err != nil {
 		return err
 	}
+	if err := add(root+"operations.go", g.operationsFile()); err != nil {
+		return err
+	}
 	if g.datesFile() {
 		if err := add(root+"time.go", g.timeFile()); err != nil {
 			return err
@@ -176,6 +180,7 @@ func (g *gen) renderGrouped(add func(name, src string) error) error {
 			continue
 		}
 		g.enter(pkg, g.svc.Package+".")
+		g.grp = grp
 		g.declare("Client", clientFileName)
 		g.declare("NewClient", clientFileName)
 		if err := add(pkg+"/doc.go", g.groupDocFile(grp)); err != nil {
@@ -247,6 +252,10 @@ func (g *gen) credential() (argument, refusal string) {
 }
 
 func (g *gen) rootClientFile() string {
+	if g.calls() {
+		// a call service's New is the client package's alone: there is no base client to make here
+		return g.fileHeader(g.apiVersionConsts())
+	}
 	g.declare("New", clientFileName)
 	argument, refusal := g.credential()
 
@@ -320,6 +329,10 @@ package %[1]s
 }
 
 func (g *gen) groupClientFile(grp *definitions.Group) string {
+	if g.calls() {
+		return g.callGroupClientFile(grp)
+	}
+
 	return g.fileHeader(fmt.Sprintf(`// Client is the %[1]s operations of %[2]s; each is a method. Requests go
 // through Client.Client, the base client shared with every other tag's.
 type Client struct {
@@ -353,6 +366,9 @@ func (g *gen) groupsWithOperations() []*definitions.Group {
 }
 
 func (g *gen) aggregateFile() string {
+	if g.calls() {
+		return g.callAggregateFile()
+	}
 	g.declare("Client", clientFileName)
 	g.declare("New", clientFileName)
 	g.declare("NewClient", clientFileName)
@@ -387,6 +403,9 @@ func (g *gen) aggregateFile() string {
 }
 
 func (g *gen) aggregateTestFile() string {
+	if g.calls() {
+		return g.callAggregateTestFile()
+	}
 	g.imports = nil
 	groups := g.groupsWithOperations()
 	shared := make([]string, 0, len(groups))

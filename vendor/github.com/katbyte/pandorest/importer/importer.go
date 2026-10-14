@@ -18,6 +18,7 @@ import (
 	"github.com/katbyte/pandorest/config"
 	"github.com/katbyte/pandorest/definitions"
 	"github.com/katbyte/pandorest/importer/workarounds"
+	"github.com/katbyte/pandorest/jsonrpc"
 	"github.com/katbyte/pandorest/openapi"
 )
 
@@ -25,7 +26,7 @@ import (
 // are for it and returns the definitions. log receives one line per
 // workaround applied and per warning.
 func Import(cfg config.Service, all []workarounds.Workaround, log func(string)) (*definitions.Service, error) {
-	spec, err := openapi.Load(cfg.Path(cfg.Spec))
+	spec, err := LoadDocument(cfg, log)
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +36,25 @@ func Import(cfg config.Service, all []workarounds.Workaround, log func(string)) 
 	}
 
 	return FromSpec(cfg, spec, applied, log)
+}
+
+// LoadDocument reads the service's vendored document as the kind its config says: an OpenAPI document, or a JSON-RPC method
+// description read into one, whose notes on what it folded are logged.
+func LoadDocument(cfg config.Service, log func(string)) (*openapi.Spec, error) {
+	if cfg.Document != config.JSONRPCDocument {
+		return openapi.Load(cfg.Path(cfg.Spec))
+	}
+	spec, notes, err := jsonrpc.Load(cfg.Path(cfg.Spec), cfg.Name, cfg.Version)
+	if err != nil {
+		return nil, err
+	}
+	for _, note := range notes {
+		if log != nil {
+			log(cfg.Name + ": " + note)
+		}
+	}
+
+	return spec, nil
 }
 
 // FromSpec normalises an already patched document.
@@ -49,12 +69,15 @@ func FromSpec(cfg config.Service, spec *openapi.Spec, applied []string, log func
 		models:    map[string]*definitions.Model{},
 		constants: map[string]*definitions.Constant{},
 		typeNames: map[string]string{},
+		methods:   map[string]bool{},
 	}
 
 	im.checkWords()
 	im.importSchemas()
-	im.keepNull()
 	groups := im.importOperations()
+	im.checkReads()
+	// after the operations, since an answer declared inline is a model only once its operation is read (dockhand's document has no components at all)
+	im.keepNull()
 	for _, g := range groups {
 		for i := range g.Operations {
 			im.markPageable(&g.Operations[i])
@@ -108,6 +131,10 @@ type importer struct {
 	// typeNames maps every Go type name declared so far to where it came from
 	typeNames map[string]string
 	failures  []string
+	// oneIDTexts is each text parameter named like a list (excludeItemIds) a kind typed as one id, to say so
+	oneIDTexts []string
+	// methods is each JSON-RPC method of the document, so the config's Reads and NotReads are held to it
+	methods map[string]bool
 }
 
 // checkWords holds the config's Words to spelling only: a key in lower case,

@@ -92,13 +92,7 @@ func (r *registry) auditSeriesSettings(ctx context.Context, s *snapshot, limit i
 		if err != nil {
 			return err
 		}
-		var want struct {
-			Folder string `json:"folder"`
-		}
-		if err := unmarshalRaw(res.Answer, &want); err != nil {
-			return err
-		}
-		formatted[i] = want.Folder
+		formatted[i] = res.Folder
 
 		return nil
 	}); err != nil {
@@ -400,7 +394,7 @@ func (r *registry) auditServer(ctx context.Context, _ *snapshot, limit int) (aud
 	out := auditOut{Scanned: 3}
 	var newest time.Time
 	for _, b := range backups.Answer {
-		if t := parseTime(b.Time); t.After(newest) {
+		if t := b.Time.Time; t.After(newest) {
 			newest = t
 		}
 	}
@@ -408,7 +402,7 @@ func (r *registry) auditServer(ctx context.Context, _ *snapshot, limit int) (aud
 	case newest.IsZero():
 		out.report(limit, finding{Subject: "backups", Problem: problemNoRecentBackup, Detail: "Sonarr holds no backup of its database and settings", Fix: "backup_create (in the admin toolset) makes one now; Sonarr makes one on its own every seven days unless backupInterval in the host section says otherwise"})
 	case time.Since(newest) > backupStale:
-		out.report(limit, finding{Subject: "backups", Problem: problemNoRecentBackup, Detail: fmt.Sprintf("the newest backup is from %s, %d days ago", day(newest.Format(time.RFC3339)), int(time.Since(newest).Hours()/24)), Fix: "backup_create (in the admin toolset) makes one now; check backupInterval in the host section, and the log for the Backup task failing"})
+		out.report(limit, finding{Subject: "backups", Problem: problemNoRecentBackup, Detail: fmt.Sprintf("the newest backup is from %s, %d days ago", day(newest), int(time.Since(newest).Hours()/24)), Fix: "backup_create (in the admin toolset) makes one now; check backupInterval in the host section, and the log for the Backup task failing"})
 	}
 
 	for _, u := range updates.Answer {
@@ -427,7 +421,7 @@ func (r *registry) auditServer(ctx context.Context, _ *snapshot, limit int) (aud
 		default:
 			fix += "; Sonarr cannot install it itself, so it is updated the way it was installed"
 		}
-		out.report(limit, finding{Subject: u.Version, Problem: problemUpdateAvailable, Detail: fmt.Sprintf("%s was released %s; %s is running", u.Version, day(u.ReleaseDate), running.Version), Fix: fix})
+		out.report(limit, finding{Subject: u.Version, Problem: problemUpdateAvailable, Detail: fmt.Sprintf("%s was released %s; %s is running", u.Version, day(u.ReleaseDate.Time), running.Version), Fix: fix})
 	}
 
 	type logged struct {
@@ -437,7 +431,7 @@ func (r *registry) auditServer(ctx context.Context, _ *snapshot, limit int) (aud
 	}
 	byLogger := map[string]*logged{}
 	for _, e := range errors.Answer.Records {
-		if time.Since(parseTime(e.Time)) > logErrorsSince {
+		if time.Since(e.Time.Time) > logErrorsSince {
 			continue
 		}
 		l := byLogger[e.Logger]

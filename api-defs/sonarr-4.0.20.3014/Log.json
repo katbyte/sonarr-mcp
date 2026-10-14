@@ -136,7 +136,7 @@
           "Name": "Time",
           "JsonName": "time",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         }
       ]

@@ -74,7 +74,7 @@ func projectFile(f *sonarr.EpisodeFileResource, episodes []int) fileRow {
 	row := fileRow{
 		ID: f.Id, Episodes: episodeLabel(f.SeasonNumber, episodes...), RelativePath: f.RelativePath, Size: humanSize(f.Size),
 		Quality: qualityName(f.Quality), CutoffNotMet: boolv(f.QualityCutoffNotMet), Languages: languageNames(f.Languages),
-		ReleaseGroup: f.ReleaseGroup, CustomFormatScore: f.CustomFormatScore, Added: day(f.DateAdded), Media: projectMedia(f.MediaInfo),
+		ReleaseGroup: f.ReleaseGroup, CustomFormatScore: f.CustomFormatScore, Added: day(f.DateAdded.Time), Media: projectMedia(f.MediaInfo),
 	}
 	for _, cf := range f.CustomFormats {
 		row.CustomFormats = append(row.CustomFormats, cf.Name)

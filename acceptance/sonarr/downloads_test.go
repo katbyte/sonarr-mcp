@@ -195,7 +195,7 @@ func TestDownloadImport(t *testing.T) {
 		t.Errorf("the import in the history = %+v", imported)
 	}
 	since := must(sc.GetHistorySince(ctx, sonarr.GetHistorySinceOptions{
-		Date: started.UTC().Format(time.RFC3339), EventType: sonarr.EpisodeHistoryEventTypeGrabbed, IncludeSeries: new(true),
+		Date: sonarr.Time{Time: started.UTC()}, EventType: sonarr.EpisodeHistoryEventTypeGrabbed, IncludeSeries: new(true),
 	})).Answer
 	if !slices.ContainsFunc(since, func(h sonarr.HistoryResource) bool { return h.Id == grabbed[0].Id && h.Series != nil }) {
 		t.Errorf("GetHistorySince the test started = %d entries, without the grab", len(since))
@@ -301,7 +301,7 @@ func TestDelayedDownloads(t *testing.T) {
 		titles = append(titles, best.Title)
 		pushed := must(sc.PostReleasePush(ctx, sonarr.ReleaseResource{
 			Title: best.Title, DownloadUrl: best.DownloadUrl, Protocol: sonarr.DownloadProtocolUsenet, IndexerId: best.IndexerId,
-			PublishDate: time.Now().UTC().Format(time.RFC3339), Size: best.Size,
+			PublishDate: sonarr.Time{Time: time.Now().UTC()}, Size: best.Size,
 		}))
 		status(t, pushed.HttpResponse, http.StatusOK)
 		// what the release was taken for is in the Mapped fields: SeriesId and

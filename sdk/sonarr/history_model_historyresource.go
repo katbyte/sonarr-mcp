@@ -7,7 +7,7 @@ type HistoryResource struct {
 	CustomFormatScore   int                     `json:"customFormatScore,omitempty"`
 	CustomFormats       []CustomFormatResource  `json:"customFormats,omitzero"`
 	Data                map[string]string       `json:"data,omitzero"`
-	Date                string                  `json:"date,omitempty"`
+	Date                Time                    `json:"date,omitzero"`
 	DownloadId          string                  `json:"downloadId,omitempty"`
 	Episode             *EpisodeResource        `json:"episode,omitempty"`
 	EpisodeId           EpisodeID               `json:"episodeId,omitempty"`

@@ -12,7 +12,7 @@
           "Field": "Start",
           "In": "Query",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {
@@ -20,7 +20,7 @@
           "Field": "End",
           "In": "Query",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {

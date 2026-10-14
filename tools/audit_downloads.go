@@ -42,7 +42,7 @@ func (r *registry) auditStuckDownloads(ctx context.Context, s *snapshot, limit i
 		}
 		out.Scanned++
 		row := projectQueue(q)
-		age := now.Sub(parseTime(q.Added))
+		age := now.Sub(q.Added.Time)
 		problem, fix := stuckProblem(q, age)
 		if problem == "" {
 			continue
@@ -52,7 +52,7 @@ func (r *registry) auditStuckDownloads(ctx context.Context, s *snapshot, limit i
 			subject = row.Episode + " " + row.Title
 		}
 		detail := fmt.Sprintf("queue id %d, %s/%s", q.Id, q.Status, q.TrackedDownloadState)
-		if age > 0 && !parseTime(q.Added).IsZero() {
+		if age > 0 && !q.Added.IsZero() {
 			detail += fmt.Sprintf(", added %s ago", roundAge(age))
 		}
 		if len(row.Messages) > 0 {
@@ -117,7 +117,7 @@ func roundAge(d time.Duration) string {
 func (r *registry) auditFailedDownloads(ctx context.Context, s *snapshot, limit int) (auditOut, error) {
 	since := time.Now().AddDate(0, 0, -failedDays)
 	res, err := r.client.GetHistorySince(ctx, sonarr.GetHistorySinceOptions{
-		Date: since.UTC().Format(time.RFC3339), IncludeSeries: new(true), IncludeEpisode: new(true),
+		Date: sonarr.Time{Time: since.UTC()}, IncludeSeries: new(true), IncludeEpisode: new(true),
 	})
 	if err != nil {
 		return auditOut{}, err
@@ -210,14 +210,14 @@ func (r *registry) auditFailedDownloads(ctx context.Context, s *snapshot, limit 
 	for i := range grabs {
 		h := &grabs[i]
 		id := strings.ToUpper(h.DownloadId)
-		if id == "" || heard[id] || inQueue[id] || seen[id] || parseTime(h.Date).After(cutoff) {
+		if id == "" || heard[id] || inQueue[id] || seen[id] || h.Date.After(cutoff) {
 			continue
 		}
 		seen[id] = true
 		row := projectHistory(h)
 		out.report(limit, finding{
 			Series: row.Series, SeriesID: h.SeriesId, Subject: outside.Text(strings.TrimSpace(row.Episode+" "+h.SourceTitle), answerLength), Problem: problemGrabWentNowhere,
-			Detail: fmt.Sprintf("grabbed %s from %s, sent to %s, and never imported or failed; it is not in the queue", day(h.Date), row.Indexer, row.Client),
+			Detail: fmt.Sprintf("grabbed %s from %s, sent to %s, and never imported or failed; it is not in the queue", day(h.Date.Time), row.Indexer, row.Client),
 			Fix:    fmt.Sprintf("history_mark_failed %d to blocklist it and search again, or episode_search", h.Id),
 		})
 	}

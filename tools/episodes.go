@@ -51,7 +51,7 @@ func projectFileRef(f *sonarr.EpisodeFileResource) *fileRef {
 func projectEpisode(e *sonarr.EpisodeResource, now time.Time) episodeRow {
 	return episodeRow{
 		ID: e.Id, Episode: episodeLabel(e.SeasonNumber, e.EpisodeNumber), Absolute: e.AbsoluteEpisodeNumber,
-		Title: e.Title, AirDate: e.AirDate, Aired: aired(e, now), Monitored: boolv(e.Monitored), HasFile: boolv(e.HasFile),
+		Title: e.Title, AirDate: day(e.AirDate.Time), Aired: aired(e, now), Monitored: boolv(e.Monitored), HasFile: boolv(e.HasFile),
 		File: projectFileRef(e.EpisodeFile),
 	}
 }
@@ -448,7 +448,7 @@ func registerEpisodeTools(r *registry) {
 		from := now.AddDate(0, 0, -in.PastDays)
 		to := now.AddDate(0, 0, limitOr(in.Days, 7))
 		res, err := client.GetCalendar(ctx, sonarr.GetCalendarOptions{
-			Start: from.Format(time.RFC3339), End: to.Format(time.RFC3339),
+			Start: sonarr.Time{Time: from}, End: sonarr.Time{Time: to},
 			Unmonitored: new(in.Unmonitored), IncludeSeries: new(true),
 		})
 		if err != nil {
@@ -457,7 +457,7 @@ func registerEpisodeTools(r *registry) {
 		rows := make([]calendarRow, 0, len(res.Answer))
 		for _, e := range res.Answer {
 			row := calendarRow{
-				AirDateUTC: e.AirDateUtc, SeriesID: e.SeriesId, Episode: episodeLabel(e.SeasonNumber, e.EpisodeNumber),
+				AirDateUTC: stamp(e.AirDateUtc.Time), SeriesID: e.SeriesId, Episode: episodeLabel(e.SeasonNumber, e.EpisodeNumber),
 				Title: e.Title, Monitored: boolv(e.Monitored), HasFile: boolv(e.HasFile),
 			}
 			if e.Series != nil {

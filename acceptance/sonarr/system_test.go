@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
@@ -23,7 +24,7 @@ func TestSystemStatus(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	st := must(sc.GetSystemStatus(ctx)).Answer
-	if !strings.HasPrefix(st.Version, "4.") || st.AppName != "Sonarr" || st.OsName == "" || st.StartTime == "" || !st.IsDocker {
+	if !strings.HasPrefix(st.Version, "4.") || st.AppName != "Sonarr" || st.OsName == "" || st.StartTime.IsZero() || !st.IsDocker {
 		t.Errorf("GetSystemStatus = %+v", st)
 	}
 
@@ -45,7 +46,7 @@ func TestSystemTasks(t *testing.T) {
 
 	tasks := must(sc.GetSystemTask(ctx)).Answer
 	i := slices.IndexFunc(tasks, func(x sonarr.TaskResource) bool { return x.TaskName == "RefreshMonitoredDownloads" })
-	if i < 0 || tasks[i].Interval != 1 || tasks[i].NextExecution == "" {
+	if i < 0 || tasks[i].Interval != 1 || tasks[i].NextExecution.IsZero() {
 		t.Fatalf("GetSystemTask = %+v, want the download check every minute", tasks)
 	}
 	if got := must(sc.GetSystemTaskById(ctx, tasks[i].Id)).Answer; got.TaskName != tasks[i].TaskName {
@@ -67,7 +68,7 @@ func TestBackups(t *testing.T) {
 		t.Fatalf("the Backup command made no backup: %+v", after)
 	}
 	b := after[i]
-	if b.Type != sonarr.BackupTypeManual || !strings.HasSuffix(b.Name, ".zip") || b.Size == 0 || b.Time == "" {
+	if b.Type != sonarr.BackupTypeManual || !strings.HasSuffix(b.Name, ".zip") || b.Size == 0 || b.Time.IsZero() {
 		t.Errorf("the new backup = %+v", b)
 	}
 
@@ -87,7 +88,7 @@ func TestLogs(t *testing.T) {
 
 	files := must(sc.GetLogFile(ctx)).Answer
 	i := slices.IndexFunc(files, func(f sonarr.LogFileResource) bool { return f.Filename == "sonarr.txt" })
-	if i < 0 || files[i].LastWriteTime == "" || files[i].ContentsUrl == "" {
+	if i < 0 || files[i].LastWriteTime.IsZero() || files[i].ContentsUrl == "" {
 		t.Fatalf("GetLogFile = %+v, want sonarr.txt", files)
 	}
 	res := must(sc.GetLogFileByFilename(ctx, files[i].Filename))
@@ -108,7 +109,7 @@ func TestUpdatesHealthAndDisks(t *testing.T) {
 
 	// the recent releases, from Sonarr's update service (through the proxy)
 	for _, u := range must(sc.GetUpdate(ctx)).Answer {
-		if u.Version == "" || u.ReleaseDate == "" {
+		if u.Version == "" || u.ReleaseDate.IsZero() {
 			t.Errorf("an update = %+v", u)
 		}
 	}
@@ -130,33 +131,21 @@ func TestUpdatesHealthAndDisks(t *testing.T) {
 func TestFileSystem(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
-	type entry struct {
-		Name string `json:"name"`
-		Path string `json:"path"`
-		Type string `json:"type"`
-	}
-	var listing struct {
-		Directories []entry `json:"directories"`
-	}
-	if err := unmarshal(must(sc.GetFileSystem(ctx, sonarr.GetFileSystemOptions{Path: "/tv/"})).Answer, &listing); err != nil ||
-		!slices.ContainsFunc(listing.Directories, func(d entry) bool { return d.Name == firefly.Folder && d.Type == "folder" }) {
-		t.Errorf("GetFileSystem(/tv/) = %+v, %v", listing, err)
+	listing := must(sc.GetFileSystem(ctx, sonarr.GetFileSystemOptions{Path: "/tv/"}))
+	if !slices.ContainsFunc(listing.Directories, func(d sonarr.FileSystemEntryResource) bool { return d.Name == firefly.Folder && d.Type == "folder" }) {
+		t.Errorf("GetFileSystem(/tv/) = %+v", listing.Answer)
 	}
 
-	var media []entry
-	if err := unmarshal(must(sc.GetFileSystemMediaFiles(ctx, sonarr.GetFileSystemMediaFilesOptions{Path: "/tv/" + firefly.Folder})).Answer, &media); err != nil ||
-		len(media) < firefly.Files || !strings.HasSuffix(media[0].Name, ".mkv") {
-		t.Fatalf("GetFileSystemMediaFiles = %+v, %v", media, err)
+	media := must(sc.GetFileSystemMediaFiles(ctx, sonarr.GetFileSystemMediaFilesOptions{Path: "/tv/" + firefly.Folder})).Answer
+	if len(media) < firefly.Files || !strings.HasSuffix(media[0].Name, ".mkv") {
+		t.Fatalf("GetFileSystemMediaFiles = %+v", media)
 	}
 
 	// a file is a file; anything else is answered as a folder, so the
 	// picker gives nothing away about what is not there
 	for path, want := range map[string]string{media[0].Path: "file", "/tv": "folder", "/nowhere": "folder"} {
-		var kind struct {
-			Type string `json:"type"`
-		}
-		if err := unmarshal(must(sc.GetFileSystemType(ctx, sonarr.GetFileSystemTypeOptions{Path: path})).Answer, &kind); err != nil || kind.Type != want {
-			t.Errorf("GetFileSystemType(%s) = %+v, %v, want %s", path, kind, err, want)
+		if kind := must(sc.GetFileSystemType(ctx, sonarr.GetFileSystemTypeOptions{Path: path})); kind.Type != want {
+			t.Errorf("GetFileSystemType(%s) = %+v, want %s", path, kind.Answer, want)
 		}
 	}
 }
@@ -219,7 +208,7 @@ func TestCommands(t *testing.T) {
 	}
 
 	cmd := must(sc.WaitForCommand(ctx, res.Id, commandWait)).Answer
-	if cmd.Name != "RescanSeries" || cmd.Status != sonarr.CommandStatusCompleted || cmd.Trigger != sonarr.CommandTriggerManual || cmd.Ended == "" {
+	if cmd.Name != "RescanSeries" || cmd.Status != sonarr.CommandStatusCompleted || cmd.Trigger != sonarr.CommandTriggerManual || cmd.Ended.IsZero() {
 		t.Errorf("WaitForCommand = %+v", cmd)
 	}
 	if !slices.ContainsFunc(must(sc.GetCommand(ctx)).Answer, func(c sonarr.CommandResource) bool { return c.Id == cmd.Id }) {
@@ -283,7 +272,7 @@ func TestCalendarByTag(t *testing.T) {
 	ff := seriesIDs[firefly.Title]
 	other := newTag(ctx, t, "sdk-calendar-other")
 	tag := newTag(ctx, t, "sdk-calendar")
-	when := sonarr.GetCalendarOptions{Start: "2002-09-01", End: "2003-01-31", Unmonitored: new(true)}
+	when := sonarr.GetCalendarOptions{Start: day(2002, time.September, 1), End: day(2003, time.January, 31), Unmonitored: new(true)}
 
 	all := must(sc.GetCalendar(ctx, when)).Answer
 	when.Tags = []sonarr.TagID{tag, other}

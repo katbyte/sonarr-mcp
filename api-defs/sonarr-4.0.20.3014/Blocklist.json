@@ -158,7 +158,7 @@
           "Name": "Date",
           "JsonName": "date",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {

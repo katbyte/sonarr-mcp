@@ -6,9 +6,9 @@ package sonarr
 type SeasonStatisticsResource struct {
 	EpisodeCount      int      `json:"episodeCount,omitempty"`
 	EpisodeFileCount  int      `json:"episodeFileCount,omitempty"`
-	NextAiring        string   `json:"nextAiring,omitempty"`
+	NextAiring        Time     `json:"nextAiring,omitzero"`
 	PercentOfEpisodes float64  `json:"percentOfEpisodes,omitempty"`
-	PreviousAiring    string   `json:"previousAiring,omitempty"`
+	PreviousAiring    Time     `json:"previousAiring,omitzero"`
 	ReleaseGroups     []string `json:"releaseGroups,omitzero"`
 	SizeOnDisk        int64    `json:"sizeOnDisk,omitempty"`
 	TotalEpisodeCount int      `json:"totalEpisodeCount,omitempty"`

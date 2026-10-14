@@ -86,6 +86,49 @@ type Operation struct {
 	// on each command's own operation, one per name, which sends the same request with its name fixed and also gets an AndWait.
 	Commands *CommandSet `json:"Commands,omitempty"`
 	Command  string      `json:"Command,omitempty"`
+	// Call is set on an operation that is a JSON-RPC method rather than a request to a path (Method is "CALL" and Path the
+	// method's name), and Arguments are what it takes, in the order they are sent; it has no path parameters, options, request
+	// body or status codes.
+	Call      *Call      `json:"Call,omitempty"`
+	Arguments []Argument `json:"Arguments,omitempty"`
+}
+
+// Call is what a JSON-RPC method says of itself: Method is its name as the server takes it, Job that the server runs it as a
+// job, Filterable that it is a query taking filters and options and answering a list, Item that it acts on one record by its
+// id, NoAuth that it may be called before logging in, Read that it changes nothing (worked out from the roles the service config
+// names), and Roles the roles that may call it as the server names them.
+type Call struct {
+	Method     string `json:"Method"`
+	Job        bool   `json:"Job,omitempty"`
+	Filterable bool   `json:"Filterable,omitempty"`
+	// Form is the one-record (QueryGet) or count (QueryCount) form of a query, which the method asks for by setting that flag in
+	// the query's options; the plain form, answering the list, has none.
+	Form   string   `json:"Form,omitempty"`
+	Item   bool     `json:"Item,omitempty"`
+	NoAuth bool     `json:"NoAuth,omitempty"`
+	Read   bool     `json:"Read,omitempty"`
+	Roles  []string `json:"Roles,omitempty"`
+	// Downloadable marks a method whose answer is a file, which the generated <Name>To writes out through a connection that
+	// can carry one; Uploadable one that takes files beside its arguments, which the generated method takes as readers.
+	Downloadable bool `json:"Downloadable,omitempty"`
+	Uploadable   bool `json:"Uploadable,omitempty"`
+}
+
+// QueryGet and QueryCount are the forms of a query beside the list: the flag in its options that asks for one record, which
+// the server refuses to answer when the filters match none, and the one that asks for how many match.
+const (
+	QueryGet   = "get"
+	QueryCount = "count"
+)
+
+// Argument is one value a JSON-RPC method takes, by position: Name as the server names it, Argument the Go argument, and
+// Required whether the server insists on it; one not required may be left off the end of the call.
+type Argument struct {
+	Name        string  `json:"Name"`
+	Argument    string  `json:"Argument"`
+	Type        TypeRef `json:"Type"`
+	Required    bool    `json:"Required,omitempty"`
+	Description string  `json:"Description,omitempty"`
 }
 
 // CommandSet is how a queued command is followed: Get is the Go name of the operation that answers one by its id, Status the field
@@ -203,11 +246,28 @@ type Model struct {
 	// Union lists the variants when the schema is a oneOf/anyOf; such a
 	// model has no fields and is raw JSON for the caller to decode.
 	Union []string `json:"Union,omitempty"`
+	// Members, for a service with TypedUnions, are the records the union is one of, each a model, with the value of
+	// Discriminator that names it where the document says which field the records name themselves by; the generated type
+	// holds the record as it came and hands it over as the member asked for.
+	Discriminator string   `json:"Discriminator,omitempty"`
+	Members       []Member `json:"Members,omitempty"`
 	// WrittenWhole marks a model callers read and write back whole - a
 	// settings object - so its empty strings and zero numbers are sent
 	// rather than left out: the server reads a field left out as null,
 	// which is not the value that was read, and not a value it will save.
 	WrittenWhole bool `json:"WrittenWhole,omitempty"`
+}
+
+// OwnItem is what a named type's name may say in place of the field's own type, or a list's element, as the package names it
+// (truenasrpc.Set[$item] on a list of an enum is truenasrpc.Set[ReplicationDirection]), so a type wrapping the field's own
+// survives the package renaming it.
+const OwnItem = "$item"
+
+// Member is one record a union is one of: the model, and the value of the union's Discriminator that names it, empty where
+// the document gives none.
+type Member struct {
+	Model string `json:"Model"`
+	Kind  string `json:"Kind,omitempty"`
 }
 
 // Field is one property of a model.
@@ -276,6 +336,9 @@ const (
 	// ID is a kind of id the service tells apart (Service.IDs), named in
 	// ReferenceName, held as a named type over its base.
 	ID ObjectType = "ID"
+	// Named is a value held as a Go type a workaround names (GoType, Import), for a value the server writes in a form of its
+	// own that the document cannot describe; the type reads and writes its own JSON.
+	Named ObjectType = "Named"
 )
 
 // IDKind is one kind of id, a named type over an int, an int64 or a string.
@@ -294,6 +357,10 @@ type TypeRef struct {
 	ReferenceName string `json:"ReferenceName,omitempty"`
 	// NestedItem is the element type of a List or Dictionary.
 	NestedItem *TypeRef `json:"NestedItem,omitempty"`
+	// GoType is the Go type a Named value is held as, written as a package uses it (truenasrpc.Secret[int]), and Import the
+	// path it comes from; the type reads and writes its own JSON.
+	GoType string `json:"GoType,omitempty"`
+	Import string `json:"Import,omitempty"`
 }
 
 // String renders a type for logs and diffs: List[Reference(BaseItemDto)].
@@ -301,6 +368,8 @@ func (t TypeRef) String() string {
 	switch t.Type {
 	case Reference:
 		return "Reference(" + t.ReferenceName + ")"
+	case Named:
+		return "Named(" + t.GoType + ")"
 	case List, Dictionary:
 		if t.NestedItem == nil {
 			return string(t.Type) + "[?]"

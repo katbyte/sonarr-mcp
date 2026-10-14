@@ -22,6 +22,11 @@ func (g *gen) methodFile(o *definitions.Operation) string {
 
 	var b strings.Builder
 	g.writeResponse(&b, o, responseType)
+	if o.Call != nil {
+		g.writeCallMethod(&b, o, responseType)
+
+		return g.fileHeader(b.String())
+	}
 	if len(o.Options) > 0 {
 		g.declare(optionsType, "operation "+o.Name)
 		g.writeOptions(&b, o, optionsType)
@@ -63,6 +68,11 @@ func (g *gen) operationFile(o *definitions.Operation) string {
 // types package's.
 func (g *gen) groupMethodFile(o *definitions.Operation) string {
 	var b strings.Builder
+	if o.Call != nil {
+		g.writeCallMethod(&b, o, g.typeName(o.Name+"Response"))
+
+		return g.fileHeader(b.String())
+	}
 	g.writeMethod(&b, o, g.typeName(o.Name+"Response"), g.typeName(o.Name+"Options"))
 	if o.Pageable != nil {
 		g.writeCompleteMethod(&b, o, g.typeName(o.Name+"Options"))
@@ -95,7 +105,7 @@ func (g *gen) responseModel(o *definitions.Operation) (typ string, pointer bool)
 	case definitions.List, definitions.Dictionary, definitions.RawObject, definitions.Any:
 		return g.goType(t), false
 	case definitions.Reference:
-		if m := g.models[t.ReferenceName]; m != nil && len(m.Union) > 0 {
+		if m := g.models[t.ReferenceName]; m != nil && len(m.Union) > 0 && len(m.Members) == 0 {
 			return t.ReferenceName, false
 		}
 	default:
@@ -123,7 +133,11 @@ func (g *gen) writeResponse(b *strings.Builder, o *definitions.Operation, respon
 		g.checkEmbedded(o)
 	}
 	typ, _ := g.responseModel(o)
-	fmt.Fprintf(b, "type %s struct {\n\tHttpResponse *http.Response\n", responseType)
+	fmt.Fprintf(b, "type %s struct {\n", responseType)
+	if o.Call == nil {
+		// a call has no response beyond its answer
+		b.WriteString("\tHttpResponse *http.Response\n")
+	}
 	if typ != "" {
 		fmt.Fprintf(b, "\tAnswer %s\n", typ)
 	}
@@ -131,7 +145,10 @@ func (g *gen) writeResponse(b *strings.Builder, o *definitions.Operation, respon
 		fmt.Fprintf(b, "\t*%s\n", embedded)
 	}
 	b.WriteString("}\n\n")
-	if typ != "" {
+	switch {
+	case typ != "" && o.Call != nil:
+		fmt.Fprintf(b, "// Answered reports whether the server answered and the answer was decoded:\n// false for a call that failed.\nfunc (r %s) Answered() bool { return r.Answer != nil }\n\n", responseType)
+	case typ != "":
 		fmt.Fprintf(b, "// Answered reports whether the server answered with a body that was decoded:\n// false for a 204, or a call that failed before one came.\nfunc (r %s) Answered() bool { return r.Answer != nil }\n\n", responseType)
 	}
 	if embedded != "" {

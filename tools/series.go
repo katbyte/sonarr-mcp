@@ -159,8 +159,8 @@ func registerSeriesTools(r *registry) {
 		out := getOut{
 			seriesSummary: summariseSeries(s, profiles, tags),
 			Overview:      s.Overview, Network: s.Network, Runtime: s.Runtime, Genres: s.Genres,
-			FirstAired: day(s.FirstAired), PreviousAiring: day(s.PreviousAiring), NextAiring: day(s.NextAiring),
-			Added: day(s.Added), RootFolder: s.RootFolderPath, SeasonFolder: boolv(s.SeasonFolder),
+			FirstAired: day(s.FirstAired.Time), PreviousAiring: day(s.PreviousAiring.Time), NextAiring: day(s.NextAiring.Time),
+			Added: day(s.Added.Time), RootFolder: s.RootFolderPath, SeasonFolder: boolv(s.SeasonFolder),
 			MonitorNewItems: string(s.MonitorNewItems), AlternateTitles: alternateTitles(s),
 			IDs: ids{Tvdb: s.TvdbId, Imdb: s.ImdbId, Tmdb: s.TmdbId, TvMaze: s.TvMazeId},
 		}
@@ -171,7 +171,7 @@ func registerSeriesTools(r *registry) {
 			row := seasonRow{Season: season.SeasonNumber, Monitored: boolv(season.Monitored)}
 			if st := season.Statistics; st != nil {
 				row.EpisodesHave, row.EpisodesWanted, row.EpisodesTotal = st.EpisodeFileCount, st.EpisodeCount, st.TotalEpisodeCount
-				row.Size, row.NextAiring = humanSize(st.SizeOnDisk), day(st.NextAiring)
+				row.Size, row.NextAiring = humanSize(st.SizeOnDisk), day(st.NextAiring.Time)
 			}
 			out.Seasons = append(out.Seasons, row)
 		}

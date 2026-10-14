@@ -23,7 +23,7 @@ func (r GetHistorySinceResponse) Answered() bool { return r.Answer != nil }
 
 // GetHistorySinceOptions holds the query and header parameters of GetHistorySince.
 type GetHistorySinceOptions struct {
-	Date           string
+	Date           Time
 	EventType      EpisodeHistoryEventType
 	IncludeSeries  *bool
 	IncludeEpisode *bool
@@ -38,8 +38,8 @@ func (o GetHistorySinceOptions) ToHeaders() *client.Headers {
 // ToQuery returns the query parameters the options set.
 func (o GetHistorySinceOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
-	if o.Date != "" {
-		out.Append("date", o.Date)
+	if !o.Date.IsZero() {
+		out.Append("date", o.Date.As(sendDateAs("GetHistorySince", "date")))
 	}
 	if o.EventType != "" {
 		out.Append("eventType", string(o.EventType))

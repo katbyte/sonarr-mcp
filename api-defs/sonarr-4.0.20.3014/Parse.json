@@ -136,7 +136,7 @@
           "Name": "AirDate",
           "JsonName": "airDate",
           "Type": {
-            "Type": "String"
+            "Type": "Date"
           },
           "Nullable": true
         },

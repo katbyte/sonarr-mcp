@@ -6,7 +6,7 @@ package sonarr
 type EpisodeFileResource struct {
 	CustomFormatScore   int                    `json:"customFormatScore,omitempty"`
 	CustomFormats       []CustomFormatResource `json:"customFormats,omitzero"`
-	DateAdded           string                 `json:"dateAdded,omitempty"`
+	DateAdded           Time                   `json:"dateAdded,omitzero"`
 	Id                  EpisodeFileID          `json:"id,omitempty"`
 	IndexerFlags        int                    `json:"indexerFlags,omitempty"`
 	Languages           []Language             `json:"languages,omitzero"`

@@ -56,6 +56,14 @@ func (im *importer) importOperations() map[string]*definitions.Group {
 			// a command the operation queues is an operation of its own, with the same request fixed to the command's name
 			commands := im.commandOperations(where, &o, op)
 			g.Operations = append(g.Operations, o)
+			// a query's one-record and count forms are operations of their own over the same method
+			for _, f := range im.queryForms(&o) {
+				if prev, ok := names[f.Name]; ok {
+					im.fail(fmt.Sprintf("%s: its %s form makes the method %s, which %s makes too", where, f.Call.Form, f.Name, prev))
+				}
+				names[f.Name] = where + " " + f.Call.Form
+				g.Operations = append(g.Operations, f)
+			}
 			for _, c := range commands {
 				if prev, ok := names[c.Name]; ok {
 					im.fail(fmt.Sprintf("%s: the command %s makes the method %s, which %s makes too", where, c.Command, c.Name, prev))
@@ -146,6 +154,9 @@ func (im *importer) pathName(method, path string) string {
 }
 
 func (im *importer) operation(method, path string, op *openapi.Operation) definitions.Operation {
+	if method == openapi.MethodCall {
+		return im.callOperation(path, op)
+	}
 	want := im.pathName(method, path)
 	switch {
 	case op.Name != "":

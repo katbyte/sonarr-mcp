@@ -407,8 +407,10 @@ func Messages(err error) []string {
 }
 
 // IsNotFound reports whether err is the server answering that what was asked
-// for is not there.
-func IsNotFound(err error) bool { return StatusCode(err) == http.StatusNotFound }
+// for is not there: a 404, or a call refused as ENOENT.
+func IsNotFound(err error) bool {
+	return StatusCode(err) == http.StatusNotFound || IsRefusedCall(err, "ENOENT")
+}
 
 // IsUnauthorized reports whether err is the server refusing the credentials,
 // or the lack of them.

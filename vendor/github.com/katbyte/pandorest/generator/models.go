@@ -12,6 +12,22 @@ func (g *gen) modelFile(m *definitions.Model) string {
 
 	var b strings.Builder
 	switch {
+	case len(m.Members) > 0:
+		fmt.Fprintf(&b, "// %s is one of several records, held as it came: ", m.Name)
+		members := make([]string, 0, len(m.Members))
+		for _, member := range m.Members {
+			if member.Kind != "" {
+				members = append(members, fmt.Sprintf("%s (%s %q)", g.typeName(member.Model), m.Discriminator, member.Kind))
+			} else {
+				members = append(members, g.typeName(member.Model))
+			}
+		}
+		b.WriteString(strings.Join(members, ", ") + ".\n")
+		if m.Discriminator != "" {
+			fmt.Fprintf(&b, "// Kind is the %q the record names itself by, and each As method hands the record over as that member, or an\n// error for a record of another kind. One is built from a member with client.UnionOf.\n", m.Discriminator)
+		} else {
+			b.WriteString("// Each As method hands the record over as that member, decoded strictly, so a record of another member's shape is an\n// error naming the key the member has no field for. One is built from a member with client.UnionOf.\n")
+		}
 	case len(m.Union) > 0:
 		fmt.Fprintf(&b, "// %s is the %q schema, a oneOf/anyOf union kept as raw JSON;\n", m.Name, m.SchemaName)
 		fmt.Fprintf(&b, "// decode it into one of: %s.\n", strings.Join(m.Union, ", "))
@@ -26,6 +42,16 @@ func (g *gen) modelFile(m *definitions.Model) string {
 	}
 
 	switch {
+	case len(m.Members) > 0:
+		fmt.Fprintf(&b, "type %s struct {\n\tclient.Union\n}\n", m.Name)
+		if m.Discriminator != "" {
+			fmt.Fprintf(&b, "\n// Kind is the %q the record names itself by, \"\" for a union holding nothing.\nfunc (u %s) Kind() string { return u.Union.Kind(%q) }\n", m.Discriminator, m.Name, m.Discriminator)
+		}
+		for _, member := range m.Members {
+			typ := g.typeName(member.Model)
+			g.declare(m.Name+".As"+typ, "model "+m.Name)
+			fmt.Fprintf(&b, "\n// As%s hands the record over as a %s.\nfunc (u %s) As%s() (%s, error) { return client.UnionAs[%s](u.Union, %q, %q) }\n", typ, typ, m.Name, typ, typ, typ, m.Discriminator, member.Kind)
+		}
 	case len(m.Union) > 0:
 		fmt.Fprintf(&b, "type %s = json.RawMessage\n", m.Name)
 	case len(m.Fields) == 0:

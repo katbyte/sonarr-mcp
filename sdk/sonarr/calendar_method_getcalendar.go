@@ -23,8 +23,8 @@ func (r GetCalendarResponse) Answered() bool { return r.Answer != nil }
 
 // GetCalendarOptions holds the query and header parameters of GetCalendar.
 type GetCalendarOptions struct {
-	Start                string
-	End                  string
+	Start                Time
+	End                  Time
 	Unmonitored          *bool
 	IncludeSeries        *bool
 	IncludeEpisodeFile   *bool
@@ -41,11 +41,11 @@ func (o GetCalendarOptions) ToHeaders() *client.Headers {
 // ToQuery returns the query parameters the options set.
 func (o GetCalendarOptions) ToQuery() *client.QueryParams {
 	out := client.QueryParams{}
-	if o.Start != "" {
-		out.Append("start", o.Start)
+	if !o.Start.IsZero() {
+		out.Append("start", o.Start.As(sendDateAs("GetCalendar", "start")))
 	}
-	if o.End != "" {
-		out.Append("end", o.End)
+	if !o.End.IsZero() {
+		out.Append("end", o.End.As(sendDateAs("GetCalendar", "end")))
 	}
 	if o.Unmonitored != nil {
 		out.Append("unmonitored", strconv.FormatBool(*o.Unmonitored))

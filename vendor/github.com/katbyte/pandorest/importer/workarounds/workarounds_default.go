@@ -394,6 +394,80 @@ func UndeclaredProperties(about About, properties map[string]map[string]*openapi
 	}}
 }
 
+// NamedTypes is for a field the server writes in a form of its own that the document cannot describe: a secret it hides from
+// some callers behind a placeholder whatever the field's type, a list it writes two ways. Each field, named <schema>.<property>,
+// is held as the Go type given, written as a package uses it (truenasrpc.Secret[int]) and imported from importPath; the type
+// reads and writes its own JSON. client.Secret[T] is the one for a hidden value. $item in the type stands for the field's own
+// type, or a list's element, as the package names it (truenasrpc.Set[$item]), so the workaround survives the package renaming
+// an enum. It fails for a schema or property that is not there.
+func NamedTypes(about About, importPath string, fields map[string]string) Workaround {
+	return defaultWorkaround{about, func(spec *openapi.Spec, note func(string)) error {
+		if len(fields) == 0 {
+			return errors.New("it names no fields")
+		}
+
+		for _, field := range openapi.SortedKeys(fields) {
+			schema, property, ok := strings.Cut(field, ".")
+			if !ok || schema == "" || property == "" {
+				return fmt.Errorf("%q is not <schema>.<property>", field)
+			}
+			if fields[field] == "" {
+				return fmt.Errorf("%s names no Go type", field)
+			}
+			s, err := Property(spec, schema, property)
+			if err != nil {
+				return err
+			}
+			if s.GoType != nil {
+				return fmt.Errorf("%s is held as %s already", field, s.GoType.Name)
+			}
+
+			s.GoType = &openapi.GoType{Name: fields[field], Import: importPath}
+		}
+		note(fmt.Sprintf("%d fields held as named types", len(fields)))
+
+		return nil
+	}}
+}
+
+// DeclaredShapes is for a field the document leaves open, a record of no declared fields or a value of no type, that the
+// server writes in a stable shape a program reads (a scrub's state, a task's last run): each field, named <schema>.<property>,
+// takes the schema given, a record declared in place, which becomes a model named for the place, or a reference to one
+// DeclaredSchemas added. It fails for a schema or property that is not there, and for one the document gives a shape now.
+func DeclaredShapes(about About, fields map[string]*openapi.Schema) Workaround {
+	return defaultWorkaround{about, func(spec *openapi.Spec, note func(string)) error {
+		if len(fields) == 0 {
+			return errors.New("it names no fields")
+		}
+
+		for _, field := range openapi.SortedKeys(fields) {
+			schema, property, ok := strings.Cut(field, ".")
+			if !ok || schema == "" || property == "" {
+				return fmt.Errorf("%q is not <schema>.<property>", field)
+			}
+			if fields[field] == nil {
+				return fmt.Errorf("%s has no shape", field)
+			}
+			p, err := Property(spec, schema, property)
+			if err != nil {
+				return err
+			}
+			if p.RefName() != "" || len(p.Properties) > 0 || p.IsUnion() || p.IsEnum() || p.Items != nil || p.GoType != nil || (p.Type != "" && p.Type != openapi.TypeObject) {
+				return fmt.Errorf("%s has a shape now", field)
+			}
+
+			shape := *fields[field]
+			if shape.Description == "" {
+				shape.Description = p.Description
+			}
+			*p = shape
+		}
+		note(fmt.Sprintf("%d fields given a shape", len(fields)))
+
+		return nil
+	}}
+}
+
 // NotAPI is for the paths a document lists that are not the API's: the web
 // interface's page, its static files, its login form, which answer HTML to a
 // browser and nothing a client reads. They are taken out of the document. It

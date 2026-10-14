@@ -5,29 +5,29 @@ package sonarr
 // SeriesResource is the "SeriesResource" schema.
 type SeriesResource struct {
 	AddOptions        *AddSeriesOptions         `json:"addOptions,omitempty"`
-	Added             string                    `json:"added,omitempty"`
+	Added             Time                      `json:"added,omitzero"`
 	AirTime           string                    `json:"airTime,omitempty"`
 	AlternateTitles   []AlternateTitleResource  `json:"alternateTitles,omitzero"`
 	Certification     string                    `json:"certification,omitempty"`
 	CleanTitle        string                    `json:"cleanTitle,omitempty"`
 	Ended             *bool                     `json:"ended,omitempty"`
 	EpisodesChanged   *bool                     `json:"episodesChanged,omitempty"`
-	FirstAired        string                    `json:"firstAired,omitempty"`
+	FirstAired        Time                      `json:"firstAired,omitzero"`
 	Folder            string                    `json:"folder,omitempty"`
 	Genres            []string                  `json:"genres,omitzero"`
 	Id                SeriesID                  `json:"id,omitempty"`
 	Images            []MediaCover              `json:"images,omitzero"`
 	ImdbId            string                    `json:"imdbId,omitempty"`
 	LanguageProfileId int                       `json:"languageProfileId,omitempty"`
-	LastAired         string                    `json:"lastAired,omitempty"`
+	LastAired         Time                      `json:"lastAired,omitzero"`
 	MonitorNewItems   NewItemMonitorTypes       `json:"monitorNewItems,omitempty"`
 	Monitored         *bool                     `json:"monitored,omitempty"`
 	Network           string                    `json:"network,omitempty"`
-	NextAiring        string                    `json:"nextAiring,omitempty"`
+	NextAiring        Time                      `json:"nextAiring,omitzero"`
 	OriginalLanguage  *Language                 `json:"originalLanguage,omitempty"`
 	Overview          string                    `json:"overview,omitempty"`
 	Path              string                    `json:"path,omitempty"`
-	PreviousAiring    string                    `json:"previousAiring,omitempty"`
+	PreviousAiring    Time                      `json:"previousAiring,omitzero"`
 	ProfileName       string                    `json:"profileName,omitempty"`
 	QualityProfileId  QualityProfileID          `json:"qualityProfileId,omitempty"`
 	Ratings           *Ratings                  `json:"ratings,omitempty"`

@@ -12,7 +12,7 @@ import (
 func TestOperationGetFileSystemMediaFiles(t *testing.T) {
 	t.Parallel()
 
-	c, s := newOperationServer(t, 200, "application/json", "{}")
+	c, s := newOperationServer(t, 200, "application/json", "[{}]")
 	result, err := c.GetFileSystemMediaFiles(t.Context(), GetFileSystemMediaFilesOptions{
 		Path: "v-Path",
 	})
@@ -49,7 +49,7 @@ func TestOperationGetFileSystemMediaFiles(t *testing.T) {
 	}
 
 	// the options may be left out, and two are refused before any request
-	c, s = newOperationServer(t, 200, "application/json", "{}")
+	c, s = newOperationServer(t, 200, "application/json", "[{}]")
 	if _, err = c.GetFileSystemMediaFiles(t.Context()); err != nil {
 		t.Errorf("without options = %v", err)
 	}

@@ -8,8 +8,8 @@ type Command struct {
 	CompletionMessage   string         `json:"completionMessage,omitempty"`
 	IsExclusive         bool           `json:"isExclusive"`
 	IsLongRunning       bool           `json:"isLongRunning"`
-	LastExecutionTime   string         `json:"lastExecutionTime,omitempty"`
-	LastStartTime       string         `json:"lastStartTime,omitempty"`
+	LastExecutionTime   Time           `json:"lastExecutionTime,omitzero"`
+	LastStartTime       Time           `json:"lastStartTime,omitzero"`
 	Name                string         `json:"name,omitempty"`
 	RequiresDiskAccess  bool           `json:"requiresDiskAccess"`
 	SendUpdatesToClient bool           `json:"sendUpdatesToClient"`

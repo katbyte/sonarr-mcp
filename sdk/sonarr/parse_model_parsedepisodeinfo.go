@@ -5,7 +5,7 @@ package sonarr
 // ParsedEpisodeInfo is the "ParsedEpisodeInfo" schema.
 type ParsedEpisodeInfo struct {
 	AbsoluteEpisodeNumbers        []int            `json:"absoluteEpisodeNumbers,omitzero"`
-	AirDate                       string           `json:"airDate,omitempty"`
+	AirDate                       Day              `json:"airDate,omitzero"`
 	DailyPart                     int              `json:"dailyPart,omitempty"`
 	EpisodeNumbers                []int            `json:"episodeNumbers,omitzero"`
 	FullSeason                    bool             `json:"fullSeason"`

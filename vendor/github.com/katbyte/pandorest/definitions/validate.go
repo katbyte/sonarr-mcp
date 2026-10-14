@@ -13,6 +13,9 @@ func (o *Operation) Types() []TypeRef {
 	for _, p := range o.PathParameters {
 		out = append(out, p.Type)
 	}
+	for _, a := range o.Arguments {
+		out = append(out, a.Type)
+	}
 	for _, opt := range o.Options {
 		out = append(out, opt.Type)
 	}
@@ -51,6 +54,10 @@ func Validate(svc *Service) error {
 			if svc.IDBase(t.ReferenceName) == "" {
 				problems = append(problems, fmt.Sprintf("%s: id of a kind the service does not declare %q", where, t.ReferenceName))
 			}
+		case Named:
+			if t.GoType == "" {
+				problems = append(problems, where+": a named type with no Go type")
+			}
 		default:
 			problems = append(problems, fmt.Sprintf("%s: unknown type %q", where, t.Type))
 		}
@@ -68,8 +75,14 @@ func Validate(svc *Service) error {
 		for i, t := range o.Types() {
 			check(fmt.Sprintf("%s type %d", o.Name, i), t)
 		}
-		if len(o.ExpectedStatusCodes) == 0 {
+		if len(o.ExpectedStatusCodes) == 0 && o.Call == nil {
 			problems = append(problems, o.Name+": no expected status codes")
+		}
+		if o.Call != nil && (len(o.PathParameters) > 0 || len(o.Options) > 0 || o.Request != nil) {
+			problems = append(problems, o.Name+": a call has arguments alone, not path parameters, options or a request body")
+		}
+		if o.Call != nil && o.Call.Form != "" && (!o.Call.Filterable || (o.Call.Form != QueryGet && o.Call.Form != QueryCount)) {
+			problems = append(problems, fmt.Sprintf("%s: a query form %q, which is %q or %q on a filterable call alone", o.Name, o.Call.Form, QueryGet, QueryCount))
 		}
 	}
 	for name, m := range models {

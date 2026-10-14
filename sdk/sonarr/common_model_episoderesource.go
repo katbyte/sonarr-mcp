@@ -5,18 +5,18 @@ package sonarr
 // EpisodeResource is the "EpisodeResource" schema.
 type EpisodeResource struct {
 	AbsoluteEpisodeNumber      int                  `json:"absoluteEpisodeNumber,omitempty"`
-	AirDate                    string               `json:"airDate,omitempty"`
-	AirDateUtc                 string               `json:"airDateUtc,omitempty"`
-	EndTime                    string               `json:"endTime,omitempty"`
+	AirDate                    Day                  `json:"airDate,omitzero"`
+	AirDateUtc                 Time                 `json:"airDateUtc,omitzero"`
+	EndTime                    Time                 `json:"endTime,omitzero"`
 	EpisodeFile                *EpisodeFileResource `json:"episodeFile,omitempty"`
 	EpisodeFileId              EpisodeFileID        `json:"episodeFileId,omitempty"`
 	EpisodeNumber              int                  `json:"episodeNumber,omitempty"`
 	FinaleType                 string               `json:"finaleType,omitempty"`
-	GrabDate                   string               `json:"grabDate,omitempty"`
+	GrabDate                   Time                 `json:"grabDate,omitzero"`
 	HasFile                    *bool                `json:"hasFile,omitempty"`
 	Id                         EpisodeID            `json:"id,omitempty"`
 	Images                     []MediaCover         `json:"images,omitzero"`
-	LastSearchTime             string               `json:"lastSearchTime,omitempty"`
+	LastSearchTime             Time                 `json:"lastSearchTime,omitzero"`
 	Monitored                  *bool                `json:"monitored,omitempty"`
 	Overview                   string               `json:"overview,omitempty"`
 	Runtime                    int                  `json:"runtime,omitempty"`

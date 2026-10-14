@@ -4,7 +4,7 @@ package sonarr
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -13,14 +13,31 @@ import (
 )
 
 // GetFileSystemResponse is the result of GetFileSystem.
+//
+// Answer is the FileSystemResource answered, nil when the server answered none (a 204), which
+// Answered tells. The same record is embedded, so res.Answer.Name may be read as
+// res.Name; when nothing was answered the embedded record is a zero one, so that
+// read is empty rather than a panic. Only the method sets the two; a response built
+// by hand sets both or neither.
 type GetFileSystemResponse struct {
 	HttpResponse *http.Response
-	Answer       json.RawMessage
+	Answer       *FileSystemResource
+	*FileSystemResource
 }
 
 // Answered reports whether the server answered with a body that was decoded:
 // false for a 204, or a call that failed before one came.
 func (r GetFileSystemResponse) Answered() bool { return r.Answer != nil }
+
+// Record is the FileSystemResource answered, as a value to change and write back, or an
+// error when the server answered none.
+func (r GetFileSystemResponse) Record() (FileSystemResource, error) {
+	if r.Answer == nil {
+		return FileSystemResource{}, errors.New("GetFileSystem answered no FileSystemResource")
+	}
+
+	return *r.Answer, nil
+}
 
 // GetFileSystemOptions holds the query and header parameters of GetFileSystem.
 type GetFileSystemOptions struct {
@@ -61,6 +78,7 @@ func (c Client) GetFileSystem(ctx context.Context, options ...GetFileSystemOptio
 		option = options[0]
 	}
 
+	result.FileSystemResource = &FileSystemResource{}
 	opts := client.RequestOptions{
 		ExpectedStatusCodes: []int{
 			http.StatusOK,
@@ -85,9 +103,12 @@ func (c Client) GetFileSystem(ctx context.Context, options ...GetFileSystemOptio
 		return
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
+	var answer FileSystemResource
+	result.Answer = &answer
+	if err = resp.Unmarshal(result.Answer); err != nil {
 		return
 	}
+	result.FileSystemResource = result.Answer
 
 	return
 }

@@ -61,7 +61,7 @@ func registerServerTools(r *registry) {
 			OperatingSystem: strings.TrimSpace(s.OsName + " " + s.OsVersion),
 			Docker:          s.IsDocker,
 			Branch:          s.Branch,
-			StartTime:       s.StartTime,
+			StartTime:       stamp(s.StartTime.Time),
 			URLBase:         s.UrlBase,
 			Database:        strings.TrimSpace(string(s.DatabaseType) + " " + s.DatabaseVersion),
 			Series:          len(series),
@@ -131,7 +131,7 @@ func registerServerTools(r *registry) {
 		for _, t := range res.Answer {
 			rows = append(rows, taskRow{
 				Name: t.Name, Command: t.TaskName, IntervalMinutes: t.Interval,
-				LastExecution: t.LastExecution, LastDuration: t.LastDuration, NextExecution: t.NextExecution,
+				LastExecution: stamp(t.LastExecution.Time), LastDuration: t.LastDuration, NextExecution: stamp(t.NextExecution.Time),
 			})
 		}
 		slices.SortFunc(rows, func(a, b taskRow) int { return strings.Compare(a.Name, b.Name) })
@@ -263,7 +263,7 @@ func registerServerTools(r *registry) {
 		out := logOut{pageOut: paged, Entries: make([]logRow, 0, len(records))}
 		for _, e := range records {
 			out.Entries = append(out.Entries, logRow{
-				Time: e.Time, Level: e.Level, Logger: e.Logger, Message: e.Message, Exception: firstLine(e.Exception),
+				Time: stamp(e.Time.Time), Level: e.Level, Logger: e.Logger, Message: e.Message, Exception: firstLine(e.Exception),
 			})
 		}
 

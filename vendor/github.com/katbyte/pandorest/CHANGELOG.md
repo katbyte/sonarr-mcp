@@ -1,3 +1,32 @@
+## v0.9.0 (2026-10-13)
+
+- **A server with no OpenAPI document can be generated from its own method list.** TrueNAS is retiring its REST API and describes its JSON-RPC methods instead. The config says `Document: config.JSONRPCDocument`, and each method becomes a call with its arguments in order, grouped by namespace.
+- **The package never sees a socket.** The repository writes the connection and hands it to `New` as a `client.Caller`. A refusal from the server is a `client.CallError` with its code, name and reason.
+- **Method names drop their namespace in a package per namespace.** `pool.query` is `c.Pool.Query`. The response type keeps the whole name.
+- **A record written out many times is one model, and an enum met in many places is one type.** Both are folded by what they hold, and named by the words their places share. A group named `Service` goes in `Service.group.json`.
+- **A query has three forms.** `Query` answers the list, `QueryOne` the first match and `QueryCount` how many. The two flags that choose the form are gone from the options, since the method sets them.
+- **A value that is one of several records can be a type of its own.** With `TypedUnions` on, it hands the record over as the member asked for and says which kind came. Off, it stays raw JSON, so no repository moves.
+- **A method that answers a file, or takes one, works.** It gets a `To` form that writes the file out, or takes files as readers at the end. The connection carries the file through `client.Downloader` and `client.Uploader`.
+- **A job's call can be had without the wait.** `<Name>Call` answers the method name and arguments for a connection that starts a job and follows it.
+- **The read sweep walks a service of calls.** Each read is called through the generated client, every answer judged as it came, and a refusal held to the error name its case expects.
+- **A program can read what each operation is.** Every package has `Operations`, a table of each operation with its method and path, its group, whether it changes nothing, runs as a job, is a query form, or carries a file. A repository regenerating on this version gains the one file.
+- **A flag in a record a call sends is left out unless set.** Changing a scrub's threshold no longer switches the scrub off.
+- **A list sent unset goes as an empty list.** The server reads null as no list at all.
+- **A method counts as a read by the roles that may call it.** `ReadRole` names the role, `Reads` and `NotReads` the exceptions, and the import refuses a name that is no method.
+- **A field can be held as a Go type the workaround names.** `NamedTypes` puts any type on any field. `client.Secret[T]` is the one for a value the server hides behind `********`, and prints as `***` so a logged record gives nothing away.
+- **An open field can be given a shape.** `DeclaredShapes` puts a declared record on a field the document leaves empty.
+- **Query filters are written for you.** `client.Where`, `client.Filters` and `client.AnyOf` build the nested lists the server reads.
+- **A date written as `{"$date": milliseconds}` is read and written.** `client.DateObjectMillis` names the form.
+- **An enum's empty value is named `Empty`, and a value whose plain name another has is spelled out.** `!data` beside `data` becomes `NotData`.
+
+## v0.8.3 (2026-10-12)
+
+- **`KeepNull` reaches an answer declared inline.** It was checked before the operations were read, and an inline answer is a model only once its operation is, so a document with no components could name nothing. Dockhand's registry test answer.
+- **The import says when a text parameter named like a list is typed as one id.** Emby's `ExcludeItemIds` carries several ids in one text value, which only `Joined` says, and by name it came out as a single id with nothing said. The line names each such parameter and where it is.
+- **A service's `Notes` come before the Ids heading in `doc.go`**, where they landed under it and read as part of it.
+- **`Of` reads a model whose id is spelt `Id`.** Emby and Jellyfin capitalise theirs, and the lookup wanted the exact lower-case name, so the kind was refused as naming a model with no id. Embyfin got past it with a `Base` beside `Of`; that can go.
+- **The generated test of a joined list sets one form.** `JoinedLists` puts a list beside its string under one name on the wire, and the test set both on one call and then expected each alone, so every such test failed; on Emby that was 70 across 21 packages. The test now sets the string alone.
+
 ## v0.8.2 (2026-10-12)
 
 - **A name in both `Names` and `Joined` imports.** Prowlarr's `tags` is a joined string parameter and a field of fifteen models; v0.8.1 claimed the parameter by name first and then refused the `Joined` entry as reaching nothing, and without the entry refused the parameter as a string. The parameter is claimed as joined before it is claimed by name.

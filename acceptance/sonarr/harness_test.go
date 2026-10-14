@@ -600,6 +600,11 @@ func isStatus(err error, code int) bool { return client.StatusCode(err) == code 
 // unmarshal decodes a raw JSON answer.
 func unmarshal(raw json.RawMessage, v any) error { return json.Unmarshal(raw, v) }
 
+// day is midnight UTC on a day, as a date the client sends.
+func day(year int, month time.Month, d int) sonarr.Time {
+	return sonarr.Time{Time: time.Date(year, month, d, 0, 0, 0, 0, time.UTC)}
+}
+
 // mkdirAll makes a directory under the host side of the container's mounts
 // that Sonarr's own user can write in. MkdirAll's mode is filtered by the
 // umask, which on Linux leaves a directory only the test can write; chmod is

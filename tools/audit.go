@@ -215,17 +215,8 @@ func (s *snapshot) foldersIn(ctx context.Context, parent string) (map[string]str
 	if err != nil {
 		return nil, err
 	}
-	var listing struct {
-		Directories []struct {
-			Name string `json:"name"`
-			Path string `json:"path"`
-		} `json:"directories"`
-	}
-	if err := unmarshalRaw(res.Answer, &listing); err != nil {
-		return nil, fmt.Errorf("reading the folders in %s: %w", parent, err)
-	}
-	out := make(map[string]string, len(listing.Directories))
-	for _, d := range listing.Directories {
+	out := make(map[string]string, len(res.Directories))
+	for _, d := range res.Directories {
 		out[strings.ToLower(d.Name)] = strings.TrimRight(d.Path, "/")
 	}
 	s.folders[parent] = out
@@ -262,14 +253,8 @@ func (s *snapshot) videoFiles(ctx context.Context, folder string) ([]string, err
 	if err != nil {
 		return nil, err
 	}
-	var files []struct {
-		Path string `json:"path"`
-	}
-	if err := unmarshalRaw(res.Answer, &files); err != nil {
-		return nil, fmt.Errorf("reading the files in %s: %w", folder, err)
-	}
 	var out []string
-	for _, f := range files {
+	for _, f := range res.Answer {
 		if !excludedPath(folder, f.Path) {
 			out = append(out, f.Path)
 		}

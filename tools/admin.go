@@ -636,14 +636,14 @@ func registerSystemTools(r *registry) {
 		Time string `json:"time"`
 	}
 	projectBackup := func(b *sonarr.BackupResource) backupRow {
-		return backupRow{ID: b.Id, Name: b.Name, Kind: string(b.Type), Size: humanSize(b.Size), Time: b.Time}
+		return backupRow{ID: b.Id, Name: b.Name, Kind: string(b.Type), Size: humanSize(b.Size), Time: stamp(b.Time.Time)}
 	}
 	backups := func(ctx context.Context) ([]sonarr.BackupResource, error) {
 		res, err := client.GetSystemBackup(ctx)
 		if err != nil {
 			return nil, err
 		}
-		slices.SortStableFunc(res.Answer, func(a, b sonarr.BackupResource) int { return strings.Compare(b.Time, a.Time) })
+		slices.SortStableFunc(res.Answer, func(a, b sonarr.BackupResource) int { return b.Time.Compare(a.Time.Time) })
 
 		return res.Answer, nil
 	}
@@ -751,7 +751,7 @@ func registerSystemTools(r *registry) {
 		if err != nil {
 			return nil, restoreOut{}, err
 		}
-		out := restoreOut{Loses: "every series added, setting changed and download recorded since " + day(b.Time) + "; files on disk are not touched, and Sonarr must be restarted to load what was restored"}
+		out := restoreOut{Loses: "every series added, setting changed and download recorded since " + day(b.Time.Time) + "; files on disk are not touched, and Sonarr must be restarted to load what was restored"}
 		if !in.Confirm {
 			out.WouldRestore = b.Name
 
@@ -791,7 +791,7 @@ func registerSystemTools(r *registry) {
 		updates, paged := pageRows(res.Answer, in)
 		out := updatesOut{pageOut: paged, Updates: make([]updateRow, 0, len(updates))}
 		for _, u := range updates {
-			row := updateRow{Version: u.Version, Branch: u.Branch, Released: day(u.ReleaseDate), Running: u.Installed, Installed: u.Installed || u.InstalledOn != "", Latest: u.Latest, Installable: u.Installable}
+			row := updateRow{Version: u.Version, Branch: u.Branch, Released: day(u.ReleaseDate.Time), Running: u.Installed, Installed: u.Installed || !u.InstalledOn.IsZero(), Latest: u.Latest, Installable: u.Installable}
 			if u.Changes != nil {
 				row.New, row.Fixed = u.Changes.New, u.Changes.Fixed
 			}
@@ -886,11 +886,11 @@ func registerSystemTools(r *registry) {
 		if err != nil {
 			return nil, logFilesOut{}, err
 		}
-		slices.SortStableFunc(res.Answer, func(a, b sonarr.LogFileResource) int { return strings.Compare(b.LastWriteTime, a.LastWriteTime) })
+		slices.SortStableFunc(res.Answer, func(a, b sonarr.LogFileResource) int { return b.LastWriteTime.Compare(a.LastWriteTime.Time) })
 		files, paged := pageRows(res.Answer, in)
 		out := logFilesOut{pageOut: paged, Files: make([]logFileRow, 0, len(files))}
 		for _, f := range files {
-			out.Files = append(out.Files, logFileRow{Filename: f.Filename, Written: f.LastWriteTime})
+			out.Files = append(out.Files, logFileRow{Filename: f.Filename, Written: stamp(f.LastWriteTime.Time)})
 		}
 
 		return nil, out, nil
@@ -1012,29 +1012,14 @@ func registerSystemTools(r *registry) {
 		if err != nil {
 			return nil, browseOut{}, err
 		}
-		var listing struct {
-			Parent      string `json:"parent"`
-			Directories []struct {
-				Name string `json:"name"`
-				Path string `json:"path"`
-			} `json:"directories"`
-			Files []struct {
-				Name string `json:"name"`
-				Path string `json:"path"`
-				Size int64  `json:"size"`
-			} `json:"files"`
-		}
-		if err := unmarshalRaw(res.Answer, &listing); err != nil {
-			return nil, browseOut{}, fmt.Errorf("reading %s: %w", in.Path, err)
-		}
-		rows := make([]browseRow, 0, len(listing.Directories)+len(listing.Files))
-		for _, d := range listing.Directories {
+		rows := make([]browseRow, 0, len(res.Directories)+len(res.Files))
+		for _, d := range res.Directories {
 			rows = append(rows, browseRow{Name: d.Name, Path: d.Path, Kind: "folder"})
 		}
-		for _, f := range listing.Files {
+		for _, f := range res.Files {
 			rows = append(rows, browseRow{Name: f.Name, Path: f.Path, Kind: "file", Size: humanSize(f.Size)})
 		}
-		out := browseOut{Path: strings.TrimSuffix(path, "/"), Parent: listing.Parent}
+		out := browseOut{Path: strings.TrimSuffix(path, "/"), Parent: res.Parent}
 		out.Entries, out.pageOut = pageRows(rows, in.pageIn)
 
 		return nil, out, nil

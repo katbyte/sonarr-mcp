@@ -213,7 +213,7 @@
           "Field": "Date",
           "In": "Query",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {
@@ -313,7 +313,7 @@
           "Name": "Date",
           "JsonName": "date",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {

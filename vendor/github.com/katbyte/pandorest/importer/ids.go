@@ -200,7 +200,7 @@ func (im *importer) idBase(c config.ID) (definitions.ObjectType, bool) {
 
 			return "", false
 		}
-		f := fieldNamed(m.Fields, "id")
+		f := idField(m.Fields)
 		if f == nil {
 			im.fail(fmt.Sprintf("%s: Of names %s, which has no id", c.Name, name))
 
@@ -246,6 +246,10 @@ func places(groups map[string]*definitions.Group) []place {
 			for ai := range o.Options {
 				a := &o.Options[ai]
 				out = append(out, place{where: where, name: a.Name, typ: &a.Type, option: a})
+			}
+			for ai := range o.Arguments {
+				a := &o.Arguments[ai]
+				out = append(out, place{where: where, name: a.Name, typ: &a.Type})
 			}
 		}
 	}
@@ -305,6 +309,17 @@ func claims(k *idKind, p *place, groups map[string]*definitions.Group, inUsed, e
 
 // pathIsOf reports whether the path of the operation at where is one of the
 // kind's: an operation on that path, by any method, answers or takes one of
+// idField is a model's own id, spelt id or Id (Emby and Jellyfin capitalise theirs), or nil.
+func idField(fields []definitions.Field) *definitions.Field {
+	for i := range fields {
+		if strings.EqualFold(fields[i].JSONName, "id") {
+			return &fields[i]
+		}
+	}
+
+	return nil
+}
+
 // the kind's models, alone or as a list; or the path is under such a path
 // (/movie/{id}/folder under /movie/{id}), whose {id} it carries. A delete
 // answers nothing and a sub-path answers something else, so the GET or PUT
@@ -353,6 +368,10 @@ func (im *importer) typeAsID(k *idKind, p *place, source string) bool {
 	case p.typ.Type == definitions.List && p.typ.NestedItem != nil && baseFits(k.base, p.typ.NestedItem.Type, false):
 		*p.typ.NestedItem = id
 	case baseFits(k.base, p.typ.Type, p.path):
+		if p.option != nil && p.typ.Type == definitions.String && strings.HasSuffix(strings.ToLower(p.name), "ids") {
+			// Emby's ExcludeItemIds is one text value carrying several, which only Joined says; typed as one id, a caller finds out by reading the options
+			im.oneIDTexts = append(im.oneIDTexts, p.name+" in "+p.where)
+		}
 		*p.typ = id
 	default:
 		hint := ""
@@ -406,6 +425,11 @@ func (im *importer) plain(p *place) bool {
 // word over many places, the models whose bare id it leaves plain, where a
 // kind's id under another model's name would hide.
 func (im *importer) logUncovered(places []place, typed map[*definitions.TypeRef]string) {
+	if n := len(im.oneIDTexts); n == 1 {
+		im.log(fmt.Sprintf("%s: 1 text parameter named like a list is typed as one id (name it in Joined if it carries several joined by commas): %s", im.cfg.Name, im.oneIDTexts[0]))
+	} else if n > 1 {
+		im.log(fmt.Sprintf("%s: %d text parameters named like lists are typed as one id each (name each in Joined if it carries several joined by commas): %s", im.cfg.Name, n, strings.Join(im.oneIDTexts, ", ")))
+	}
 	var plainModels []string
 	byName := map[string][]string{}
 	for i := range places {

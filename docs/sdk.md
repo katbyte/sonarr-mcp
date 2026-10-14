@@ -29,11 +29,12 @@ rescan, err := c.RescanSeriesAndWait(ctx, sonarr.RescanSeriesCommand{SeriesId: s
 - **A method for every one of Sonarr's 239 operations.** Each has typed options, a typed body and a typed answer.
 - **Every page of a list.** A paged list has a `Complete` form that reads every page, and an `Each` form that reads a page at a time.
 - **Commands that wait.** Each command Sonarr can be asked to run has a method, and a form that waits for it to finish.
+- **Dates are dates.** Each date is a `sonarr.Time`, and an episode's air date a `sonarr.Day`. Both hold a `time.Time`, so `e.AirDateUtc.Before(time.Now())` works. A date Sonarr has not set reads as zero.
 - **An id that cannot be mixed up.** Each kind of id has a type of its own: `SeriesID`, `EpisodeID`, `EpisodeFileID`, `TagID`, `QualityProfileID`, `CommandID`, `TvdbID`. An episode's id handed where a series' belongs does not compile. `sonarr.SeriesID(n)` makes one from a plain number.
 - **Errors for anything unexpected.** Each operation knows the answers Sonarr gives it. Anything else is an error.
 - **No redirects.** It refuses a redirect rather than following one, so give it the address Sonarr itself answers on.
 
-`sonarr.DocumentVersion` says which Sonarr release the API was taken from.
+`sonarr.DocumentVersion` says which Sonarr release the API was taken from, and `sonarr.Operations` lists every operation with its method, its path and whether it changes nothing.
 
 ## How it is made
 

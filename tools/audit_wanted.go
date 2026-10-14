@@ -3,7 +3,6 @@ package tools
 import (
 	"cmp"
 	"context"
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -11,15 +10,6 @@ import (
 
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
-
-// unmarshalRaw decodes a raw JSON answer.
-func unmarshalRaw(raw json.RawMessage, v any) error {
-	if len(raw) == 0 {
-		return nil
-	}
-
-	return json.Unmarshal(raw, v)
-}
 
 // queuedEpisodes is the set of episodes the download queue holds.
 func (r *registry) queuedEpisodes(ctx context.Context) (map[sonarr.EpisodeID]bool, error) {
@@ -106,7 +96,7 @@ func (r *registry) auditMissingEpisodes(ctx context.Context, s *snapshot, limit 
 		if len(missing) == 0 {
 			continue
 		}
-		slices.SortStableFunc(missing, func(a, b *sonarr.EpisodeResource) int { return strings.Compare(a.AirDateUtc, b.AirDateUtc) })
+		slices.SortStableFunc(missing, func(a, b *sonarr.EpisodeResource) int { return a.AirDateUtc.Compare(b.AirDateUtc.Time) })
 
 		labels := make([]string, 0, len(missing))
 		downloading, searched := 0, 0
@@ -115,7 +105,7 @@ func (r *registry) auditMissingEpisodes(ctx context.Context, s *snapshot, limit 
 			switch {
 			case queued[e.Id]:
 				downloading++
-			case e.LastSearchTime != "":
+			case !e.LastSearchTime.IsZero():
 				searched++
 			}
 		}
@@ -126,8 +116,8 @@ func (r *registry) auditMissingEpisodes(ctx context.Context, s *snapshot, limit 
 			problem = problemWholeSeasonMissing
 		}
 		detail := fmt.Sprintf("%d missing: %s", len(labels), shortList(labels, 12))
-		if oldest := missing[0].AirDate; oldest != "" {
-			detail += "; oldest aired " + oldest
+		if oldest := missing[0].AirDate; !oldest.IsZero() {
+			detail += "; oldest aired " + day(oldest.Time)
 		}
 		var notes []string
 		if downloading > 0 {
@@ -338,7 +328,7 @@ func noFiles(series *sonarr.SeriesResource, eps []sonarr.EpisodeResource, disk [
 	// a special nobody monitors says nothing about a show that has seasons: one often airs before the show itself does
 	seasons := slices.ContainsFunc(eps, func(e sonarr.EpisodeResource) bool { return e.SeasonNumber > 0 })
 	known, shown, wanted, downloading := 0, 0, 0, 0
-	next := ""
+	var next time.Time
 	for i := range eps {
 		e := &eps[i]
 		if seasons && e.SeasonNumber == 0 && !boolv(e.Monitored) {
@@ -346,7 +336,11 @@ func noFiles(series *sonarr.SeriesResource, eps []sonarr.EpisodeResource, disk [
 		}
 		known++
 		if !aired(e, now) {
-			if date := cmp.Or(e.AirDateUtc, e.AirDate); date != "" && (next == "" || date < next) {
+			date := e.AirDateUtc.Time
+			if date.IsZero() {
+				date = e.AirDate.Time
+			}
+			if !date.IsZero() && (next.IsZero() || date.Before(next)) {
 				next = date
 			}
 
@@ -375,7 +369,7 @@ func noFiles(series *sonarr.SeriesResource, eps []sonarr.EpisodeResource, disk [
 		f.Problem = problemNoneTracked
 		f.Detail = fmt.Sprintf("its folder holds %s, and Sonarr tracks none", countOf(len(disk), "video file"))
 		f.Fix = "import_scan the folder, then import_apply; audit_untracked_files says why each file is not tracked"
-	case shown == 0 && next == "":
+	case shown == 0 && next.IsZero():
 		f.Problem = problemNothingAired
 		f.Detail = fmt.Sprintf("Sonarr has an air date for none of its %s, so it never looks for one", countOf(known, "episode"))
 		f.Fix = "series_refresh, in case TheTVDB has the dates now; season_search fetches a season without them"
@@ -409,7 +403,7 @@ func noFiles(series *sonarr.SeriesResource, eps []sonarr.EpisodeResource, disk [
 	if series.Status == sonarr.SeriesStatusTypeDeleted {
 		f.Detail += "; TheTVDB has removed the show"
 	}
-	if added := day(series.Added); added != "" {
+	if added := day(series.Added.Time); added != "" {
 		f.Detail += "; added " + added
 	}
 

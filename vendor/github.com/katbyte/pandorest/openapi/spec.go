@@ -35,6 +35,9 @@ type PathItem struct {
 	Put    *Operation `json:"put"`
 	Delete *Operation `json:"delete"`
 	Patch  *Operation `json:"patch"`
+	// Call is the one operation of a path that is a JSON-RPC method rather than a URL ("pool.query"), which a method description
+	// loaded by the jsonrpc package makes; no OpenAPI document carries it.
+	Call *Operation `json:"x-call,omitempty"`
 }
 
 // Operation is one HTTP method on one path.
@@ -55,6 +58,24 @@ type Operation struct {
 	// Commands is set by a workaround on an operation that queues a command named in its body, and says which commands there
 	// are and how a queued one is followed. No document carries it.
 	Commands *CommandSet `json:"-"`
+	// Call is what a JSON-RPC method says of itself beyond its parameters and answer, set by the jsonrpc package on an operation
+	// under a path's Call; its parameters are In "call", in the order the method takes them.
+	Call *CallInfo `json:"x-call,omitempty"`
+}
+
+// CallInfo is what a JSON-RPC method description says of a method beside what it takes and answers: Method is its name as the
+// server takes it, Job that it runs as a job, Filterable that it is a query taking filters and options, Item that it acts on one
+// record by its id, NoAuth that it may be called before logging in, Downloadable and Uploadable that its bytes move outside the
+// call, and Roles the roles that may call it, as the server names them.
+type CallInfo struct {
+	Method       string   `json:"method"`
+	Job          bool     `json:"job,omitempty"`
+	Filterable   bool     `json:"filterable,omitempty"`
+	Item         bool     `json:"item,omitempty"`
+	NoAuth       bool     `json:"noAuth,omitempty"`
+	Downloadable bool     `json:"downloadable,omitempty"`
+	Uploadable   bool     `json:"uploadable,omitempty"`
+	Roles        []string `json:"roles,omitempty"`
 }
 
 // CommandSet is how a server that queues commands by name through one operation is followed: Get is the operation that answers a
@@ -113,6 +134,8 @@ const (
 	InPath   = "path"
 	InQuery  = "query"
 	InHeader = "header"
+	// InCall is a JSON-RPC method's parameter, one of the values sent in order; no OpenAPI document declares one.
+	InCall = "call"
 )
 
 // RequestBody maps media types to their schema.
@@ -186,6 +209,25 @@ type Schema struct {
 	AllOf                []*Schema       `json:"allOf,omitempty"`
 	OneOf                []*Schema       `json:"oneOf,omitempty"`
 	AnyOf                []*Schema       `json:"anyOf,omitempty"`
+	// GoType is a Go type a workaround holds the value as in place of what the schema describes, for a value the server writes
+	// in a form of its own: a secret hidden behind a placeholder, a list written two ways.
+	GoType *GoType `json:"x-go-type,omitempty"`
+	// Discriminator says, for a choice of records (oneOf, anyOf), which field the records name themselves by and which value
+	// of it names each member schema.
+	Discriminator *Discriminator `json:"discriminator,omitempty"`
+}
+
+// Discriminator is how a choice of records is told apart: the property every member carries, and each value of it with the
+// reference ("#/components/schemas/Name") of the member it names.
+type Discriminator struct {
+	PropertyName string            `json:"propertyName"`
+	Mapping      map[string]string `json:"mapping,omitempty"`
+}
+
+// GoType names a Go type as a package would write it (truenasrpc.Secret[int]) and the import path it comes from.
+type GoType struct {
+	Name   string `json:"name"`
+	Import string `json:"import,omitempty"`
 }
 
 // SchemaRefPrefix is how a `$ref` names a component schema.
@@ -301,9 +343,13 @@ type Method struct {
 	Operation *Operation
 }
 
+// MethodCall is the "method" of a JSON-RPC call among a path's operations, beside GET, POST and the rest: a place names one as
+// "CALL pool.query".
+const MethodCall = "CALL"
+
 // Methods returns the imported operations of a path in a fixed method order.
 func (p *PathItem) Methods() []Method {
-	all := []Method{{"GET", p.Get}, {"POST", p.Post}, {"PUT", p.Put}, {"DELETE", p.Delete}, {"PATCH", p.Patch}}
+	all := []Method{{"GET", p.Get}, {"POST", p.Post}, {"PUT", p.Put}, {"DELETE", p.Delete}, {"PATCH", p.Patch}, {MethodCall, p.Call}}
 
 	return slices.DeleteFunc(all, func(m Method) bool { return m.Operation == nil })
 }

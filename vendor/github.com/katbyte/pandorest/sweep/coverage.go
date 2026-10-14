@@ -1,9 +1,9 @@
 package sweep
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
-	"net/http"
 	"reflect"
 	"slices"
 	"strings"
@@ -28,6 +28,8 @@ type coverage struct {
 	seen   map[string]bool
 	// values are the values seen per enum type
 	values map[string]map[string]bool
+	// word is what answers: a GET, or a read call of a service over a connection
+	word string
 }
 
 type placeKind int
@@ -54,9 +56,12 @@ func newCoverage(s Sweep) *coverage {
 			}
 		}
 	}
+	if s.Definitions != nil && s.calls() {
+		c.word = "read"
+	}
 	visited := map[reflect.Type]bool{}
 	for _, op := range s.Definitions.Operations() {
-		if op.Method != http.MethodGet {
+		if !isRead(op) {
 			continue
 		}
 		m := s.method(op)
@@ -248,7 +253,7 @@ func (c *coverage) reached(places []string, seen string) string {
 		}
 	}
 	// a place is a field of a record a GET answers, so a model no GET answers is not among them
-	line := fmt.Sprintf("%s in what a GET answers, %s %d", placesWord(len(places)), seen, len(places)-len(never))
+	line := fmt.Sprintf("%s in what a %s answers, %s %d", placesWord(len(places)), cmp.Or(c.word, "GET"), seen, len(places)-len(never))
 	if len(never) > 0 && len(never) < len(places) {
 		line += " (never: " + named(never) + ")"
 	}
@@ -281,11 +286,13 @@ type Report struct {
 	// Notes are what the run's answers carried of the places an answer can hold an enum, a date or a boolean held by value, and
 	// which listed enum values none carried: unproven rather than wrong.
 	Notes []string
+	// word is what the sweep swept: GET operations, or the read calls of a service over a connection
+	word string
 }
 
 // Summary is the counts in one line.
 func (r *Report) Summary(service string) string {
-	return fmt.Sprintf("%s: %d GET operations: %d answered, %d answered nothing by their Empty case, %d refused as their case says, %d skipped, %d failed", service, r.Answered+r.Empty+r.Refused+r.Skipped+r.Failed, r.Answered, r.Empty, r.Refused, r.Skipped, r.Failed)
+	return fmt.Sprintf("%s: %d %s: %d answered, %d answered nothing by their Empty case, %d refused as their case says, %d skipped, %d failed", service, r.Answered+r.Empty+r.Refused+r.Skipped+r.Failed, cmp.Or(r.word, "GET operations"), r.Answered, r.Empty, r.Refused, r.Skipped, r.Failed)
 }
 
 // add counts one operation's outcome.

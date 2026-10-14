@@ -111,7 +111,7 @@
           "Name": "InstalledOn",
           "JsonName": "installedOn",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -126,7 +126,7 @@
           "Name": "ReleaseDate",
           "JsonName": "releaseDate",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {

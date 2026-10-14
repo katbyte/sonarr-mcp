@@ -44,6 +44,11 @@ type gen struct {
 	qual    string
 	pkgs    map[string]string
 	imports []importSpec
+	// grp is the group whose package is being rendered, which a call's method is named within; nil elsewhere
+	grp *definitions.Group
+	// named are the packages the service's named types come from, by the qualifier a type is written with ("truenasrpc."),
+	// gathered once for the files whose bodies use one
+	named map[string]importSpec
 }
 
 // importSpec is one import a generated file needs: a path, and the name it
@@ -85,6 +90,22 @@ func newGen(svc *definitions.Service, opts Options) (*gen, error) {
 	}
 	if opts.Client != "" && opts.Grouped {
 		return nil, fmt.Errorf("%s: a Client of the service's own is for the flat layout; grouped, the constructor is generated, and an authorizer declared beside the generated files is named in Auth by its lowercase name", svc.Name)
+	}
+	if opts.Client == "" && g.calls() {
+		// a call service has no credential or authorizer: its connection logs in
+		if opts.Credential != "" || opts.NewDoc != "" || svc.Auth != "" {
+			return nil, fmt.Errorf("%s: a service of calls takes a connection, so Credential, NewDoc and Auth say nothing: drop them", svc.Name)
+		}
+		if opts.ClientService != "" && !isIdent(opts.ClientService) {
+			return nil, fmt.Errorf("%s: ClientService %q is not the name of a value in the package", svc.Name, opts.ClientService)
+		}
+		g.declare("Client", clientFileName)
+		g.declare("New", clientFileName)
+		if opts.ClientService != "" {
+			g.declare(opts.ClientService, "the service's own file")
+		}
+
+		return g, nil
 	}
 	if opts.Client == "" {
 		// New's parameter must be a name, and not one New already uses
@@ -274,9 +295,47 @@ func (g *gen) goType(t definitions.TypeRef) string {
 		return "map[string]" + g.goType(*t.NestedItem)
 	case definitions.Reference, definitions.ID:
 		return g.typeName(t.ReferenceName)
+	case definitions.Named:
+		return t.GoType
 	}
 
 	return "any"
+}
+
+// namedImports are the packages the service's named types come from, by the qualifier a type is written with: a type written
+// truenasrpc.Secret[int] from github.com/katbyte/truenas-mcp/sdk/truenasrpc is imported plain, and one whose qualifier is not
+// its path's last element under that name.
+func (g *gen) namedImports() map[string]importSpec {
+	if g.named != nil {
+		return g.named
+	}
+	g.named = map[string]importSpec{}
+	var walk func(t definitions.TypeRef)
+	walk = func(t definitions.TypeRef) {
+		switch t.Type {
+		case definitions.Named:
+			if qual, _, ok := strings.Cut(t.GoType, "."); ok && t.Import != "" {
+				g.named[qual+"."] = importSpec{t.Import, qual}
+			}
+		case definitions.List, definitions.Dictionary:
+			if t.NestedItem != nil {
+				walk(*t.NestedItem)
+			}
+		default:
+		}
+	}
+	for _, m := range g.svc.Models() {
+		for _, f := range m.Fields {
+			walk(f.Type)
+		}
+	}
+	for _, o := range g.svc.Operations() {
+		for _, t := range o.Types() {
+			walk(t)
+		}
+	}
+
+	return g.named
 }
 
 // heldType renders a type as a model's field holds it: a struct model by
@@ -321,17 +380,20 @@ func (g *gen) boolPointer(m *definitions.Model, f *definitions.Field) bool {
 // that defaults a flag to true reads the false; one held by pointer
 // (boolPointer) is omitempty, so nil leaves it unset. Lists and
 // maps are omitzero, so a nil one is left out but an empty one is sent,
-// which is how a body clears a list. The rest are omitempty, except the
-// strings and numbers of a model written back whole (a settings object),
-// which are always sent: read "", write "", rather than a null the server
-// does not save. A field the document requires is always sent whatever it
-// is, so an empty string goes as "" rather than not at all.
+// which is how a body clears a list, as are the dates and a named type, since omitempty never leaves a struct out. The rest are
+// omitempty, except the strings and numbers of a model written back whole (a settings object), which are always sent: read "",
+// write "", rather than a null the server does not save. A field the document requires is always sent whatever it is, so an
+// empty string goes as "" rather than not at all.
 func (g *gen) fieldTag(m *definitions.Model, f *definitions.Field) string {
 	if f.Required || (f.Type.Type == definitions.Boolean && !g.boolPointer(m, f)) {
 		return f.JSONName
 	}
+	if union := g.models[f.Type.ReferenceName]; f.Type.Type == definitions.Reference && union != nil && len(union.Members) > 0 {
+		// a union holding nothing is left out, since omitempty never leaves a struct out
+		return f.JSONName + ",omitzero"
+	}
 	switch f.Type.Type {
-	case definitions.List, definitions.Dictionary, definitions.DateTime, definitions.Date, definitions.UnixSeconds, definitions.UnixMillis:
+	case definitions.List, definitions.Dictionary, definitions.DateTime, definitions.Date, definitions.UnixSeconds, definitions.UnixMillis, definitions.Named:
 		return f.JSONName + ",omitzero"
 	case definitions.String, definitions.Integer, definitions.Integer64, definitions.Float, definitions.Double:
 		// a number or string whose null is kept is a pointer, and its nil is left out
@@ -384,6 +446,13 @@ func (g *gen) fileHeader(body string) string {
 	}
 	for _, imp := range g.imports {
 		ext = append(ext, imp.String())
+	}
+	named := g.namedImports()
+	for _, use := range sortedKeys(named) {
+		// the base client's own package is imported already wherever the body says client.
+		if imp := named[use]; usesPackage(body, use) && !slices.Contains(ext, imp.String()) && (use != "client." || imp.path != g.opts.ClientImport) {
+			ext = append(ext, imp.String())
+		}
 	}
 	switch len(std) + len(ext) {
 	case 0:
@@ -445,7 +514,8 @@ func usesPackage(code, selector string) bool {
 				break
 			}
 			at := i + j
-			if at == 0 || !isIdentRune(rune(line[at-1])) && line[at-1] != '.' && line[at-1] != '"' {
+			// a selector after a dot is a field of something else, except after the dots of a variadic (files ...io.Reader)
+			if at == 0 || !isIdentRune(rune(line[at-1])) && (line[at-1] != '.' || strings.HasSuffix(line[:at], "...")) && line[at-1] != '"' {
 				return true
 			}
 			i = at + len(selector)
@@ -563,6 +633,9 @@ path prefix) that authenticates with %[2]s. The options are the base
 client's: a logger to trace to, a transport of the caller's own.`
 
 func (g *gen) clientFile() string {
+	if g.calls() {
+		return g.callClientFile()
+	}
 	if g.opts.Client != "" {
 		return g.fileHeader(g.apiVersionConsts() + strings.TrimSpace(g.opts.Client) + "\n")
 	}
@@ -631,6 +704,62 @@ func (g *gen) docFile() string {
 //
 `, g.opts.ClientImport)
 	}
+	if g.calls() {
+		b.WriteString(`// # Calls
+//
+// Each method of the server is a method here, named for it (pool.query is
+// PoolQuery) and taking a context and then the method's arguments in the
+// order the server takes them, each typed from the server's description; an
+// argument the server does not insist on may be left as its zero, and those
+// left so at the end are not sent. Every call goes through the client.Caller
+// New is given, which the repository writes over its connection: it is what
+// dials, logs in, numbers the calls and matches the answers.
+//
+// It returns a <Name>Response holding, when the method answers something,
+// Answer: a pointer for a struct, enum or primitive and the value for a list,
+// map or raw JSON, nil when the call failed. A struct answer is also embedded,
+// so res.Answer.Name may be read as res.Name, a zero record when nothing was
+// answered, and Record() hands it back by value with an error when none came.
+// A call the server refuses is an error carrying a client.CallError with what
+// the server said: its code, error name and reason; client.CallErrorOf reads
+// it, IsNotFound says the server has no such record, and client.IsRefusedCall
+// tells a refusal from a connection that failed.
+`)
+	} else {
+		g.writeRequestDoc(&b)
+	}
+	if g.paged != nil {
+		pages := g.paged.Pageable.StartIndexOption
+		if g.paged.Pageable.LimitOption != "" {
+			pages += " and " + g.paged.Pageable.LimitOption
+		}
+		fmt.Fprintf(&b, "//\n// A list operation, one whose options page with %s, also has a\n// <Name>Complete method that loads every result, and a <Name>Each that\n// hands them out one at a time as a range, so a loop that stops asks for no\n// page more.\n", pages)
+	}
+	if notes := comment("", g.opts.Notes); notes != "" {
+		// before the Ids heading, or the service's own words read as part of it
+		b.WriteString("//\n")
+		b.WriteString(notes)
+	}
+	if len(g.svc.IDs) > 0 {
+		names := make([]string, 0, len(g.svc.IDs))
+		for _, k := range g.svc.IDs {
+			names = append(names, k.Name)
+		}
+		fmt.Fprintf(&b, "//\n// # Ids\n//\n// %s are kinds of id the package tells apart, each a bare named type over\n// the int or string the document declares, so that one kind where another goes\n// does not compile. Where an id sits among the options it is held by value and\n// sent when not zero. int(id) and SeriesID(n) convert one value, client.IDs and\n// client.StringIDs a list.\n", strings.Join(names, ", "))
+	}
+	if len(g.svc.Workarounds) > 0 {
+		b.WriteString("//\n// # Workarounds\n//\n// The importer fixed these bugs in the document before generating from it:\n//\n")
+		for _, w := range g.svc.Workarounds {
+			fmt.Fprintf(&b, "//   - %s\n", w)
+		}
+	}
+	fmt.Fprintf(&b, "package %s\n", g.svc.Package)
+
+	return b.String()
+}
+
+// writeRequestDoc is the Calls section of a service of requests: what a method takes and answers.
+func (g *gen) writeRequestDoc(b *strings.Builder) {
 	b.WriteString(`// # Calls
 //
 // A method takes a context, then the path parameters in path order, then the
@@ -663,33 +792,6 @@ func (g *gen) docFile() string {
 // not document is an error: client.StatusCode reads the status from it, and
 // IsNotFound and the other Is helpers say which it is.
 `)
-	if g.paged != nil {
-		pages := g.paged.Pageable.StartIndexOption
-		if g.paged.Pageable.LimitOption != "" {
-			pages += " and " + g.paged.Pageable.LimitOption
-		}
-		fmt.Fprintf(&b, "//\n// A list operation, one whose options page with %s, also has a\n// <Name>Complete method that loads every result, and a <Name>Each that\n// hands them out one at a time as a range, so a loop that stops asks for no\n// page more.\n", pages)
-	}
-	if len(g.svc.IDs) > 0 {
-		names := make([]string, 0, len(g.svc.IDs))
-		for _, k := range g.svc.IDs {
-			names = append(names, k.Name)
-		}
-		fmt.Fprintf(&b, "//\n// # Ids\n//\n// %s are kinds of id the package tells apart, each a bare named type over\n// the int or string the document declares, so that one kind where another goes\n// does not compile. Where an id sits among the options it is held by value and\n// sent when not zero. int(id) and SeriesID(n) convert one value, client.IDs and\n// client.StringIDs a list.\n", strings.Join(names, ", "))
-	}
-	if notes := comment("", g.opts.Notes); notes != "" {
-		b.WriteString("//\n")
-		b.WriteString(notes)
-	}
-	if len(g.svc.Workarounds) > 0 {
-		b.WriteString("//\n// # Workarounds\n//\n// The importer fixed these bugs in the document before generating from it:\n//\n")
-		for _, w := range g.svc.Workarounds {
-			fmt.Fprintf(&b, "//   - %s\n", w)
-		}
-	}
-	fmt.Fprintf(&b, "package %s\n", g.svc.Package)
-
-	return b.String()
 }
 
 // kindsUsed is every type a service's fields, options, path parameters and bodies are of, so that a
@@ -792,8 +894,7 @@ func (g *gen) idShape(kind string) string {
 	return ""
 }
 
-// sentModels is every model a request body reaches, itself or through a
-// field, a list or a map of it.
+// sentModels is every model a request body or a call's argument reaches, itself or through a field, a list or a map of it.
 func sentModels(svc *definitions.Service) map[string]bool {
 	models := svc.Models()
 	sent := map[string]bool{}
@@ -811,11 +912,18 @@ func sentModels(svc *definitions.Service) map[string]bool {
 			for i := range m.Fields {
 				reach(m.Fields[i].Type)
 			}
+			// a union that is sent sends one of its members
+			for _, member := range m.Members {
+				reach(definitions.TypeRef{Type: definitions.Reference, ReferenceName: member.Model})
+			}
 		}
 	}
 	for _, o := range svc.Operations() {
 		if o.Request != nil {
 			reach(o.Request.Type)
+		}
+		for _, a := range o.Arguments {
+			reach(a.Type)
 		}
 	}
 

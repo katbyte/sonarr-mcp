@@ -33,7 +33,7 @@ github.com/katbyte/go-kt/test/services/arrserver
 github.com/katbyte/go-kt/test/services/newznab
 github.com/katbyte/go-kt/test/services/sabnzbd
 github.com/katbyte/go-kt/version
-# github.com/katbyte/pandorest v0.8.2
+# github.com/katbyte/pandorest v0.9.0
 ## explicit; go 1.27.0
 github.com/katbyte/pandorest
 github.com/katbyte/pandorest/client
@@ -43,6 +43,7 @@ github.com/katbyte/pandorest/differ
 github.com/katbyte/pandorest/generator
 github.com/katbyte/pandorest/importer
 github.com/katbyte/pandorest/importer/workarounds
+github.com/katbyte/pandorest/jsonrpc
 github.com/katbyte/pandorest/openapi
 github.com/katbyte/pandorest/sweep
 # github.com/modelcontextprotocol/go-sdk v1.8.0

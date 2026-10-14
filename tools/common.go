@@ -94,35 +94,30 @@ func humanSize(n int64) string {
 	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
 }
 
-// day trims a timestamp to its date, "" for none.
-func day(stamp string) string {
-	if len(stamp) >= 10 {
-		return stamp[:10]
+// day is a date as the day alone ("2026-09-19"), "" for none.
+func day(t time.Time) string {
+	if t.IsZero() {
+		return ""
 	}
 
-	return stamp
+	return t.UTC().Format(time.DateOnly)
 }
 
-// parseTime reads one of Sonarr's timestamps; the zero time for none.
-func parseTime(stamp string) time.Time {
-	if stamp == "" {
-		return time.Time{}
-	}
-	for _, layout := range []string{time.RFC3339Nano, "2006-01-02T15:04:05", "2006-01-02"} {
-		if t, err := time.Parse(layout, stamp); err == nil {
-			return t
-		}
+// stamp is a date as Sonarr writes it ("2026-09-19T13:00:00Z"), "" for none.
+func stamp(t time.Time) string {
+	if t.IsZero() {
+		return ""
 	}
 
-	return time.Time{}
+	return t.UTC().Format(time.RFC3339)
 }
 
 // aired reports whether an episode has aired: it has an air date, and the
 // date is in the past.
 func aired(e *sonarr.EpisodeResource, now time.Time) bool {
-	t := parseTime(e.AirDateUtc)
+	t := e.AirDateUtc.Time
 	if t.IsZero() {
-		t = parseTime(e.AirDate)
+		t = e.AirDate.Time
 	}
 
 	return !t.IsZero() && t.Before(now)
@@ -319,7 +314,7 @@ func projectCommand(c *sonarr.CommandResource) commandOut {
 
 	return commandOut{
 		ID: c.Id, Name: name, Status: string(c.Status), Message: c.Message,
-		Started: c.Started, Ended: c.Ended, Duration: c.Duration,
+		Started: stamp(c.Started.Time), Ended: stamp(c.Ended.Time), Duration: c.Duration,
 	}
 }
 

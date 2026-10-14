@@ -15,6 +15,16 @@ import (
 // other JSON file there is one group.
 const ServiceFile = "Service.json"
 
+// GroupFile is the file a group's definitions are in: <Name>.json, but for a group named Service (TrueNAS has a service
+// namespace), whose file would be the service description's, and is Service.group.json instead.
+func GroupFile(name string) string {
+	if name+".json" == ServiceFile {
+		return name + ".group.json"
+	}
+
+	return name + ".json"
+}
+
 // Load reads a definitions directory.
 func Load(dir string) (*Service, error) {
 	var svc Service
@@ -34,7 +44,7 @@ func Load(dir string) (*Service, error) {
 		if err := readJSON(filepath.Join(dir, e.Name()), &g); err != nil {
 			return nil, err
 		}
-		if want := g.Name + ".json"; e.Name() != want {
+		if want := GroupFile(g.Name); e.Name() != want {
 			return nil, fmt.Errorf("%s: holds group %q, which belongs in %s", filepath.Join(dir, e.Name()), g.Name, want)
 		}
 		svc.Groups = append(svc.Groups, g)
@@ -56,7 +66,7 @@ func Save(svc *Service, dir string) error {
 		return err
 	}
 	for i := range svc.Groups {
-		name := svc.Groups[i].Name + ".json"
+		name := GroupFile(svc.Groups[i].Name)
 		if want[name] {
 			return fmt.Errorf("two groups are named %q", svc.Groups[i].Name)
 		}

@@ -9,18 +9,18 @@ type CommandResource struct {
 	ClientUserAgent     string          `json:"clientUserAgent,omitempty"`
 	CommandName         string          `json:"commandName,omitempty"`
 	Duration            string          `json:"duration,omitempty"`
-	Ended               string          `json:"ended,omitempty"`
+	Ended               Time            `json:"ended,omitzero"`
 	Exception           string          `json:"exception,omitempty"`
 	Id                  CommandID       `json:"id,omitempty"`
-	LastExecutionTime   string          `json:"lastExecutionTime,omitempty"`
+	LastExecutionTime   Time            `json:"lastExecutionTime,omitzero"`
 	Message             string          `json:"message,omitempty"`
 	Name                string          `json:"name,omitempty"`
 	Priority            CommandPriority `json:"priority,omitempty"`
-	Queued              string          `json:"queued,omitempty"`
+	Queued              Time            `json:"queued,omitzero"`
 	Result              CommandResult   `json:"result,omitempty"`
 	SendUpdatesToClient bool            `json:"sendUpdatesToClient"`
-	Started             string          `json:"started,omitempty"`
-	StateChangeTime     string          `json:"stateChangeTime,omitempty"`
+	Started             Time            `json:"started,omitzero"`
+	StateChangeTime     Time            `json:"stateChangeTime,omitzero"`
 	Status              CommandStatus   `json:"status,omitempty"`
 	Trigger             CommandTrigger  `json:"trigger,omitempty"`
 	UpdateScheduledTask bool            `json:"updateScheduledTask"`

@@ -55,6 +55,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/katbyte/pandorest/client"
 	"github.com/katbyte/pandorest/definitions"
 )
 
@@ -82,10 +83,13 @@ type Case struct {
 	Skip string
 	// Status is the error status the server answers with, and Decode is set
 	// when it answers a body the documented model cannot decode; Why says
-	// why that is the server's behaviour rather than a bug to fix.
-	Status int
-	Decode bool
-	Why    string
+	// why that is the server's behaviour rather than a bug to fix. Refused
+	// is the same for a call: the error name the server refuses it with
+	// (EACCES for a role it does not have, ENOENT for a record it has none of).
+	Status  int
+	Refused string
+	Decode  bool
+	Why     string
 	// Sometimes accepts an answer as well as the Status or the Decode, for a
 	// call that depends on something outside the server (a catalogue it
 	// fetches from the internet).
@@ -99,9 +103,12 @@ type Case struct {
 	// nothing on the next, so that neither is a failure.
 	MayBeEmpty string
 	// Path and Options supply arguments by parameter name and options field,
-	// beyond what the fixtures resolve.
-	Path    map[string]string
-	Options map[string]any
+	// beyond what the fixtures resolve; Arguments does the same for a call,
+	// by the argument's name as the server takes it, with a value of the
+	// argument's own type or a string to read one from.
+	Path      map[string]string
+	Options   map[string]any
+	Arguments map[string]any
 }
 
 // Fixtures resolves arguments from the suite's fixtures. A path parameter is
@@ -213,14 +220,14 @@ func (o *Outcome) notef(format string, args ...any) {
 func (s Sweep) Run(t *testing.T) {
 	t.Helper()
 
-	if s.Definitions == nil || s.Client == nil || s.StatusCode == nil {
+	if s.Definitions == nil || s.Client == nil || (s.StatusCode == nil && !s.calls()) {
 		t.Fatal("a sweep needs the service's definitions, its client and the base client's StatusCode")
 	}
 
-	var report Report
+	report := Report{word: s.word()}
 	cov := newCoverage(s)
 	for _, op := range s.Definitions.Operations() {
-		if op.Method != http.MethodGet {
+		if !isRead(op) {
 			continue
 		}
 
@@ -243,7 +250,7 @@ func (s Sweep) Run(t *testing.T) {
 	}
 
 	for _, name := range s.StaleCases() {
-		t.Errorf("the case for %s names no GET operation", name)
+		t.Errorf("the case for %s names no %s", name, strings.TrimSuffix(s.word(), "s"))
 	}
 
 	// what a missing id of each kind gets, what the run came to, and what its answers left unproven
@@ -303,7 +310,7 @@ func (s Sweep) probeMissing(ctx context.Context, kind, id string) string {
 func (s Sweep) StaleCases() []string {
 	gets := map[string]bool{}
 	for _, op := range s.Definitions.Operations() {
-		gets[op.Name] = op.Method == http.MethodGet
+		gets[op.Name] = isRead(op)
 	}
 
 	var stale []string
@@ -343,7 +350,7 @@ func (s Sweep) runOperation(ctx context.Context, op *definitions.Operation, cov 
 	}
 
 	a, err := s.call(ctx, hangUp, op, args, cov)
-	expectsFailure := c.Status != 0 || c.Decode
+	expectsFailure := c.Status != 0 || c.Refused != "" || c.Decode
 	switch {
 	case err == nil && expectsFailure && !c.Sometimes:
 		out.failf("%s now answers; drop its case (%s)", op.Key(), c.Why)
@@ -352,6 +359,9 @@ func (s Sweep) runOperation(ctx context.Context, op *definitions.Operation, cov 
 	case c.Status != 0 && a.status == c.Status:
 		out.refused = true
 		out.notef("%s: HTTP %d, as expected: %s", op.Key(), a.status, c.Why)
+	case c.Refused != "" && a.refusal == c.Refused:
+		out.refused = true
+		out.notef("%s: refused with %s, as expected: %s", op.Key(), a.refusal, c.Why)
 	case c.Decode && a.undecoded:
 		out.refused = true
 		out.notef("%s: does not decode, as expected: %s", op.Key(), c.Why)
@@ -373,6 +383,35 @@ func (s Sweep) arguments(ctx context.Context, op *definitions.Operation, c Case)
 	}
 	mt := method.Type()
 	args := []reflect.Value{reflect.ValueOf(ctx)}
+
+	if op.Call != nil {
+		// a call's arguments in order: the case's, the fixtures' by name, and otherwise the zero value, which one the server
+		// does not insist on may be left as
+		if mt.NumIn() != len(op.Arguments)+1 {
+			return nil, fmt.Errorf("the method takes %d arguments for a call of %d", mt.NumIn()-1, len(op.Arguments))
+		}
+		for i, a := range op.Arguments {
+			v := reflect.New(mt.In(i + 1)).Elem()
+			value, ok := c.Arguments[a.Name]
+			if !ok {
+				value, ok = lookupFold(s.Fixtures.Always, a.Name)
+			}
+			if !ok && a.Required {
+				value, ok = lookupFold(s.Fixtures.Options, a.Name)
+			}
+			if !ok && a.Required {
+				return nil, fmt.Errorf("no value for the argument %s", a.Name)
+			}
+			if ok {
+				if err := setValue(v, value); err != nil {
+					return nil, fmt.Errorf("argument %s: %w", a.Name, err)
+				}
+			}
+			args = append(args, v)
+		}
+
+		return args, nil
+	}
 
 	for _, p := range op.PathParameters {
 		value, ok := c.Path[p.Name]
@@ -480,23 +519,139 @@ func (s Sweep) optionValue(o *definitions.Option, c Case) (value any, ok bool, e
 }
 
 // method finds the operation's method: on the client itself, or on the
-// client's field named for the operation's group.
+// client's field named for the operation's group, where a call's method
+// drops the group's name (c.Pool.Query).
 func (s Sweep) method(op *definitions.Operation) reflect.Value {
+	recv, name := s.receiver(op)
+	if !recv.IsValid() {
+		return reflect.Value{}
+	}
+
+	return recv.MethodByName(name)
+}
+
+// receiver is the value the operation's method is called on and the method's name: the client itself, or its field for the
+// operation's group.
+func (s Sweep) receiver(op *definitions.Operation) (recv reflect.Value, name string) {
 	v := reflect.ValueOf(s.Client)
 	if m := v.MethodByName(op.Name); m.IsValid() {
-		return m
+		return v, op.Name
 	}
 	for gi := range s.Definitions.Groups {
 		grp := &s.Definitions.Groups[gi]
 		if !slices.ContainsFunc(grp.Operations, func(o definitions.Operation) bool { return o.Name == op.Name }) {
 			continue
 		}
-		if f := reflect.Indirect(v).FieldByName(grp.Name); f.IsValid() {
-			return f.MethodByName(op.Name)
+		f := reflect.Indirect(v).FieldByName(grp.Name)
+		if !f.IsValid() {
+			continue
+		}
+		if short := strings.TrimPrefix(op.Name, grp.Name); op.Call != nil && short != op.Name && f.MethodByName(short).IsValid() {
+			return f, short
+		}
+
+		return f, op.Name
+	}
+
+	return reflect.Value{}, ""
+}
+
+// callOperation calls a read call through a capture of its connection and judges the answer as it came against what the
+// method decoded: a refusal is the error name the server gave, and a decode failure an answer the model cannot read.
+func (s Sweep) callOperation(op *definitions.Operation, args []reflect.Value, cov *coverage) (answer, error) {
+	var a answer
+	c := &capture{}
+	method, err := s.callMethod(op, c)
+	if err != nil {
+		return a, err
+	}
+	results := method.Call(args)
+	if len(results) != 2 || results[0].Kind() != reflect.Struct {
+		return a, errors.New("the method does not return a result and an error, as a generated one does")
+	}
+	err, _ = reflect.TypeAssert[error](results[1])
+	if err != nil {
+		if refused := client.CallErrorOf(err); refused != nil {
+			a.refusal = refused.ErrName
+		}
+		a.undecoded = a.refusal == "" && c.raw != nil
+
+		return a, err
+	}
+	if op.Response == nil || c.raw == nil {
+		return a, nil
+	}
+
+	return judgeJSON(c.raw, results[0].FieldByName("Answer"), cov), nil
+}
+
+// callMethod is a call's method on a copy of its client whose connection is wrapped in the capture, so the sweep reads the
+// answer as it came as well as the method decoding it.
+func (s Sweep) callMethod(op *definitions.Operation, c *capture) (reflect.Value, error) {
+	recv, name := s.receiver(op)
+	if !recv.IsValid() {
+		return reflect.Value{}, errors.New("the client has no such method")
+	}
+	recv = reflect.Indirect(recv)
+	held := recv.FieldByName("Caller")
+	if !held.IsValid() || held.Kind() != reflect.Interface {
+		return reflect.Value{}, errors.New("the client has no Caller, as a generated one over a connection does")
+	}
+	inner, ok := reflect.TypeAssert[client.Caller](held)
+	if !ok || inner == nil {
+		return reflect.Value{}, errors.New("the client's Caller is nil")
+	}
+	c.inner = inner
+	wrapped := reflect.New(recv.Type()).Elem()
+	wrapped.Set(recv)
+	wrapped.FieldByName("Caller").Set(reflect.ValueOf(c))
+
+	return wrapped.MethodByName(name), nil
+}
+
+// capture is a connection over the client's own that keeps each answer as it came, before the method decodes it.
+type capture struct {
+	inner client.Caller
+	raw   json.RawMessage
+}
+
+func (c *capture) Call(ctx context.Context, method string, params []any, into any) error {
+	c.raw = nil
+	var raw json.RawMessage
+	if err := c.inner.Call(ctx, method, params, &raw); err != nil {
+		return err
+	}
+	c.raw = raw
+	if into == nil {
+		return nil
+	}
+
+	return json.Unmarshal(raw, into)
+}
+
+// isRead reports whether the sweep calls an operation: a GET, or a call that changes nothing.
+func isRead(op *definitions.Operation) bool {
+	return op.Method == http.MethodGet || (op.Call != nil && op.Call.Read)
+}
+
+// calls reports whether the service is one of calls over a connection, which has no HTTP status to go by.
+func (s Sweep) calls() bool {
+	for _, op := range s.Definitions.Operations() {
+		if op.Call != nil {
+			return true
 		}
 	}
 
-	return reflect.Value{}
+	return false
+}
+
+// word is what the sweep calls what it sweeps, for the report.
+func (s Sweep) word() string {
+	if s.calls() {
+		return "read calls"
+	}
+
+	return "GET operations"
 }
 
 // setValue sets a path argument or options field from a fixture: a string, a
@@ -504,6 +659,12 @@ func (s Sweep) method(op *definitions.Operation) reflect.Value {
 func setValue(v reflect.Value, value any) error {
 	if !v.IsValid() {
 		return errors.New("no such field")
+	}
+	if given := reflect.ValueOf(value); given.IsValid() && given.Type().AssignableTo(v.Type()) {
+		// a value of the argument's own type, as a case gives a call's filters or options
+		v.Set(given)
+
+		return nil
 	}
 	s := fmt.Sprint(value)
 	switch v.Kind() {
@@ -568,6 +729,8 @@ type answer struct {
 	// stream is set for an event stream, read only as far as its first event
 	empty  bool
 	stream bool
+	// refusal is the error name a call was refused with, "" for one that was not
+	refusal string
 	// dropped are the places in the answer whose content the model lost
 	// whole, and undeclared the keys it has no field for, as Model.key
 	dropped    []string
@@ -700,6 +863,9 @@ func unreadDates(v reflect.Value, at string, found []string) []string {
 // failure. hangUp cancels ctx, the context the call was given.
 func (s Sweep) call(ctx context.Context, hangUp context.CancelFunc, op *definitions.Operation, args []reflect.Value, cov *coverage) (answer, error) {
 	var a answer
+	if op.Call != nil {
+		return s.callOperation(op, args, cov)
+	}
 	results := s.method(op).Call(args)
 	if len(results) != 2 || results[0].Kind() != reflect.Struct {
 		return a, errors.New("the method does not return a result and an error, as a generated one does")
@@ -904,6 +1070,10 @@ func dropped(sent any, model reflect.Value, at string) []string {
 		model = model.Elem()
 	}
 
+	if heldWhole(model.Type()) {
+		return nil
+	}
+
 	var out []string
 	switch a := sent.(type) {
 	case map[string]any:
@@ -959,7 +1129,16 @@ func dropped(sent any, model reflect.Value, at string) []string {
 	return out
 }
 
-var rawMessage = reflect.TypeFor[json.RawMessage]()
+var (
+	rawMessage  = reflect.TypeFor[json.RawMessage]()
+	unmarshaler = reflect.TypeFor[json.Unmarshaler]()
+)
+
+// heldWhole reports whether a type reads its JSON itself (a union holding the record as it came, a secret behind a placeholder,
+// a date), so what it holds is not the sweep's to judge field by field.
+func heldWhole(t reflect.Type) bool {
+	return t == rawMessage || t.Implements(unmarshaler) || reflect.PointerTo(t).Implements(unmarshaler)
+}
 
 // undeclared walks a decoded JSON value beside the Go type it decodes into
 // and records each object key the type has no field for, as Type.key.
@@ -967,7 +1146,7 @@ func undeclared(t reflect.Type, sent any, seen map[string]bool) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
-	if t == rawMessage || t.Kind() == reflect.Interface {
+	if heldWhole(t) || t.Kind() == reflect.Interface {
 		return
 	}
 

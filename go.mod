@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/gookit/color v1.6.1
 	github.com/katbyte/go-kt v0.6.4
-	github.com/katbyte/pandorest v0.8.2
+	github.com/katbyte/pandorest v0.9.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0

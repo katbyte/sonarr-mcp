@@ -35,7 +35,8 @@
       "Response": {
         "ContentType": "application/json",
         "Type": {
-          "Type": "RawObject"
+          "Type": "Reference",
+          "ReferenceName": "FileSystemResource"
         }
       },
       "ExpectedStatusCodes": [
@@ -59,7 +60,11 @@
       "Response": {
         "ContentType": "application/json",
         "Type": {
-          "Type": "RawObject"
+          "Type": "List",
+          "NestedItem": {
+            "Type": "Reference",
+            "ReferenceName": "MediaFileResource"
+          }
         }
       },
       "ExpectedStatusCodes": [
@@ -83,11 +88,147 @@
       "Response": {
         "ContentType": "application/json",
         "Type": {
-          "Type": "RawObject"
+          "Type": "Reference",
+          "ReferenceName": "FileSystemTypeResource"
         }
       },
       "ExpectedStatusCodes": [
         200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "FileSystemEntryResource",
+      "SchemaName": "FileSystemEntryResource",
+      "Description": "One folder or file in a listing.",
+      "Fields": [
+        {
+          "Name": "Extension",
+          "JsonName": "extension",
+          "Description": "a file's, with its dot",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "LastModified",
+          "JsonName": "lastModified",
+          "Type": {
+            "Type": "DateTime"
+          },
+          "Nullable": true
+        },
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "Path",
+          "JsonName": "path",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "Size",
+          "JsonName": "size",
+          "Type": {
+            "Type": "Integer64"
+          }
+        },
+        {
+          "Name": "Type",
+          "JsonName": "type",
+          "Description": "folder, file, drive or parent",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "FileSystemResource",
+      "SchemaName": "FileSystemResource",
+      "Description": "What a folder holds: its folders, its files if they were asked for, and the folder above it, which the top has none of.",
+      "Fields": [
+        {
+          "Name": "Directories",
+          "JsonName": "directories",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "FileSystemEntryResource"
+            }
+          }
+        },
+        {
+          "Name": "Files",
+          "JsonName": "files",
+          "Type": {
+            "Type": "List",
+            "NestedItem": {
+              "Type": "Reference",
+              "ReferenceName": "FileSystemEntryResource"
+            }
+          }
+        },
+        {
+          "Name": "Parent",
+          "JsonName": "parent",
+          "Type": {
+            "Type": "String"
+          },
+          "Nullable": true
+        }
+      ]
+    },
+    {
+      "Name": "FileSystemTypeResource",
+      "SchemaName": "FileSystemTypeResource",
+      "Description": "What a path is.",
+      "Fields": [
+        {
+          "Name": "Type",
+          "JsonName": "type",
+          "Description": "folder or file",
+          "Type": {
+            "Type": "String"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "MediaFileResource",
+      "SchemaName": "MediaFileResource",
+      "Description": "A video file under a folder, with its path from that folder.",
+      "Fields": [
+        {
+          "Name": "Name",
+          "JsonName": "name",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "Path",
+          "JsonName": "path",
+          "Type": {
+            "Type": "String"
+          }
+        },
+        {
+          "Name": "RelativePath",
+          "JsonName": "relativePath",
+          "Type": {
+            "Type": "String"
+          }
+        }
       ]
     }
   ]

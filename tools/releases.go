@@ -150,7 +150,7 @@ func registerReleaseTools(r *registry) {
 			return nil, grabOut{}, err
 		}
 		recent, err := client.GetHistorySince(ctx, sonarr.GetHistorySinceOptions{
-			Date: since.Format(time.RFC3339), EventType: sonarr.EpisodeHistoryEventTypeGrabbed, IncludeSeries: new(true), IncludeEpisode: new(true),
+			Date: sonarr.Time{Time: since}, EventType: sonarr.EpisodeHistoryEventTypeGrabbed, IncludeSeries: new(true), IncludeEpisode: new(true),
 		})
 		if err != nil {
 			return nil, grabOut{}, err
@@ -222,8 +222,8 @@ func registerReleaseTools(r *registry) {
 				out.Episodes = episodeLabel(info.SeasonNumber, info.EpisodeNumbers...)
 			case len(info.AbsoluteEpisodeNumbers) > 0:
 				out.Episodes = fmt.Sprintf("absolute %v", info.AbsoluteEpisodeNumbers)
-			case info.AirDate != "":
-				out.Episodes = "aired " + info.AirDate
+			case !info.AirDate.IsZero():
+				out.Episodes = "aired " + day(info.AirDate.Time)
 			}
 		}
 

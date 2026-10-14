@@ -75,14 +75,14 @@
           "Name": "LastExecution",
           "JsonName": "lastExecution",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {
           "Name": "LastStartTime",
           "JsonName": "lastStartTime",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {
@@ -97,7 +97,7 @@
           "Name": "NextExecution",
           "JsonName": "nextExecution",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {

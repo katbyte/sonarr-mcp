@@ -8,5 +8,5 @@ type LogFileResource struct {
 	DownloadUrl   string `json:"downloadUrl,omitempty"`
 	Filename      string `json:"filename,omitempty"`
 	Id            int    `json:"id,omitempty"`
-	LastWriteTime string `json:"lastWriteTime,omitempty"`
+	LastWriteTime Time   `json:"lastWriteTime,omitzero"`
 }

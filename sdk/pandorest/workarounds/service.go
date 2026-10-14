@@ -15,6 +15,7 @@ package workarounds
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/katbyte/pandorest/config"
 	pandorest "github.com/katbyte/pandorest/importer/workarounds"
@@ -40,10 +41,13 @@ var Services = []config.Service{{
 	// New is worded for Sonarr: its credential is an API key, and its address may carry a URL base
 	Credential: "API key",
 	NewDoc:     "New returns a client for the Sonarr server at baseURL (scheme and host,\noptionally the URL base it is configured with) that authenticates with its\nAPI key. The options are the base client's: client.WithLog to trace what\nis sent, client.WithTransport to send it through a transport of the\ncaller's own.",
-	Notes:      `Dates are strings: Sonarr sends RFC 3339 in UTC ("2026-09-19T13:00:00Z").`,
 	// history, the queue, the blocklist, the wanted lists, the exclusions and the log page by number, and answer a PagingResource
 	Paging:       &config.Paging{Start: "page", Limit: "pageSize", Items: "records", Total: "totalRecords", ByPage: true},
 	WrittenWhole: sonarrSettings,
+	// Sonarr writes a date and time as RFC 3339 in UTC ("2026-09-19T13:00:00Z"), with year one for never, which reads as no date; an episode's
+	// air date is a day on its own ("2026-09-19")
+	Dates: config.Dates{Send: time.RFC3339},
+	Days:  config.Dates{Send: time.DateOnly},
 	// the ids that travel between calls are told apart by the compiler; the rest stay plain numbers
 	IDs:   sonarrIDs,
 	Plain: sonarrPlainIDs,
@@ -103,17 +107,20 @@ var sonarrWords = map[string]string{
 var All = []pandorest.Workaround{
 	// Swashbuckle types the id of every PUT path as text, where the GET and DELETE of the same path take a number
 	pandorest.NumberedPathIDs(pandorest.About{Name: "sonarr-numbered-path-ids", Service: Service, Bug: "a PUT path types its {id} as text where the GET and DELETE of the same path type it as a number"}),
-	sonarrUIRoutes{},
-	sonarrUndeclaredResponses{},
-	sonarrUndeclaredWriteResponses{},
-	sonarrCreatedAccepted{},
-	sonarrTestAllResults{},
+	sonarrUIRoutes,
+	sonarrAnswerRecords,
+	sonarrUndeclaredResponses,
+	sonarrUndeclaredWriteResponses,
+	sonarrCreatedAccepted,
+	sonarrTestResults,
+	sonarrTestAllResults,
 	sonarrCommandBody{},
 	// after the body is an open record: the commands the tools queue get a record and a method each
 	pandorest.Commands(pandorest.About{Name: "sonarr-commands", Service: Service, Bug: "POST /api/v3/command takes every command through one open body, so nothing says what a command is called or which fields it reads"}, sonarrCommands),
 	sonarrCommandResourceBody{},
 	sonarrHTTPURIString{},
-	sonarrBulkUpdateLists{},
+	sonarrAirDays,
+	sonarrBulkUpdateLists,
 }
 
 // operation finds an operation a workaround targets.

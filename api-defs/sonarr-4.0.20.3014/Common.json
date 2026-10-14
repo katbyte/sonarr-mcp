@@ -127,7 +127,7 @@
           "Name": "LastExecutionTime",
           "JsonName": "lastExecutionTime",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -135,7 +135,7 @@
           "Name": "LastStartTime",
           "JsonName": "lastStartTime",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -336,7 +336,7 @@
           "Name": "DateAdded",
           "JsonName": "dateAdded",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {
@@ -470,7 +470,7 @@
           "Name": "AirDate",
           "JsonName": "airDate",
           "Type": {
-            "Type": "String"
+            "Type": "Date"
           },
           "Nullable": true
         },
@@ -478,7 +478,7 @@
           "Name": "AirDateUtc",
           "JsonName": "airDateUtc",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -486,7 +486,7 @@
           "Name": "EndTime",
           "JsonName": "endTime",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -525,7 +525,7 @@
           "Name": "GrabDate",
           "JsonName": "grabDate",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -560,7 +560,7 @@
           "Name": "LastSearchTime",
           "JsonName": "lastSearchTime",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -991,7 +991,7 @@
           "Name": "LastWriteTime",
           "JsonName": "lastWriteTime",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         }
       ]
@@ -1454,7 +1454,7 @@
           "Name": "Added",
           "JsonName": "added",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -1536,7 +1536,7 @@
           "Name": "EstimatedCompletionTime",
           "JsonName": "estimatedCompletionTime",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -1788,7 +1788,7 @@
           "Name": "AirDate",
           "JsonName": "airDate",
           "Type": {
-            "Type": "String"
+            "Type": "Date"
           },
           "Nullable": true
         },
@@ -2083,7 +2083,7 @@
           "Name": "PublishDate",
           "JsonName": "publishDate",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {
@@ -2340,7 +2340,7 @@
           "Name": "NextAiring",
           "JsonName": "nextAiring",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -2355,7 +2355,7 @@
           "Name": "PreviousAiring",
           "JsonName": "previousAiring",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -2438,7 +2438,7 @@
           "Name": "Added",
           "JsonName": "added",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           }
         },
         {
@@ -2496,7 +2496,7 @@
           "Name": "FirstAired",
           "JsonName": "firstAired",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -2558,7 +2558,7 @@
           "Name": "LastAired",
           "JsonName": "lastAired",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -2589,7 +2589,7 @@
           "Name": "NextAiring",
           "JsonName": "nextAiring",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },
@@ -2621,7 +2621,7 @@
           "Name": "PreviousAiring",
           "JsonName": "previousAiring",
           "Type": {
-            "Type": "String"
+            "Type": "DateTime"
           },
           "Nullable": true
         },

@@ -4,6 +4,7 @@ package sonarr
 
 import (
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/katbyte/pandorest/client"
@@ -32,6 +33,12 @@ func TestOperationGetFileSystem(t *testing.T) {
 	}
 	if result.Answer == nil || !result.Answered() {
 		t.Error("the answer was not decoded")
+	}
+	if result.FileSystemResource != result.Answer {
+		t.Error("the embedded answer is not the answer")
+	}
+	if record, err := result.Record(); err != nil || !reflect.DeepEqual(record, *result.Answer) {
+		t.Errorf("Record = %+v, %v", record, err)
 	}
 
 	// an answer that does not decode is an error, with the response

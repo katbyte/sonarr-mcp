@@ -11,9 +11,9 @@ type UpdateResource struct {
 	Id          int            `json:"id,omitempty"`
 	Installable bool           `json:"installable"`
 	Installed   bool           `json:"installed"`
-	InstalledOn string         `json:"installedOn,omitempty"`
+	InstalledOn Time           `json:"installedOn,omitzero"`
 	Latest      bool           `json:"latest"`
-	ReleaseDate string         `json:"releaseDate,omitempty"`
+	ReleaseDate Time           `json:"releaseDate,omitzero"`
 	Url         string         `json:"url,omitempty"`
 	Version     string         `json:"version,omitempty"`
 }

@@ -49,21 +49,22 @@
 // sent when not zero. int(id) and SeriesID(n) convert one value, client.IDs and
 // client.StringIDs a list.
 //
-// Dates are strings: Sonarr sends RFC 3339 in UTC ("2026-09-19T13:00:00Z").
-//
 // # Workarounds
 //
 // The importer fixed these bugs in the document before generating from it:
 //
 //   - sonarr-numbered-path-ids
 //   - sonarr-ui-routes
+//   - sonarr-answer-records
 //   - sonarr-undeclared-responses
 //   - sonarr-undeclared-write-responses
 //   - sonarr-created-accepted
+//   - sonarr-test-results
 //   - sonarr-test-all-results
 //   - sonarr-command-body
 //   - sonarr-commands
 //   - sonarr-command-resource-body
 //   - sonarr-http-uri-string
+//   - sonarr-air-days
 //   - sonarr-bulk-update-lists
 package sonarr

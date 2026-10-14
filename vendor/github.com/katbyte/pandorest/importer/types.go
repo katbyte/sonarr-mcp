@@ -48,6 +48,28 @@ func (im *importer) typeRef(s *openapi.Schema, owner, field string) definitions.
 	if s == nil {
 		return definitions.TypeRef{Type: definitions.Any}
 	}
+	if s.GoType != nil {
+		name := s.GoType.Name
+		if name == "" {
+			im.fail(fmt.Sprintf("%s.%s: held as a Go type with no name", owner, field))
+		}
+		if strings.Contains(name, definitions.OwnItem) {
+			// the field's own type, or a list's element, as the package names it, so a type wrapping it survives a renaming
+			bare := *s
+			bare.GoType = nil
+			own := im.typeRef(&bare, owner, field)
+			if own.Type == definitions.List && own.NestedItem != nil {
+				own = *own.NestedItem
+			}
+			item, ok := ownName(own)
+			if !ok {
+				im.fail(fmt.Sprintf("%s.%s: %s stands for the field's own type, which is %s, not one a name can stand for", owner, field, definitions.OwnItem, own))
+			}
+			name = strings.ReplaceAll(name, definitions.OwnItem, item)
+		}
+
+		return definitions.TypeRef{Type: definitions.Named, GoType: name, Import: s.GoType.Import}
+	}
 	if ref := s.RefName(); ref != "" {
 		if _, ok := im.spec.Components.Schemas[ref]; !ok {
 			im.fail(fmt.Sprintf("%s.%s: $ref to undefined schema %q", owner, field, ref))
@@ -57,6 +79,16 @@ func (im *importer) typeRef(s *openapi.Schema, owner, field string) definitions.
 			return im.typeRef(im.spec.Components.Schemas[ref], owner, field)
 		}
 		return reference(typeName(ref))
+	}
+	if s.IsUnion() && im.cfg.TypedUnions && im.memberRefs(s) {
+		// a choice of records declared inline is a union model named for the place it sits in, as an inline object is
+		name := owner + field
+		im.claimName(name, "inline union "+name)
+		if im.models[name] == nil {
+			im.models[name] = im.unionModel(name, "", s)
+		}
+
+		return reference(name)
 	}
 	if s.IsUnion() || len(s.AllOf) > 1 {
 		return definitions.TypeRef{Type: definitions.RawObject}
@@ -101,6 +133,29 @@ func reference(name string) definitions.TypeRef {
 	return definitions.TypeRef{Type: definitions.Reference, ReferenceName: name}
 }
 
+// ownName is a type's name as the package writes it in a field, for a named type to stand in for: a model, enum or id by name,
+// a primitive by Go's; a date, a list, a map or raw JSON has no one name and answers false.
+func ownName(t definitions.TypeRef) (string, bool) {
+	switch t.Type {
+	case definitions.Reference, definitions.ID:
+		return t.ReferenceName, true
+	case definitions.String:
+		return "string", true
+	case definitions.Integer:
+		return "int", true
+	case definitions.Integer64:
+		return "int64", true
+	case definitions.Float:
+		return "float32", true
+	case definitions.Double:
+		return "float64", true
+	case definitions.Boolean:
+		return "bool", true
+	default:
+		return "", false
+	}
+}
+
 // importSchemas turns every component schema into a model or constant.
 func (im *importer) importSchemas() {
 	for _, schemaName := range openapi.SortedKeys(im.spec.Components.Schemas) {
@@ -112,7 +167,7 @@ func (im *importer) importSchemas() {
 			im.constants[name] = im.constant(name, schemaName, s)
 		case kindUnion:
 			im.claimName(name, "schema "+schemaName)
-			im.models[name] = unionModel(name, schemaName, s)
+			im.models[name] = im.unionModel(name, schemaName, s)
 		case kindAlias:
 			// resolved where it is referenced
 		default:
@@ -202,7 +257,11 @@ func (im *importer) constant(name, schemaName string, s *openapi.Schema) *defini
 	c := &definitions.Constant{Name: name, SchemaName: schemaName, Description: cleanText(s.Description)}
 	seen := map[string]string{}
 	for _, v := range s.EnumValues() {
-		cname := name + openapi.Camel(v)
+		cname := name + valueWord(v)
+		if _, ok := seen[cname]; ok {
+			// a value whose plain name another has ("!data" beside "data") is spelled out before it is given up on
+			cname = name + spelledWord(v)
+		}
 		if prev, ok := seen[cname]; ok {
 			im.warn(fmt.Sprintf("%s: values %q and %q are both %s; %q skipped", name, prev, v, cname, v))
 			continue
@@ -214,9 +273,27 @@ func (im *importer) constant(name, schemaName string, s *openapi.Schema) *defini
 	return c
 }
 
-// unionModel records a oneOf/anyOf schema: the variants share no
-// discriminator to decode on, so the model is raw JSON and names them.
-func unionModel(name, schemaName string, s *openapi.Schema) *definitions.Model {
+// valueWord is the word a value adds to its enum's name: its letters and digits, and Empty for "" (TrueNAS's tls_policy has
+// no policy as ""), which would otherwise be the enum's own name.
+func valueWord(v string) string {
+	if strings.TrimSpace(v) == "" {
+		return "Empty"
+	}
+
+	return openapi.Camel(v)
+}
+
+// spelledWord is a value's word with the signs Camel drops spelled out, for a value its plain word does not tell from another:
+// "!" is Not, "+" is Plus, "&" is And, "/" is Or.
+func spelledWord(v string) string {
+	return openapi.Camel(strings.NewReplacer("!", " not ", "+", " plus ", "&", " and ", "/", " or ").Replace(v))
+}
+
+// unionModel records a oneOf/anyOf schema: raw JSON naming the variants, which the caller decodes; for a service with
+// TypedUnions whose variants are all records of the document, the members too, each with the value of the field the
+// records name themselves by where the document says which (its discriminator), so the generated type hands the record over
+// as the member asked for.
+func (im *importer) unionModel(name, schemaName string, s *openapi.Schema) *definitions.Model {
 	m := &definitions.Model{Name: name, SchemaName: schemaName, Description: cleanText(s.Description)}
 	for _, v := range slices.Concat(s.OneOf, s.AnyOf) {
 		if ref := v.RefName(); ref != "" {
@@ -225,8 +302,39 @@ func unionModel(name, schemaName string, s *openapi.Schema) *definitions.Model {
 			m.Union = append(m.Union, "<inline "+strings.TrimSpace(v.Type+" "+v.Format)+">")
 		}
 	}
+	if !im.cfg.TypedUnions || !im.memberRefs(s) {
+		return m
+	}
+
+	byRef := map[string]string{}
+	if s.Discriminator != nil {
+		m.Discriminator = s.Discriminator.PropertyName
+		for kind, ref := range s.Discriminator.Mapping {
+			byRef[strings.TrimPrefix(ref, openapi.SchemaRefPrefix)] = kind
+		}
+	}
+	for _, v := range slices.Concat(s.OneOf, s.AnyOf) {
+		m.Members = append(m.Members, definitions.Member{Model: typeName(v.RefName()), Kind: byRef[v.RefName()]})
+	}
 
 	return m
+}
+
+// memberRefs reports whether every variant of a union is a record of the document, which a typed union needs: one that is a
+// string or a list among records stays raw JSON.
+func (im *importer) memberRefs(s *openapi.Schema) bool {
+	variants := slices.Concat(s.OneOf, s.AnyOf)
+	if len(variants) == 0 {
+		return false
+	}
+	for _, v := range variants {
+		ref := v.RefName()
+		if ref == "" || im.spec.Components.Schemas[ref] == nil || im.kindOf(ref) != kindObject {
+			return false
+		}
+	}
+
+	return true
 }
 
 // integerType is an integer schema as the SDK holds it: a date a workaround

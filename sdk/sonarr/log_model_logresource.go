@@ -11,5 +11,5 @@ type LogResource struct {
 	Logger        string `json:"logger,omitempty"`
 	Message       string `json:"message,omitempty"`
 	Method        string `json:"method,omitempty"`
-	Time          string `json:"time,omitempty"`
+	Time          Time   `json:"time,omitzero"`
 }

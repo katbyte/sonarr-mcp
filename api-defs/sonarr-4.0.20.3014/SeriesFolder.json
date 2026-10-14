@@ -19,11 +19,28 @@
       "Response": {
         "ContentType": "application/json",
         "Type": {
-          "Type": "RawObject"
+          "Type": "Reference",
+          "ReferenceName": "SeriesFolderResource"
         }
       },
       "ExpectedStatusCodes": [
         200
+      ]
+    }
+  ],
+  "Models": [
+    {
+      "Name": "SeriesFolderResource",
+      "SchemaName": "SeriesFolderResource",
+      "Description": "The folder name the series folder format makes for a series.",
+      "Fields": [
+        {
+          "Name": "Folder",
+          "JsonName": "folder",
+          "Type": {
+            "Type": "String"
+          }
+        }
       ]
     }
   ]

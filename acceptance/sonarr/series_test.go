@@ -74,11 +74,8 @@ func TestSeriesLifecycle(t *testing.T) {
 	}
 
 	// the folder the naming format makes for it
-	var folder struct {
-		Folder string `json:"folder"`
-	}
-	if err := unmarshal(must(sc.GetSeriesByIdFolder(ctx, id)).Answer, &folder); err != nil || folder.Folder != theExpanse.Title {
-		t.Errorf("GetSeriesByIdFolder = %+v, %v", folder, err)
+	if folder := must(sc.GetSeriesByIdFolder(ctx, id)); folder.Folder != theExpanse.Title {
+		t.Errorf("GetSeriesByIdFolder = %+v", folder.Answer)
 	}
 
 	// an edit, then a move: the record changes at once, the files follow
@@ -187,7 +184,7 @@ func TestEpisodes(t *testing.T) {
 		t.Fatal("GetEpisode listed nothing for Severance")
 	}
 	e := episode(ctx, t, id, 1)
-	if !boolValue(e.HasFile) || e.EpisodeFile == nil || e.EpisodeFile.Quality == nil || e.Title == "" || e.AirDateUtc == "" {
+	if !boolValue(e.HasFile) || e.EpisodeFile == nil || e.EpisodeFile.Quality == nil || e.Title == "" || e.AirDateUtc.IsZero() {
 		t.Errorf("S01E01 did not decode with its file: %+v", e)
 	}
 	if got := must(sc.GetEpisodeById(ctx, e.Id)).Answer; got.Title != e.Title {
@@ -366,7 +363,7 @@ func TestCalendarAndWanted(t *testing.T) {
 
 	// Firefly's first run, which aired in 2002
 	cal := must(sc.GetCalendar(ctx, sonarr.GetCalendarOptions{
-		Start: "2002-09-01T00:00:00Z", End: "2002-12-31T00:00:00Z", Unmonitored: new(true), IncludeSeries: new(true),
+		Start: day(2002, time.September, 1), End: day(2002, time.December, 31), Unmonitored: new(true), IncludeSeries: new(true),
 	})).Answer
 	i := slices.IndexFunc(cal, func(e sonarr.EpisodeResource) bool { return e.SeriesId == seriesIDs[firefly.Title] })
 	if i < 0 || cal[i].Series == nil || cal[i].Series.Title != firefly.Title {

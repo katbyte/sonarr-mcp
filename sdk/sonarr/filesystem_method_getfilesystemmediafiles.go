@@ -4,7 +4,6 @@ package sonarr
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -14,7 +13,7 @@ import (
 // GetFileSystemMediaFilesResponse is the result of GetFileSystemMediaFiles.
 type GetFileSystemMediaFilesResponse struct {
 	HttpResponse *http.Response
-	Answer       json.RawMessage
+	Answer       []MediaFileResource
 }
 
 // Answered reports whether the server answered with a body that was decoded:
