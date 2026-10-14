@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 (2026-10-14)
 
-Found by running the audits against a real library of 6,000 series.
+The audits finish on a library of thousands, found by running them against a real one of 6,000 series, and `audit_no_files` names every series with no files at all. In the Go client, dates are dates.
 
 ### Breaking
 
