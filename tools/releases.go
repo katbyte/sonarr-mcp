@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -119,7 +120,7 @@ func registerReleaseTools(r *registry) {
 			if row.Approved {
 				out.Approved++
 			}
-			if len(out.Releases) < limitOr(in.Limit, 25) {
+			if len(out.Releases) < mcpregistry.LimitOr(in.Limit, 25) {
 				out.Releases = append(out.Releases, row)
 			}
 		}
@@ -255,7 +256,7 @@ func registerReleaseTools(r *registry) {
 		default:
 			return nil, wantedOut{}, fmt.Errorf("kind must be missing or cutoff, got %q", in.Kind)
 		}
-		cmd, err := r.settleCommand(ctx, name, waitFor(in.Wait), sent, err)
+		cmd, err := r.settleCommand(ctx, name, mcpregistry.WaitFor(in.Wait, commandWait), sent, err)
 		if err != nil {
 			return nil, wantedOut{}, err
 		}

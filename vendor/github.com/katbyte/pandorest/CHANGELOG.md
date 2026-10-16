@@ -1,3 +1,18 @@
+## v0.11.0 (2026-10-14)
+
+- **The client is on go-kt v0.8.0, where chttp is now httpc.** Nothing about it changes, but a repository that takes go-kt v0.8.0 needs this release for the client to compile, so pandorest moves first and the generated packages follow.
+
+## v0.10.0 (2026-10-14)
+
+- **A service whose pages count from 0 can say so.** `FirstPage: new(0)` beside `ByPage` in a paging shape starts the pager at page 0 and counts the pages loaded from there. Unset is 1, as before.
+- **A generated test fills a list of ids with the kind's example.** It used `a` and `b`, or 1 and 2, so with a shape on the kind the method refused its own test's call before sending it. A list is now the example twice over, as a single id already was.
+- **The package doc names its own id kind.** The Ids section's example read `SeriesID(n)` in every package, so Radarr's said a name it does not have. It now names the package's first kind over its own base, `MovieID(n)` or `ItemID(s)`.
+
+## v0.9.1 (2026-10-13)
+
+- **A union member keeps every kind the document sends to it.** Where several kinds name one record, such as a mirror, a stripe and the raidz levels all being one vdev, one kind was kept at random, so two runs of the generator differed and a record of the other kinds was refused. Every kind is kept, in order, and a record of any of them is that member.
+- **`check` finds a call's method under its short name.** In a package per namespace it reported every method of a JSON-RPC service missing, since it looked for the full name. It now looks on each group's own client for the name the method is generated under, so one group's `Query` does not stand for another's.
+
 ## v0.9.0 (2026-10-13)
 
 - **A server with no OpenAPI document can be generated from its own method list.** TrueNAS is retiring its REST API and describes its JSON-RPC methods instead. The config says `Document: config.JSONRPCDocument`, and each method becomes a call with its arguments in order, grouped by namespace.

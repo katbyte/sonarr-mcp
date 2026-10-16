@@ -229,10 +229,21 @@ type Pageable struct {
 	// then the page wanted, counted from 1, rather than the index of its
 	// first result.
 	ByPage bool `json:"ByPage,omitempty"`
+	// FirstPage is the number of the first page where the list pages by number and does not count from 1; First is the number to read.
+	FirstPage *int `json:"FirstPage,omitempty"`
 	// ItemsField and TotalField are fields of the response model.
 	ItemsField string  `json:"ItemsField"`
 	TotalField string  `json:"TotalField"`
 	ItemType   TypeRef `json:"ItemType"`
+}
+
+// First is the number of the first page of a list that pages by number: 1 unless the service says otherwise.
+func (p *Pageable) First() int {
+	if p.FirstPage == nil {
+		return 1
+	}
+
+	return *p.FirstPage
 }
 
 // Model is an object schema, or a oneOf/anyOf union kept as raw JSON.
@@ -263,11 +274,12 @@ type Model struct {
 // survives the package renaming it.
 const OwnItem = "$item"
 
-// Member is one record a union is one of: the model, and the value of the union's Discriminator that names it, empty where
-// the document gives none.
+// Member is one record a union is one of: the model, and the values of the union's Discriminator that name it, in order,
+// none where the document gives none; several where the document sends several kinds to one record (a mirror, a stripe and
+// three raidz levels are all one vdev record).
 type Member struct {
-	Model string `json:"Model"`
-	Kind  string `json:"Kind,omitempty"`
+	Model string   `json:"Model"`
+	Kinds []string `json:"Kinds,omitempty"`
 }
 
 // Field is one property of a model.

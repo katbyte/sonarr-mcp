@@ -670,26 +670,32 @@ func (l *loader) property(owner, prop string, p *schema) *openapi.Schema {
 // name themselves by (disc), the value naming each member, from the mapping by the member's class or from the one value the
 // field is fixed to in the record.
 func (l *loader) members(out *openapi.Schema, records []*schema, disc *discriminator) {
-	var byTitle map[string]string
 	if disc != nil {
 		out.Discriminator = &openapi.Discriminator{PropertyName: disc.PropertyName, Mapping: map[string]string{}}
-		byTitle = map[string]string{}
-		for kind, ref := range disc.Mapping {
-			byTitle[path.Base(ref)] = kind
-		}
 	}
+	// the document's record under each class title, once converted, so every kind the mapping sends to a class is kept
+	byTitle := map[string]string{}
 	for _, v := range records {
 		member := l.convert(v)
 		out.OneOf = append(out.OneOf, member)
 		if out.Discriminator == nil || member.RefName() == "" {
 			continue
 		}
-		kind := byTitle[v.Title]
-		if p := v.Properties[disc.PropertyName]; kind == "" && p != nil && len(p.Const) > 0 {
+		byTitle[v.Title] = member.RefName()
+		// a record the mapping does not name is known by the one value its field is fixed to
+		var kind string
+		if p := v.Properties[disc.PropertyName]; p != nil && len(p.Const) > 0 {
 			_ = json.Unmarshal(p.Const, &kind)
 		}
 		if kind != "" {
 			out.Discriminator.Mapping[kind] = openapi.SchemaRefPrefix + member.RefName()
+		}
+	}
+	if disc != nil {
+		for kind, ref := range disc.Mapping {
+			if name := byTitle[path.Base(ref)]; name != "" {
+				out.Discriminator.Mapping[kind] = openapi.SchemaRefPrefix + name
+			}
 		}
 	}
 }

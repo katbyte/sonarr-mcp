@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -236,7 +237,7 @@ func registerImportTools(r *registry) {
 		}
 
 		sent, err := r.client.ManualImport(ctx, sonarr.ManualImportCommand{Files: files, ImportMode: mode})
-		cmd, err := r.settleCommand(ctx, "ManualImport", waitFor(in.Wait), sent, err)
+		cmd, err := r.settleCommand(ctx, "ManualImport", mcpregistry.WaitFor(in.Wait, commandWait), sent, err)
 		out.Command = cmd
 		if err != nil {
 			return nil, out, err

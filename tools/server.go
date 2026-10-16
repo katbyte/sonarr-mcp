@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	"github.com/katbyte/go-kt/version"
 	apiclient "github.com/katbyte/pandorest/client"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
@@ -164,7 +165,7 @@ func registerServerTools(r *registry) {
 					return nil, commandOut{}, err
 				}
 				sent, err := client.PostCommand(ctx, body)
-				out, err := r.settleCommand(ctx, t.TaskName, waitFor(in.Wait), sent, err)
+				out, err := r.settleCommand(ctx, t.TaskName, mcpregistry.WaitFor(in.Wait, commandWait), sent, err)
 				return nil, out, err
 			}
 		}

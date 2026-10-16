@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/katbyte/go-kt/lock"
+	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	apiclient "github.com/katbyte/pandorest/client"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -696,7 +697,7 @@ func registerSystemTools(r *registry) {
 		Description: "Back up Sonarr's database and settings now, before a change worth being able to undo. The backup is kept with the scheduled ones, under Sonarr's own retention.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in backupCreateIn) (*mcp.CallToolResult, backupCreateOut, error) {
 		sent, err := client.Backup(ctx, sonarr.BackupCommand{})
-		cmd, err := r.settleCommand(ctx, "Backup", waitFor(in.Wait), sent, err)
+		cmd, err := r.settleCommand(ctx, "Backup", mcpregistry.WaitFor(in.Wait, commandWait), sent, err)
 		out := backupCreateOut{Command: cmd}
 		if err != nil || !commandDone(sonarr.CommandStatus(cmd.Status)) {
 			return nil, out, err
@@ -923,7 +924,7 @@ func registerSystemTools(r *registry) {
 		}
 		defer func() { _ = res.HttpResponse.Body.Close() }()
 
-		keep := min(limitOr(in.Lines, 200), 2000)
+		keep := min(mcpregistry.LimitOr(in.Lines, 200), 2000)
 		want := strings.ToLower(in.Contains)
 		out := logReadOut{Filename: name}
 		lines := bufio.NewScanner(res.HttpResponse.Body)

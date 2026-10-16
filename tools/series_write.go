@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/katbyte/go-kt/lock"
+	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -215,7 +216,7 @@ func registerSeriesWriteTools(r *registry) {
 		}
 		out := lookupOut{}
 		for i := range found {
-			if len(out.Candidates) >= limitOr(in.Limit, 10) {
+			if len(out.Candidates) >= mcpregistry.LimitOr(in.Limit, 10) {
 				break
 			}
 			out.Candidates = append(out.Candidates, lookupSummary(&found[i]))
@@ -306,7 +307,7 @@ func registerSeriesWriteTools(r *registry) {
 		// on the series until it has, so the series is watched until they
 		// are gone
 		var added *sonarr.SeriesResource
-		for deadline := time.Now().Add(waitFor(in.Wait)); ; {
+		for deadline := time.Now().Add(mcpregistry.WaitFor(in.Wait, commandWait)); ; {
 			now, readErr := client.GetSeriesById(ctx, res.Answer.Id, sonarr.GetSeriesByIdOptions{})
 			if readErr != nil {
 				return nil, addOut{}, fmt.Errorf("%s was added, and reading it back failed: %w", res.Answer.Title, readErr)
@@ -526,7 +527,7 @@ func registerSeriesWriteTools(r *registry) {
 			return seriesCommandOut{}, err
 		}
 		sent, err := queue(ctx, s.Id)
-		cmd, err := r.settleCommand(ctx, name, waitFor(in.Wait), sent, err)
+		cmd, err := r.settleCommand(ctx, name, mcpregistry.WaitFor(in.Wait, commandWait), sent, err)
 		if err != nil {
 			return seriesCommandOut{}, err
 		}
@@ -641,7 +642,7 @@ func registerSeriesWriteTools(r *registry) {
 			return nil, out, nil
 		}
 		sent, err := client.RenameFiles(ctx, sonarr.RenameFilesCommand{SeriesId: s.Id, Files: ids})
-		cmd, err := r.settleCommand(ctx, "RenameFiles", waitFor(in.Wait), sent, err)
+		cmd, err := r.settleCommand(ctx, "RenameFiles", mcpregistry.WaitFor(in.Wait, commandWait), sent, err)
 		out.Command = &cmd
 
 		return nil, out, err

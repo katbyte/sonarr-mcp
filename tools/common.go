@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	"github.com/katbyte/pandorest/client"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
@@ -371,32 +372,10 @@ func commandDone(s sonarr.CommandStatus) bool {
 	}
 }
 
-// waitFor is the wait a tool's input asks for: the default when unset, none
-// when negative.
-func waitFor(seconds int) time.Duration {
-	switch {
-	case seconds < 0:
-		return 0
-	case seconds == 0:
-		return commandWait
-	default:
-		return time.Duration(seconds) * time.Second
-	}
-}
-
 func firstLine(s string) string {
 	line, _, _ := strings.Cut(s, "\n")
 
 	return strings.TrimSpace(line)
-}
-
-// limitOr is a limit input with its default.
-func limitOr(limit, def int) int {
-	if limit <= 0 {
-		return def
-	}
-
-	return limit
 }
 
 const (
@@ -426,7 +405,7 @@ type pageOut struct {
 // default when no limit is given, never more than maxLimit, never before the
 // start.
 func (p pageIn) args() (limit, offset int) {
-	return min(limitOr(p.Limit, defaultLimit), maxLimit), max(p.Offset, 0)
+	return min(mcpregistry.LimitOr(p.Limit, defaultLimit), maxLimit), max(p.Offset, 0)
 }
 
 // pageRows is one page of a list held whole: at most limit rows from offset,
@@ -436,17 +415,7 @@ func pageRows[T any](all []T, in pageIn) ([]T, pageOut) {
 	from := min(offset, len(all))
 	rows := all[from:min(from+limit, len(all))]
 
-	return rows, pageOut{Total: len(all), Offset: offset, NextOffset: nextOffset(offset, len(rows), len(all))}
-}
-
-// nextOffset is where the page after one of n rows from offset starts, or 0
-// when that was the last.
-func nextOffset(offset, n, total int) int {
-	if n == 0 || offset+n >= total {
-		return 0
-	}
-
-	return offset + n
+	return rows, pageOut{Total: len(all), Offset: offset, NextOffset: mcpregistry.NextOffset(offset, len(rows), len(all))}
 }
 
 // window reads limit rows from offset out of a listing Sonarr pages by page
@@ -473,7 +442,7 @@ func window[T any](in pageIn, fetch func(page, size int) ([]T, int, error)) ([]T
 		rows = rows[:min(limit, len(rows))]
 	}
 
-	return rows, pageOut{Total: total, Offset: offset, NextOffset: nextOffset(offset, len(rows), total)}, nil
+	return rows, pageOut{Total: total, Offset: offset, NextOffset: mcpregistry.NextOffset(offset, len(rows), total)}, nil
 }
 
 // countOf is a count and its noun, pluralised: "1 file", "3 files".

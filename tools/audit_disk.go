@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
@@ -280,7 +281,7 @@ func (r *registry) auditUntrackedFiles(ctx context.Context, s *snapshot, limit i
 		}
 		// past the limit a file is counted and not asked about: to say why it tracks none of them Sonarr parses the whole folder, which is the
 		// slow part, and a library can have thousands of such folders
-		if len(out.Findings) >= limitOr(limit, 100) {
+		if len(out.Findings) >= mcpregistry.LimitOr(limit, 100) {
 			out.Found += len(untracked)
 
 			continue

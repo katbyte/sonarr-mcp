@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -374,7 +375,7 @@ func registerEpisodeTools(r *registry) {
 		}
 		ids := episodeIDs(picked)
 		sent, err := client.EpisodeSearch(ctx, sonarr.EpisodeSearchCommand{EpisodeIds: ids})
-		cmd, err := r.settleCommand(ctx, "EpisodeSearch", waitFor(in.Wait), sent, err)
+		cmd, err := r.settleCommand(ctx, "EpisodeSearch", mcpregistry.WaitFor(in.Wait, commandWait), sent, err)
 		if err != nil {
 			return nil, searchOut{}, err
 		}
@@ -405,7 +406,7 @@ func registerEpisodeTools(r *registry) {
 			return nil, searchOut{}, noSeason(s, in.Season)
 		}
 		sent, err := client.SeasonSearch(ctx, sonarr.SeasonSearchCommand{SeriesId: s.Id, SeasonNumber: new(in.Season)})
-		cmd, err := r.settleCommand(ctx, "SeasonSearch", waitFor(in.Wait), sent, err)
+		cmd, err := r.settleCommand(ctx, "SeasonSearch", mcpregistry.WaitFor(in.Wait, commandWait), sent, err)
 		if err != nil {
 			return nil, searchOut{}, err
 		}
@@ -446,7 +447,7 @@ func registerEpisodeTools(r *registry) {
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in calendarIn) (*mcp.CallToolResult, calendarOut, error) {
 		now := time.Now().UTC()
 		from := now.AddDate(0, 0, -in.PastDays)
-		to := now.AddDate(0, 0, limitOr(in.Days, 7))
+		to := now.AddDate(0, 0, mcpregistry.LimitOr(in.Days, 7))
 		res, err := client.GetCalendar(ctx, sonarr.GetCalendarOptions{
 			Start: sonarr.Time{Time: from}, End: sonarr.Time{Time: to},
 			Unmonitored: new(in.Unmonitored), IncludeSeries: new(true),

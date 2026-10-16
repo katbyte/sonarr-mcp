@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 )
 
@@ -56,7 +57,7 @@ func (r *registry) auditMissingEpisodes(ctx context.Context, s *snapshot, limit 
 
 	// the series of the seasons that will be listed are read side by side; a season past the limit is counted and not read
 	listed := map[sonarr.SeriesID]bool{}
-	for _, k := range short[:min(len(short), limitOr(limit, 100))] {
+	for _, k := range short[:min(len(short), mcpregistry.LimitOr(limit, 100))] {
 		listed[k.series.Id] = true
 	}
 	if err := s.warm(ctx, reads{episodes: true, of: func(series *sonarr.SeriesResource) bool { return listed[series.Id] }}); err != nil {
@@ -70,7 +71,7 @@ func (r *registry) auditMissingEpisodes(ctx context.Context, s *snapshot, limit 
 	out := auditOut{Scanned: len(s.series)}
 	now := time.Now()
 	for _, k := range short {
-		if len(out.Findings) >= limitOr(limit, 100) {
+		if len(out.Findings) >= mcpregistry.LimitOr(limit, 100) {
 			out.Found++
 
 			continue
@@ -280,7 +281,7 @@ func (r *registry) auditNoFiles(ctx context.Context, s *snapshot, limit int) (au
 	out := auditOut{Scanned: len(s.series)}
 	listed := map[sonarr.SeriesID]bool{}
 	for i := range s.series {
-		if !hasFiles(&s.series[i]) && len(listed) < limitOr(limit, 100) {
+		if !hasFiles(&s.series[i]) && len(listed) < mcpregistry.LimitOr(limit, 100) {
 			listed[s.series[i].Id] = true
 		}
 	}

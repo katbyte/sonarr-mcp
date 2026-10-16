@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The shared library goes from go-kt v0.6.4 to v0.9.0, and the generator from pandorest v0.9.0 to v0.11.0, whose client is on go-kt's new HTTP package. The Go client comes out the same. Three small helpers the tools kept their own copies of (the page size asked for, where the next page starts, how long to wait for a command) are go-kt's now.
+
 ## 0.3.0 (2026-10-14)
 
 The audits finish on a library of thousands, found by running them against a real one of 6,000 series, and `audit_no_files` names every series with no files at all. In the Go client, dates are dates.

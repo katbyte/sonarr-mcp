@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	mcpregistry "github.com/katbyte/go-kt/mcp/registry"
 	"github.com/katbyte/go-kt/parallel"
 	"github.com/katbyte/sonarr-mcp/sdk/sonarr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -48,7 +49,7 @@ type auditOut struct {
 // report adds a finding, counting it whether or not it fits under the limit.
 func (o *auditOut) report(limit int, f finding) {
 	o.Found++
-	if len(o.Findings) < limitOr(limit, 100) {
+	if len(o.Findings) < mcpregistry.LimitOr(limit, 100) {
 		o.Findings = append(o.Findings, f)
 	}
 }

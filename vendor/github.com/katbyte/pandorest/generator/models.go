@@ -16,8 +16,8 @@ func (g *gen) modelFile(m *definitions.Model) string {
 		fmt.Fprintf(&b, "// %s is one of several records, held as it came: ", m.Name)
 		members := make([]string, 0, len(m.Members))
 		for _, member := range m.Members {
-			if member.Kind != "" {
-				members = append(members, fmt.Sprintf("%s (%s %q)", g.typeName(member.Model), m.Discriminator, member.Kind))
+			if len(member.Kinds) > 0 {
+				members = append(members, fmt.Sprintf("%s (%s %s)", g.typeName(member.Model), m.Discriminator, strings.Join(quotedWords(member.Kinds), ", ")))
 			} else {
 				members = append(members, g.typeName(member.Model))
 			}
@@ -50,7 +50,8 @@ func (g *gen) modelFile(m *definitions.Model) string {
 		for _, member := range m.Members {
 			typ := g.typeName(member.Model)
 			g.declare(m.Name+".As"+typ, "model "+m.Name)
-			fmt.Fprintf(&b, "\n// As%s hands the record over as a %s.\nfunc (u %s) As%s() (%s, error) { return client.UnionAs[%s](u.Union, %q, %q) }\n", typ, typ, m.Name, typ, typ, typ, m.Discriminator, member.Kind)
+			kinds := append([]string{fmt.Sprintf("%q", m.Discriminator)}, quotedWords(member.Kinds)...)
+			fmt.Fprintf(&b, "\n// As%s hands the record over as a %s.\nfunc (u %s) As%s() (%s, error) { return client.UnionAs[%s](u.Union, %s) }\n", typ, typ, m.Name, typ, typ, typ, strings.Join(kinds, ", "))
 		}
 	case len(m.Union) > 0:
 		fmt.Fprintf(&b, "type %s = json.RawMessage\n", m.Name)
@@ -71,6 +72,16 @@ func (g *gen) modelFile(m *definitions.Model) string {
 	}
 
 	return g.fileHeader(b.String())
+}
+
+// quotedWords is each word as a Go string literal.
+func quotedWords(words []string) []string {
+	out := make([]string, len(words))
+	for i, w := range words {
+		out[i] = fmt.Sprintf("%q", w)
+	}
+
+	return out
 }
 
 // accessors are GetName and GetId for a record that has a Name and an Id, so

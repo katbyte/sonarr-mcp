@@ -306,15 +306,17 @@ func (im *importer) unionModel(name, schemaName string, s *openapi.Schema) *defi
 		return m
 	}
 
-	byRef := map[string]string{}
+	// every kind the document sends to a member, in order, so the output is the same run to run
+	byRef := map[string][]string{}
 	if s.Discriminator != nil {
 		m.Discriminator = s.Discriminator.PropertyName
-		for kind, ref := range s.Discriminator.Mapping {
-			byRef[strings.TrimPrefix(ref, openapi.SchemaRefPrefix)] = kind
+		for _, kind := range openapi.SortedKeys(s.Discriminator.Mapping) {
+			ref := strings.TrimPrefix(s.Discriminator.Mapping[kind], openapi.SchemaRefPrefix)
+			byRef[ref] = append(byRef[ref], kind)
 		}
 	}
 	for _, v := range slices.Concat(s.OneOf, s.AnyOf) {
-		m.Members = append(m.Members, definitions.Member{Model: typeName(v.RefName()), Kind: byRef[v.RefName()]})
+		m.Members = append(m.Members, definitions.Member{Model: typeName(v.RefName()), Kinds: byRef[v.RefName()]})
 	}
 
 	return m
