@@ -978,7 +978,12 @@ func describeFields(fields []map[string]any) []map[string]any {
 			choices := make([]map[string]any, 0, len(options))
 			for _, o := range options {
 				if opt, ok := o.(map[string]any); ok {
-					choices = append(choices, map[string]any{"value": opt["value"], "name": opt["name"]})
+					// a choice's value is a number, and the client's record of it leaves out a 0, as the first choice often is
+					value := opt["value"]
+					if value == nil {
+						value = 0
+					}
+					choices = append(choices, map[string]any{"value": value, "name": opt["name"]})
 				}
 			}
 			row["options"] = choices

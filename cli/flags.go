@@ -3,7 +3,10 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/katbyte/go-kt/clog"
 	"github.com/katbyte/pandorest/client"
@@ -49,8 +52,8 @@ func configureFlags(root *cobra.Command) error {
 	pflags.StringP("server", "s", "", "Sonarr's url, with its URL base if it has one, e.g. http://nas:8989")
 	pflags.StringP("token", "t", "", "the Sonarr API key, from Settings → General → Security (consider exporting to SONARR_TOKEN instead)")
 	pflags.Bool("read-only", false, "register only tools that never change Sonarr's state")
-	pflags.Bool("enable-delete", false, "register the tools that delete series and episode files from disk")
-	pflags.StringSlice("toolsets", nil, "groups of tools to register: all, core (default), curation, library, admin, or a resource family like series (core is always included)")
+	pflags.Bool("enable-delete", false, "register the 15 tools that delete: series and episode files from disk, tags, backups, and settings such as indexers and download clients. Each still changes nothing without confirm")
+	pflags.StringSlice("toolsets", nil, "groups of tools to register: all, core (default), library, curation, admin, settings, or a resource family like series (core is always included)")
 	pflags.StringSlice("allow-tools", nil, "register these tools by name: names, prefix globs like series_*, or the essential preset. On its own, only these; beside --toolsets, these as well as the sets")
 	pflags.StringSlice("deny-tools", nil, "never register these tools, whatever asked for them: names or prefix globs like *_delete")
 	pflags.String("listen", "", "serve MCP over HTTP on this address (e.g. :8080) instead of stdio")
@@ -80,9 +83,62 @@ func configureFlags(root *cobra.Command) error {
 		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); !ok {
 			clog.Log.Errorf("Error reading config file: %v", err)
 		}
+
+		return nil
+	}
+
+	return readConfigNames(viper.ConfigFileUsed())
+}
+
+// readConfigNames holds a config file to the names it takes, the flags in capitals with _ for - (SERVER, ALLOW_TOOLS), and reads each name
+// with a _ as its flag. A name it does not take would do nothing and say nothing, so each is an error saying what to write instead.
+func readConfigNames(path string) error {
+	file := viper.New()
+	file.SetConfigFile(path)
+	file.SetConfigType("env")
+	if err := file.ReadInConfig(); err != nil {
+		return err
+	}
+
+	var wrong []string
+	for _, key := range slices.Sorted(slices.Values(file.AllKeys())) {
+		flag := strings.ReplaceAll(key, "_", "-")
+		if _, ok := envNames[flag]; !ok {
+			wrong = append(wrong, misnamed(strings.ToUpper(key)))
+
+			continue
+		}
+		if flag != key {
+			viper.RegisterAlias(key, flag)
+		}
+	}
+	if len(wrong) > 0 {
+		return fmt.Errorf("%s: %s", path, strings.Join(wrong, "; "))
 	}
 
 	return nil
+}
+
+// misnamed says what is wrong with a name a config file does not take: an environment variable's name is told the file's name for it, and
+// anything else what the file takes.
+func misnamed(key string) string {
+	flags := slices.Sorted(maps.Keys(envNames))
+	for _, flag := range flags {
+		if slices.Contains(envNames[flag], key) {
+			return fmt.Sprintf("%s is the environment's name for --%s; in this file it is %s", key, flag, fileName(flag))
+		}
+	}
+	names := make([]string, 0, len(flags))
+	for _, flag := range flags {
+		names = append(names, fileName(flag))
+	}
+
+	return fmt.Sprintf("%s is not a setting; this file takes %s", key, strings.Join(names, ", "))
+}
+
+// fileName is a flag's name in a config file: in capitals, with _ for -.
+func fileName(flag string) string {
+	return strings.ToUpper(strings.ReplaceAll(flag, "-", "_"))
 }
 
 // GetFlags returns the fully populated FlagData.

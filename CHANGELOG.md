@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- **A config file took only some of the flags, and ignored the rest without a word.** A flag with a `-` in its name (`read-only`, `enable-delete`, `allow-tools`, `deny-tools`, `auth-token`, `allow-no-auth`) could not be set in one at all. It is now written with a `_`, such as `ALLOW_TOOLS=`. A name the file does not take, such as the environment's `SONARR_SERVER=`, stops the program and says what to write instead.
+- The `_kinds` tools listed a setting's choice worth 0 with no value, so nothing said what to send for it. Sonarr's Fail Downloads is one, with Executables as 0.
+- The help for `--toolsets` names the `settings` toolset, and the help for `--enable-delete` says it brings all 15 tools that delete, not only those for series and files.
+
 ### Changed
 
 - The shared library goes from go-kt v0.6.4 to v0.9.0, and the generator from pandorest v0.9.0 to v0.11.0, whose client is on go-kt's new HTTP package. The Go client comes out the same. Three small helpers the tools kept their own copies of (the page size asked for, where the next page starts, how long to wait for a command) are go-kt's now.

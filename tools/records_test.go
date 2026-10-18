@@ -459,3 +459,23 @@ func TestRecordTestAllWhenOneThrows(t *testing.T) {
 		t.Errorf("%d notifications were tried on their own, want the two that are sent for something", tried)
 	}
 }
+
+// A setting's first choice is often worth 0, which the client's record of a choice leaves out: it is listed as 0, not as no value, or a caller
+// cannot tell what to send for it. Sonarr's Fail Downloads is one, with Executables as 0.
+func TestKindChoiceWorthZero(t *testing.T) {
+	t.Parallel()
+
+	kind, err := asMap(sonarr.IndexerResource{Fields: []sonarr.Field{{Name: "failDownloads", Type: "select", SelectOptions: []sonarr.SelectOption{{Value: 0, Name: "Executables"}, {Value: 1, Name: "Potentially Dangerous"}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	settings := describeFields(fieldsOf(kind))
+	if len(settings) != 1 {
+		t.Fatalf("settings = %v, want failDownloads alone", settings)
+	}
+	choices, ok := settings[0]["options"].([]map[string]any)
+	if !ok || len(choices) != 2 || choices[0]["value"] != 0 || choices[0]["name"] != "Executables" || fmt.Sprint(choices[1]["value"]) != "1" {
+		t.Errorf("choices = %v, want Executables as 0 and Potentially Dangerous as 1", choices)
+	}
+}

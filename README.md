@@ -79,7 +79,7 @@ Set these as environment variables, as flags, or in a config file. Only the firs
 
 `SONARR_URL` and `SONARR_API_KEY` work too, since other Sonarr tools use those names.
 
-A config file goes in `~/.sonarr-mcp`, or in `./.sonarr-mcp` for one project. Its names are the flags in capitals, without `SONARR_` in front:
+A config file goes in `~/.sonarr-mcp`, or in `./.sonarr-mcp` for one project. Its names are the flags in capitals, with `_` for `-` and without `SONARR_` in front, such as `ALLOW_TOOLS`. A name it does not take stops the program, saying what to write instead:
 
 ```env
 SERVER=http://nas:8989

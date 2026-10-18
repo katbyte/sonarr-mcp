@@ -3,6 +3,8 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -11,8 +13,10 @@ import (
 
 // viper is global, so none of these can run in parallel and each resets it.
 const (
-	testServer = "http://nas:8989"
-	testTool   = "series_get"
+	testServer  = "http://nas:8989"
+	testTool    = "series_get"
+	denyDeletes = "*_delete"
+	testBearer  = "bearer"
 )
 
 // load drives the real flag wiring against a temporary home and working
@@ -30,6 +34,18 @@ func load(t *testing.T, home, wd string) *FlagData {
 	}
 
 	return GetFlags()
+}
+
+// configure drives the flag wiring as load does, and returns what it said of the config file.
+func configure(t *testing.T, home, wd string) error {
+	t.Helper()
+
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	t.Setenv("HOME", home)
+	t.Chdir(wd)
+
+	return configureFlags(&cobra.Command{Use: "sonarr-mcp"})
 }
 
 func write(t *testing.T, dir, body string) {
@@ -91,6 +107,37 @@ func TestEnvironmentOverridesConfigFile(t *testing.T) {
 	}
 }
 
+// A flag with a - in its name is written with a _ in a config file, since an env file takes no -, and reaches its flag like any other.
+//
+//nolint:paralleltest // viper is global state; these mutate it
+func TestConfigFileTakesEveryFlag(t *testing.T) {
+	home := t.TempDir()
+	write(t, home, "SERVER=http://from-home\nREAD_ONLY=true\nENABLE_DELETE=true\nALLOW_TOOLS=series_get\nDENY_TOOLS=*_delete\nAUTH_TOKEN=bearer\nALLOW_NO_AUTH=true\n")
+
+	f := load(t, home, t.TempDir())
+	if f.Server != "http://from-home" || !f.ReadOnly || !f.EnableDelete || !slices.Equal(f.AllowTools, []string{testTool}) || !slices.Equal(f.DenyTools, []string{denyDeletes}) || f.AuthToken != testBearer || !f.AllowNoAuth {
+		t.Errorf("flags from the file = %+v, want every one of them set", f)
+	}
+}
+
+// A name a config file does not take did nothing and said nothing, so a file written with the environment's names (SONARR_SERVER=) left the
+// server unset with no word why. Each such name is an error that says what to write instead.
+//
+//nolint:paralleltest // viper is global state; these mutate it
+func TestConfigFileNamesWhatItDoesNotTake(t *testing.T) {
+	for body, want := range map[string]string{ //nolint:gosec // the names of settings in a file, not credentials
+		"SONARR_SERVER=http://nas:8989\nSONARR_TOKEN=t\n": "SONARR_SERVER is the environment's name for --server; in this file it is SERVER; SONARR_TOKEN is the environment's name for --token; in this file it is TOKEN",
+		"SONARR_URL=http://nas:8989\n":                    "SONARR_URL is the environment's name for --server; in this file it is SERVER",
+		"SERVER=http://nas:8989\nSERVR=http://nas\n":      "SERVR is not a setting; this file takes ALLOW_NO_AUTH, ALLOW_TOOLS, AUTH_TOKEN, DENY_TOOLS, ENABLE_DELETE, LISTEN, READ_ONLY, SERVER, TOKEN, TOOLSETS",
+	} {
+		home := t.TempDir()
+		write(t, home, body)
+		if err := configure(t, home, t.TempDir()); err == nil || !strings.HasSuffix(err.Error(), ": "+want) {
+			t.Errorf("a file of %q = %v, want it to say %q", body, err, want)
+		}
+	}
+}
+
 // Every documented SONARR_* variable has to actually reach its field; a
 // typo in the binding map is invisible until someone sets the variable and
 // nothing happens.
@@ -107,11 +154,11 @@ func TestEnvironmentBindings(t *testing.T) {
 		{"SONARR_READ_ONLY", on, func(f *FlagData) bool { return f.ReadOnly }},
 		{"SONARR_ENABLE_DELETE", on, func(f *FlagData) bool { return f.EnableDelete }},
 		{"SONARR_LISTEN", ":8080", func(f *FlagData) bool { return f.Listen == ":8080" }},
-		{"SONARR_AUTH_TOKEN", "bearer", func(f *FlagData) bool { return f.AuthToken == "bearer" }},
+		{"SONARR_AUTH_TOKEN", testBearer, func(f *FlagData) bool { return f.AuthToken == testBearer }},
 		{"SONARR_ALLOW_NO_AUTH", on, func(f *FlagData) bool { return f.AllowNoAuth }},
 		{"SONARR_TOOLSETS", "curation", func(f *FlagData) bool { return len(f.Toolsets) == 1 && f.Toolsets[0] == "curation" }},
 		{"SONARR_ALLOW_TOOLS", testTool, func(f *FlagData) bool { return len(f.AllowTools) == 1 && f.AllowTools[0] == testTool }},
-		{"SONARR_DENY_TOOLS", "*_delete", func(f *FlagData) bool { return len(f.DenyTools) == 1 && f.DenyTools[0] == "*_delete" }},
+		{"SONARR_DENY_TOOLS", denyDeletes, func(f *FlagData) bool { return len(f.DenyTools) == 1 && f.DenyTools[0] == denyDeletes }},
 		// the names the rest of the Sonarr tooling uses reach the same fields
 		{"SONARR_URL", testServer, func(f *FlagData) bool { return f.Server == testServer }},
 		{"SONARR_API_KEY", "key", func(f *FlagData) bool { return f.Token == "key" }},
