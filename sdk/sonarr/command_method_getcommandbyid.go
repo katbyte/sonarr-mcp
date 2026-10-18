@@ -5,7 +5,6 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -49,12 +48,12 @@ func (c Client) GetCommandById(ctx context.Context, id CommandID) (result GetCom
 		},
 		HTTPMethod: http.MethodGet,
 		Operation:  "GetCommandById",
-		Path:       fmt.Sprintf("/api/v3/command/%s", url.PathEscape(strconv.Itoa(int(id)))),
+		Path:       "/api/v3/command/" + url.PathEscape(strconv.Itoa(int(id))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -63,15 +62,15 @@ func (c Client) GetCommandById(ctx context.Context, id CommandID) (result GetCom
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer CommandResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.CommandResource = result.Answer
 
-	return
+	return result, nil
 }

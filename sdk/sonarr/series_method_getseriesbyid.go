@@ -47,8 +47,7 @@ type GetSeriesByIdOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetSeriesByIdOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -64,8 +63,7 @@ func (o GetSeriesByIdOptions) ToQuery() *client.QueryParams {
 func (c Client) GetSeriesById(ctx context.Context, id SeriesID, includeSeasonImages ...bool) (result GetSeriesByIdResponse, err error) {
 	var option GetSeriesByIdOptions
 	if len(includeSeasonImages) > 1 {
-		err = fmt.Errorf("GetSeriesById takes one includeSeasonImages at most, not %d", len(includeSeasonImages))
-		return
+		return result, fmt.Errorf("GetSeriesById takes one includeSeasonImages at most, not %d", len(includeSeasonImages))
 	}
 	if len(includeSeasonImages) == 1 {
 		option.IncludeSeasonImages = &includeSeasonImages[0]
@@ -79,12 +77,12 @@ func (c Client) GetSeriesById(ctx context.Context, id SeriesID, includeSeasonIma
 		HTTPMethod:    http.MethodGet,
 		Operation:     "GetSeriesById",
 		OptionsObject: option,
-		Path:          fmt.Sprintf("/api/v3/series/%s", url.PathEscape(strconv.Itoa(int(id)))),
+		Path:          "/api/v3/series/" + url.PathEscape(strconv.Itoa(int(id))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -93,15 +91,15 @@ func (c Client) GetSeriesById(ctx context.Context, id SeriesID, includeSeasonIma
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer SeriesResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.SeriesResource = result.Answer
 
-	return
+	return result, nil
 }

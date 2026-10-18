@@ -63,8 +63,8 @@ func newOperationServer(t *testing.T, status int, contentType, body string) (*Cl
 	return c, s
 }
 
-// only returns the one request the server received.
-func (s *operationServer) only(t *testing.T) (*http.Request, string) {
+// only returns the one request the server received, and its body.
+func (s *operationServer) only(t *testing.T) (r *http.Request, body string) {
 	t.Helper()
 
 	if len(s.requests) != 1 {
@@ -95,7 +95,7 @@ func expectQuery(t *testing.T, r *http.Request, name string, want ...string) {
 // pagedServer answers the first pages requests with one item each and an
 // empty list after, reporting total items under the names the list answers
 // with, and records the page of each request.
-func pagedServer(t *testing.T, startIndex, items, total, item string, count, pages int) (*Client, *[]string) {
+func pagedServer(t *testing.T, startIndex, items, total, item string, count, pages int) (paged *Client, asked *[]string) {
 	t.Helper()
 
 	var starts []string

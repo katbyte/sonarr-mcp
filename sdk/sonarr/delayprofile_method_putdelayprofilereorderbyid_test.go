@@ -21,7 +21,7 @@ func TestOperationPutDelayProfileReorderById(t *testing.T) {
 	_ = body
 	expectRequest(t, r, http.MethodPut, "/api/v3/delayprofile/reorder/7")
 	expectQuery(t, r, "after", "7")
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusOK {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {
@@ -47,8 +47,8 @@ func TestOperationPutDelayProfileReorderById(t *testing.T) {
 	if _, err = c.PutDelayProfileReorderById(t.Context(), 7); err != nil {
 		t.Errorf("without the option = %v", err)
 	}
-	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("after") != "" {
-		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("after"))
+	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("After") != "" {
+		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("After"))
 	}
 	// two values are refused before any request
 	if _, err = c.PutDelayProfileReorderById(t.Context(), 7, 7, 7); err == nil || len(s.requests) != 1 {

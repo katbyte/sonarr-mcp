@@ -58,8 +58,7 @@ type GetQueueOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetQueueOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -107,8 +106,7 @@ func (o GetQueueOptions) ToQuery() *client.QueryParams {
 // GetQueue calls GET /api/v3/queue.
 func (c Client) GetQueue(ctx context.Context, options ...GetQueueOptions) (result GetQueueResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetQueue takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetQueue takes one options struct at most, not %d", len(options))
 	}
 	var option GetQueueOptions
 	if len(options) == 1 {
@@ -128,7 +126,7 @@ func (c Client) GetQueue(ctx context.Context, options ...GetQueueOptions) (resul
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -137,17 +135,17 @@ func (c Client) GetQueue(ctx context.Context, options ...GetQueueOptions) (resul
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer QueueResourcePagingResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.QueueResourcePagingResource = result.Answer
 
-	return
+	return result, nil
 }
 
 // GetQueueCompleteResult is every result GetQueueComplete loaded.
@@ -161,8 +159,7 @@ type GetQueueCompleteResult struct {
 // options.PageSize is the page size, client.DefaultPageSize when unset.
 func (c Client) GetQueueComplete(ctx context.Context, options ...GetQueueOptions) (result GetQueueCompleteResult, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetQueueComplete takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetQueueComplete takes one options struct at most, not %d", len(options))
 	}
 	var option GetQueueOptions
 	if len(options) == 1 {
@@ -184,17 +181,16 @@ func (c Client) GetQueueComplete(ctx context.Context, options ...GetQueueOptions
 		page, err = c.GetQueue(ctx, option)
 		result.LatestHttpResponse = page.HttpResponse
 		if err != nil {
-			err = fmt.Errorf("loading results: %w", err)
-			return
+			return result, fmt.Errorf("loading results: %w", err)
 		}
 		if page.Answer == nil || len(page.Answer.Records) == 0 {
-			return
+			return result, nil
 		}
 		result.Items = append(result.Items, page.Answer.Records...)
 		// a short page is the last; so is the page that reaches the total, when
 		// the server reports one
 		if len(page.Answer.Records) < limit || page.Answer.TotalRecords > 0 && number*limit >= page.Answer.TotalRecords {
-			return
+			return result, nil
 		}
 		number++
 	}
@@ -244,8 +240,8 @@ func (c Client) GetQueueEach(ctx context.Context, options ...GetQueueOptions) it
 			if page.Answer == nil || len(page.Answer.Records) == 0 {
 				return
 			}
-			for _, item := range page.Answer.Records {
-				if !yield(item, nil) {
+			for i := range page.Answer.Records {
+				if !yield(page.Answer.Records[i], nil) {
 					return
 				}
 			}

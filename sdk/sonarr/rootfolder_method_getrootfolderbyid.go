@@ -5,8 +5,8 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -47,12 +47,12 @@ func (c Client) GetRootFolderById(ctx context.Context, id int) (result GetRootFo
 		},
 		HTTPMethod: http.MethodGet,
 		Operation:  "GetRootFolderById",
-		Path:       fmt.Sprintf("/api/v3/rootfolder/%d", id),
+		Path:       "/api/v3/rootfolder/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -61,15 +61,15 @@ func (c Client) GetRootFolderById(ctx context.Context, id int) (result GetRootFo
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer RootFolderResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.RootFolderResource = result.Answer
 
-	return
+	return result, nil
 }

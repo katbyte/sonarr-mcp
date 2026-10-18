@@ -25,7 +25,7 @@ func TestOperationDeleteSeriesById(t *testing.T) {
 	expectRequest(t, r, http.MethodDelete, "/api/v3/series/7")
 	expectQuery(t, r, "deleteFiles", "true")
 	expectQuery(t, r, "addImportListExclusion", "true")
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusOK {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 

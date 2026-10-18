@@ -34,8 +34,7 @@ type GetCalendarOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetCalendarOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -68,8 +67,7 @@ func (o GetCalendarOptions) ToQuery() *client.QueryParams {
 // GetCalendar calls GET /api/v3/calendar.
 func (c Client) GetCalendar(ctx context.Context, options ...GetCalendarOptions) (result GetCalendarResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetCalendar takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetCalendar takes one options struct at most, not %d", len(options))
 	}
 	var option GetCalendarOptions
 	if len(options) == 1 {
@@ -88,7 +86,7 @@ func (c Client) GetCalendar(ctx context.Context, options ...GetCalendarOptions) 
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -97,12 +95,12 @@ func (c Client) GetCalendar(ctx context.Context, options ...GetCalendarOptions) 
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(&result.Answer); err != nil {
+		return result, err
 	}
 
-	return
+	return result, nil
 }

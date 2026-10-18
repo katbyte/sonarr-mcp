@@ -30,7 +30,7 @@ func TestOperationPutEpisodeMonitor(t *testing.T) {
 	if body != "{}" {
 		t.Errorf("an empty record sent %q, want %q: a field never set went out", body, "{}")
 	}
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 202 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusAccepted {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {
@@ -56,8 +56,8 @@ func TestOperationPutEpisodeMonitor(t *testing.T) {
 	if _, err = c.PutEpisodeMonitor(t.Context(), EpisodesMonitoredResource{}); err != nil {
 		t.Errorf("without the option = %v", err)
 	}
-	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("includeImages") != "" {
-		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("includeImages"))
+	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("Includeimages") != "" {
+		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("Includeimages"))
 	}
 	// two values are refused before any request
 	if _, err = c.PutEpisodeMonitor(t.Context(), EpisodesMonitoredResource{}, true, true); err == nil || len(s.requests) != 1 {

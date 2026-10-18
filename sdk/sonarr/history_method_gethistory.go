@@ -58,8 +58,7 @@ type GetHistoryOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetHistoryOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -107,8 +106,7 @@ func (o GetHistoryOptions) ToQuery() *client.QueryParams {
 // GetHistory calls GET /api/v3/history.
 func (c Client) GetHistory(ctx context.Context, options ...GetHistoryOptions) (result GetHistoryResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetHistory takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetHistory takes one options struct at most, not %d", len(options))
 	}
 	var option GetHistoryOptions
 	if len(options) == 1 {
@@ -128,7 +126,7 @@ func (c Client) GetHistory(ctx context.Context, options ...GetHistoryOptions) (r
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -137,17 +135,17 @@ func (c Client) GetHistory(ctx context.Context, options ...GetHistoryOptions) (r
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer HistoryResourcePagingResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.HistoryResourcePagingResource = result.Answer
 
-	return
+	return result, nil
 }
 
 // GetHistoryCompleteResult is every result GetHistoryComplete loaded.
@@ -161,8 +159,7 @@ type GetHistoryCompleteResult struct {
 // options.PageSize is the page size, client.DefaultPageSize when unset.
 func (c Client) GetHistoryComplete(ctx context.Context, options ...GetHistoryOptions) (result GetHistoryCompleteResult, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetHistoryComplete takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetHistoryComplete takes one options struct at most, not %d", len(options))
 	}
 	var option GetHistoryOptions
 	if len(options) == 1 {
@@ -184,17 +181,16 @@ func (c Client) GetHistoryComplete(ctx context.Context, options ...GetHistoryOpt
 		page, err = c.GetHistory(ctx, option)
 		result.LatestHttpResponse = page.HttpResponse
 		if err != nil {
-			err = fmt.Errorf("loading results: %w", err)
-			return
+			return result, fmt.Errorf("loading results: %w", err)
 		}
 		if page.Answer == nil || len(page.Answer.Records) == 0 {
-			return
+			return result, nil
 		}
 		result.Items = append(result.Items, page.Answer.Records...)
 		// a short page is the last; so is the page that reaches the total, when
 		// the server reports one
 		if len(page.Answer.Records) < limit || page.Answer.TotalRecords > 0 && number*limit >= page.Answer.TotalRecords {
-			return
+			return result, nil
 		}
 		number++
 	}
@@ -244,8 +240,8 @@ func (c Client) GetHistoryEach(ctx context.Context, options ...GetHistoryOptions
 			if page.Answer == nil || len(page.Answer.Records) == 0 {
 				return
 			}
-			for _, item := range page.Answer.Records {
-				if !yield(item, nil) {
+			for i := range page.Answer.Records {
+				if !yield(page.Answer.Records[i], nil) {
 					return
 				}
 			}

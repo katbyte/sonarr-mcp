@@ -53,8 +53,7 @@ type GetWantedMissingOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetWantedMissingOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -87,8 +86,7 @@ func (o GetWantedMissingOptions) ToQuery() *client.QueryParams {
 // GetWantedMissing calls GET /api/v3/wanted/missing.
 func (c Client) GetWantedMissing(ctx context.Context, options ...GetWantedMissingOptions) (result GetWantedMissingResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetWantedMissing takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetWantedMissing takes one options struct at most, not %d", len(options))
 	}
 	var option GetWantedMissingOptions
 	if len(options) == 1 {
@@ -108,7 +106,7 @@ func (c Client) GetWantedMissing(ctx context.Context, options ...GetWantedMissin
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -117,17 +115,17 @@ func (c Client) GetWantedMissing(ctx context.Context, options ...GetWantedMissin
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer EpisodeResourcePagingResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.EpisodeResourcePagingResource = result.Answer
 
-	return
+	return result, nil
 }
 
 // GetWantedMissingCompleteResult is every result GetWantedMissingComplete loaded.
@@ -141,8 +139,7 @@ type GetWantedMissingCompleteResult struct {
 // options.PageSize is the page size, client.DefaultPageSize when unset.
 func (c Client) GetWantedMissingComplete(ctx context.Context, options ...GetWantedMissingOptions) (result GetWantedMissingCompleteResult, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetWantedMissingComplete takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetWantedMissingComplete takes one options struct at most, not %d", len(options))
 	}
 	var option GetWantedMissingOptions
 	if len(options) == 1 {
@@ -164,17 +161,16 @@ func (c Client) GetWantedMissingComplete(ctx context.Context, options ...GetWant
 		page, err = c.GetWantedMissing(ctx, option)
 		result.LatestHttpResponse = page.HttpResponse
 		if err != nil {
-			err = fmt.Errorf("loading results: %w", err)
-			return
+			return result, fmt.Errorf("loading results: %w", err)
 		}
 		if page.Answer == nil || len(page.Answer.Records) == 0 {
-			return
+			return result, nil
 		}
 		result.Items = append(result.Items, page.Answer.Records...)
 		// a short page is the last; so is the page that reaches the total, when
 		// the server reports one
 		if len(page.Answer.Records) < limit || page.Answer.TotalRecords > 0 && number*limit >= page.Answer.TotalRecords {
-			return
+			return result, nil
 		}
 		number++
 	}
@@ -224,8 +220,8 @@ func (c Client) GetWantedMissingEach(ctx context.Context, options ...GetWantedMi
 			if page.Answer == nil || len(page.Answer.Records) == 0 {
 				return
 			}
-			for _, item := range page.Answer.Records {
-				if !yield(item, nil) {
+			for i := range page.Answer.Records {
+				if !yield(page.Answer.Records[i], nil) {
 					return
 				}
 			}

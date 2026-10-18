@@ -32,7 +32,7 @@ func (c Client) GetRemotePathMapping(ctx context.Context) (result GetRemotePathM
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -41,12 +41,12 @@ func (c Client) GetRemotePathMapping(ctx context.Context) (result GetRemotePathM
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(&result.Answer); err != nil {
+		return result, err
 	}
 
-	return
+	return result, nil
 }

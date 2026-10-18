@@ -52,11 +52,11 @@ func (c Client) PostAutoTagging(ctx context.Context, input AutoTaggingResource) 
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -65,15 +65,15 @@ func (c Client) PostAutoTagging(ctx context.Context, input AutoTaggingResource) 
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer AutoTaggingResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.AutoTaggingResource = result.Answer
 
-	return
+	return result, nil
 }

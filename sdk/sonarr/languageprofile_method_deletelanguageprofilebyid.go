@@ -4,8 +4,8 @@ package sonarr
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -25,12 +25,12 @@ func (c Client) DeleteLanguageProfileById(ctx context.Context, id int) (result D
 		},
 		HTTPMethod: http.MethodDelete,
 		Operation:  "DeleteLanguageProfileById",
-		Path:       fmt.Sprintf("/api/v3/languageprofile/%d", id),
+		Path:       "/api/v3/languageprofile/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -39,8 +39,8 @@ func (c Client) DeleteLanguageProfileById(ctx context.Context, id int) (result D
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

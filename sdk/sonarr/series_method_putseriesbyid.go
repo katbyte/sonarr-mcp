@@ -47,8 +47,7 @@ type PutSeriesByIdOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o PutSeriesByIdOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -64,8 +63,7 @@ func (o PutSeriesByIdOptions) ToQuery() *client.QueryParams {
 func (c Client) PutSeriesById(ctx context.Context, id SeriesID, input SeriesResource, moveFiles ...bool) (result PutSeriesByIdResponse, err error) {
 	var option PutSeriesByIdOptions
 	if len(moveFiles) > 1 {
-		err = fmt.Errorf("PutSeriesById takes one moveFiles at most, not %d", len(moveFiles))
-		return
+		return result, fmt.Errorf("PutSeriesById takes one moveFiles at most, not %d", len(moveFiles))
 	}
 	if len(moveFiles) == 1 {
 		option.MoveFiles = &moveFiles[0]
@@ -80,16 +78,16 @@ func (c Client) PutSeriesById(ctx context.Context, id SeriesID, input SeriesReso
 		HTTPMethod:    http.MethodPut,
 		Operation:     "PutSeriesById",
 		OptionsObject: option,
-		Path:          fmt.Sprintf("/api/v3/series/%s", url.PathEscape(strconv.Itoa(int(id)))),
+		Path:          "/api/v3/series/" + url.PathEscape(strconv.Itoa(int(id))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -98,15 +96,15 @@ func (c Client) PutSeriesById(ctx context.Context, id SeriesID, input SeriesReso
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer SeriesResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.SeriesResource = result.Answer
 
-	return
+	return result, nil
 }

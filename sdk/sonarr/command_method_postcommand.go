@@ -57,11 +57,11 @@ func (c Client) PostCommand(ctx context.Context, input json.RawMessage) (result 
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -70,17 +70,17 @@ func (c Client) PostCommand(ctx context.Context, input json.RawMessage) (result 
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer CommandResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.CommandResource = result.Answer
 
-	return
+	return result, nil
 }
 
 // CommandPoll is how often WaitForCommand asks after a command.
@@ -95,24 +95,21 @@ func (c Client) WaitForCommand(ctx context.Context, id CommandID, wait time.Dura
 	for {
 		result, err = c.GetCommandById(ctx, id)
 		if err != nil || result.Answer == nil {
-			return
+			return result, err
 		}
 		status := string(result.Answer.Status)
 		if slices.Contains([]string{"failed", "aborted", "cancelled", "orphaned"}, status) {
-			err = fmt.Errorf("the command %v %s %s: %s: %w", id, string(result.Answer.Name), status, strings.TrimSpace(strings.Join([]string{string(result.Answer.Message), string(result.Answer.Exception)}, " ")), client.ErrCommandFailed)
-			return
+			return result, fmt.Errorf("the command %v %s %s: %s: %w", id, result.Answer.Name, status, strings.TrimSpace(result.Answer.Message+" "+result.Answer.Exception), client.ErrCommandFailed)
 		}
 		if slices.Contains([]string{"completed", "failed", "aborted", "cancelled", "orphaned"}, status) {
-			return
+			return result, nil
 		}
 		if time.Now().After(deadline) {
-			err = fmt.Errorf("the command %v is still %s after %s: %w", id, status, wait, client.ErrCommandRunning)
-			return
+			return result, fmt.Errorf("the command %v is still %s after %s: %w", id, status, wait, client.ErrCommandRunning)
 		}
 		select {
 		case <-ctx.Done():
-			err = ctx.Err()
-			return
+			return result, ctx.Err()
 		case <-time.After(CommandPoll):
 		}
 	}

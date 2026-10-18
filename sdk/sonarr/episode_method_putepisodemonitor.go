@@ -28,8 +28,7 @@ type PutEpisodeMonitorOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o PutEpisodeMonitorOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -45,8 +44,7 @@ func (o PutEpisodeMonitorOptions) ToQuery() *client.QueryParams {
 func (c Client) PutEpisodeMonitor(ctx context.Context, input EpisodesMonitoredResource, includeImages ...bool) (result PutEpisodeMonitorResponse, err error) {
 	var option PutEpisodeMonitorOptions
 	if len(includeImages) > 1 {
-		err = fmt.Errorf("PutEpisodeMonitor takes one includeImages at most, not %d", len(includeImages))
-		return
+		return result, fmt.Errorf("PutEpisodeMonitor takes one includeImages at most, not %d", len(includeImages))
 	}
 	if len(includeImages) == 1 {
 		option.IncludeImages = &includeImages[0]
@@ -65,11 +63,11 @@ func (c Client) PutEpisodeMonitor(ctx context.Context, input EpisodesMonitoredRe
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -78,12 +76,12 @@ func (c Client) PutEpisodeMonitor(ctx context.Context, input EpisodesMonitoredRe
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(&result.Answer); err != nil {
+		return result, err
 	}
 
-	return
+	return result, nil
 }

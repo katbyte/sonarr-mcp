@@ -1,3 +1,12 @@
+## v0.13.1 (2026-10-18)
+
+- **A grouped package's tests pass staticcheck.** Their options live in another package, so every deprecated option a generated test set was a finding. The line now says why it is set.
+
+## v0.13.0 (2026-10-18)
+
+- **The generated code passes the linters.** A repository can turn off the generated-code exclusion and lint the package it checks in like the rest of its code. Every method and test file moves on regenerate; nothing a caller wrote changes. Three checks stay for the repository to exclude for the package, as [docs/generated-code.md](docs/generated-code.md) says.
+- **pandorest lints what it writes.** `make lint-generated` renders the test packages and lints them the same way, and CI runs it.
+
 ## v0.12.0 (2026-10-18)
 
 - **A missing id's answer is checked, not just noted.** The sweep's `MissingIDs` now takes, per kind, the id, the GET to probe through and the answer wanted (`"404"`, or `"nothing"`), and fails the run when the server answers anything else, so a server that changes what a missing id gets fails CI instead of changing a line in the log. A service's file moves from `"ItemID": "000"` to `"ItemID": {ID: "000", Operation: "GetItem", Want: "404"}`.

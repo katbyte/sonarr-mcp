@@ -39,7 +39,7 @@ func TestOperationGetWantedCutoff(t *testing.T) {
 	expectQuery(t, r, "includeEpisodeFile", "true")
 	expectQuery(t, r, "includeImages", "true")
 	expectQuery(t, r, "monitored", "true")
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusOK {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {
@@ -48,7 +48,7 @@ func TestOperationGetWantedCutoff(t *testing.T) {
 	if result.EpisodeResourcePagingResource != result.Answer {
 		t.Error("the embedded answer is not the answer")
 	}
-	if record, err := result.Record(); err != nil || !reflect.DeepEqual(record, *result.Answer) {
+	if record, err := result.Record(); err != nil || !reflect.DeepEqual(&record, result.Answer) {
 		t.Errorf("Record = %+v, %v", record, err)
 	}
 

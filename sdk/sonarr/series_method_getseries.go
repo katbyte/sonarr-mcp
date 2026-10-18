@@ -29,8 +29,7 @@ type GetSeriesOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetSeriesOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -48,8 +47,7 @@ func (o GetSeriesOptions) ToQuery() *client.QueryParams {
 // GetSeries calls GET /api/v3/series.
 func (c Client) GetSeries(ctx context.Context, options ...GetSeriesOptions) (result GetSeriesResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetSeries takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetSeries takes one options struct at most, not %d", len(options))
 	}
 	var option GetSeriesOptions
 	if len(options) == 1 {
@@ -68,7 +66,7 @@ func (c Client) GetSeries(ctx context.Context, options ...GetSeriesOptions) (res
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -77,12 +75,12 @@ func (c Client) GetSeries(ctx context.Context, options ...GetSeriesOptions) (res
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(&result.Answer); err != nil {
+		return result, err
 	}
 
-	return
+	return result, nil
 }

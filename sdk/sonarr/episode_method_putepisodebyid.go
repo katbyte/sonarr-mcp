@@ -5,7 +5,6 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -50,16 +49,16 @@ func (c Client) PutEpisodeById(ctx context.Context, id EpisodeID, input EpisodeR
 		},
 		HTTPMethod: http.MethodPut,
 		Operation:  "PutEpisodeById",
-		Path:       fmt.Sprintf("/api/v3/episode/%s", url.PathEscape(strconv.Itoa(int(id)))),
+		Path:       "/api/v3/episode/" + url.PathEscape(strconv.Itoa(int(id))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -68,15 +67,15 @@ func (c Client) PutEpisodeById(ctx context.Context, id EpisodeID, input EpisodeR
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer EpisodeResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.EpisodeResource = result.Answer
 
-	return
+	return result, nil
 }

@@ -4,8 +4,8 @@ package sonarr
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -23,12 +23,12 @@ func (c Client) DeleteReleaseProfileById(ctx context.Context, id int) (result De
 		},
 		HTTPMethod: http.MethodDelete,
 		Operation:  "DeleteReleaseProfileById",
-		Path:       fmt.Sprintf("/api/v3/releaseprofile/%d", id),
+		Path:       "/api/v3/releaseprofile/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -37,8 +37,8 @@ func (c Client) DeleteReleaseProfileById(ctx context.Context, id int) (result De
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

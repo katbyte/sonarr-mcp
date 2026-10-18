@@ -5,8 +5,8 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -47,12 +47,12 @@ func (c Client) GetImportListById(ctx context.Context, id int) (result GetImport
 		},
 		HTTPMethod: http.MethodGet,
 		Operation:  "GetImportListById",
-		Path:       fmt.Sprintf("/api/v3/importlist/%d", id),
+		Path:       "/api/v3/importlist/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -61,15 +61,15 @@ func (c Client) GetImportListById(ctx context.Context, id int) (result GetImport
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer ImportListResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.ImportListResource = result.Answer
 
-	return
+	return result, nil
 }

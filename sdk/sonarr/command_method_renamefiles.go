@@ -55,11 +55,11 @@ func (c Client) RenameFiles(ctx context.Context, input RenameFilesCommand) (resu
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -68,29 +68,28 @@ func (c Client) RenameFiles(ctx context.Context, input RenameFilesCommand) (resu
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer CommandResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.CommandResource = result.Answer
 
-	return
+	return result, nil
 }
 
 // RenameFilesAndWait queues the RenameFiles command and waits for it as WaitForCommand does, answering it as it stands.
 func (c Client) RenameFilesAndWait(ctx context.Context, input RenameFilesCommand, wait time.Duration) (result GetCommandByIdResponse, err error) {
 	queued, err := c.RenameFiles(ctx, input)
 	if err != nil {
-		return
+		return result, err
 	}
 	if queued.Answer == nil {
-		err = errors.New("RenameFiles answered no command to wait for")
-		return
+		return result, errors.New("RenameFiles answered no command to wait for")
 	}
 
-	return c.WaitForCommand(ctx, CommandID(queued.Answer.Id), wait)
+	return c.WaitForCommand(ctx, queued.Answer.Id, wait)
 }

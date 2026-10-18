@@ -5,8 +5,8 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -48,16 +48,16 @@ func (c Client) PutConfigMediaManagementById(ctx context.Context, id int, input 
 		},
 		HTTPMethod: http.MethodPut,
 		Operation:  "PutConfigMediaManagementById",
-		Path:       fmt.Sprintf("/api/v3/config/mediamanagement/%d", id),
+		Path:       "/api/v3/config/mediamanagement/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -66,15 +66,15 @@ func (c Client) PutConfigMediaManagementById(ctx context.Context, id int, input 
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer MediaManagementConfigResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.MediaManagementConfigResource = result.Answer
 
-	return
+	return result, nil
 }

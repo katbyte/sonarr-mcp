@@ -4,8 +4,8 @@ package sonarr
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -23,12 +23,12 @@ func (c Client) DeleteIndexerById(ctx context.Context, id int) (result DeleteInd
 		},
 		HTTPMethod: http.MethodDelete,
 		Operation:  "DeleteIndexerById",
-		Path:       fmt.Sprintf("/api/v3/indexer/%d", id),
+		Path:       "/api/v3/indexer/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -37,8 +37,8 @@ func (c Client) DeleteIndexerById(ctx context.Context, id int) (result DeleteInd
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

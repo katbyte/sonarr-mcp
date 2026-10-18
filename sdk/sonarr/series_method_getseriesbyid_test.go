@@ -22,7 +22,7 @@ func TestOperationGetSeriesById(t *testing.T) {
 	_ = body
 	expectRequest(t, r, http.MethodGet, "/api/v3/series/7")
 	expectQuery(t, r, "includeSeasonImages", "true")
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusOK {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {
@@ -31,7 +31,7 @@ func TestOperationGetSeriesById(t *testing.T) {
 	if result.SeriesResource != result.Answer {
 		t.Error("the embedded answer is not the answer")
 	}
-	if record, err := result.Record(); err != nil || !reflect.DeepEqual(record, *result.Answer) {
+	if record, err := result.Record(); err != nil || !reflect.DeepEqual(&record, result.Answer) {
 		t.Errorf("Record = %+v, %v", record, err)
 	}
 
@@ -54,8 +54,8 @@ func TestOperationGetSeriesById(t *testing.T) {
 	if _, err = c.GetSeriesById(t.Context(), SeriesID(7)); err != nil {
 		t.Errorf("without the option = %v", err)
 	}
-	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("includeSeasonImages") != "" {
-		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("includeSeasonImages"))
+	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("Includeseasonimages") != "" {
+		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("Includeseasonimages"))
 	}
 	// two values are refused before any request
 	if _, err = c.GetSeriesById(t.Context(), SeriesID(7), true, true); err == nil || len(s.requests) != 1 {

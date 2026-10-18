@@ -25,7 +25,7 @@ func TestOperationGetRename(t *testing.T) {
 	expectRequest(t, r, http.MethodGet, "/api/v3/rename")
 	expectQuery(t, r, "seriesId", "7")
 	expectQuery(t, r, "seasonNumber", "7")
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusOK {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {

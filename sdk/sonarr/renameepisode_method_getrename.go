@@ -29,8 +29,7 @@ type GetRenameOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetRenameOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -48,8 +47,7 @@ func (o GetRenameOptions) ToQuery() *client.QueryParams {
 // GetRename calls GET /api/v3/rename.
 func (c Client) GetRename(ctx context.Context, options ...GetRenameOptions) (result GetRenameResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetRename takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetRename takes one options struct at most, not %d", len(options))
 	}
 	var option GetRenameOptions
 	if len(options) == 1 {
@@ -68,7 +66,7 @@ func (c Client) GetRename(ctx context.Context, options ...GetRenameOptions) (res
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -77,12 +75,12 @@ func (c Client) GetRename(ctx context.Context, options ...GetRenameOptions) (res
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(&result.Answer); err != nil {
+		return result, err
 	}
 
-	return
+	return result, nil
 }

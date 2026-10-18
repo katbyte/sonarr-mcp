@@ -5,8 +5,8 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -47,12 +47,12 @@ func (c Client) GetIndexerById(ctx context.Context, id int) (result GetIndexerBy
 		},
 		HTTPMethod: http.MethodGet,
 		Operation:  "GetIndexerById",
-		Path:       fmt.Sprintf("/api/v3/indexer/%d", id),
+		Path:       "/api/v3/indexer/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -61,15 +61,15 @@ func (c Client) GetIndexerById(ctx context.Context, id int) (result GetIndexerBy
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer IndexerResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.IndexerResource = result.Answer
 
-	return
+	return result, nil
 }

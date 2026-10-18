@@ -46,8 +46,7 @@ type PostImportListOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o PostImportListOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -63,8 +62,7 @@ func (o PostImportListOptions) ToQuery() *client.QueryParams {
 func (c Client) PostImportList(ctx context.Context, input ImportListResource, forceSave ...bool) (result PostImportListResponse, err error) {
 	var option PostImportListOptions
 	if len(forceSave) > 1 {
-		err = fmt.Errorf("PostImportList takes one forceSave at most, not %d", len(forceSave))
-		return
+		return result, fmt.Errorf("PostImportList takes one forceSave at most, not %d", len(forceSave))
 	}
 	if len(forceSave) == 1 {
 		option.ForceSave = &forceSave[0]
@@ -84,11 +82,11 @@ func (c Client) PostImportList(ctx context.Context, input ImportListResource, fo
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -97,15 +95,15 @@ func (c Client) PostImportList(ctx context.Context, input ImportListResource, fo
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer ImportListResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.ImportListResource = result.Answer
 
-	return
+	return result, nil
 }

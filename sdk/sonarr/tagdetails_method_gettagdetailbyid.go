@@ -5,7 +5,6 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -49,12 +48,12 @@ func (c Client) GetTagDetailById(ctx context.Context, id TagID) (result GetTagDe
 		},
 		HTTPMethod: http.MethodGet,
 		Operation:  "GetTagDetailById",
-		Path:       fmt.Sprintf("/api/v3/tag/detail/%s", url.PathEscape(strconv.Itoa(int(id)))),
+		Path:       "/api/v3/tag/detail/" + url.PathEscape(strconv.Itoa(int(id))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -63,15 +62,15 @@ func (c Client) GetTagDetailById(ctx context.Context, id TagID) (result GetTagDe
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer TagDetailsResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.TagDetailsResource = result.Answer
 
-	return
+	return result, nil
 }

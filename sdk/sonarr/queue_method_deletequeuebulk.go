@@ -26,8 +26,7 @@ type DeleteQueueBulkOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o DeleteQueueBulkOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -51,8 +50,7 @@ func (o DeleteQueueBulkOptions) ToQuery() *client.QueryParams {
 // DeleteQueueBulk calls DELETE /api/v3/queue/bulk.
 func (c Client) DeleteQueueBulk(ctx context.Context, input QueueBulkResource, options ...DeleteQueueBulkOptions) (result DeleteQueueBulkResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("DeleteQueueBulk takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("DeleteQueueBulk takes one options struct at most, not %d", len(options))
 	}
 	var option DeleteQueueBulkOptions
 	if len(options) == 1 {
@@ -72,11 +70,11 @@ func (c Client) DeleteQueueBulk(ctx context.Context, input QueueBulkResource, op
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -85,8 +83,8 @@ func (c Client) DeleteQueueBulk(ctx context.Context, input QueueBulkResource, op
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

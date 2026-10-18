@@ -28,11 +28,11 @@ func (c Client) DeleteImportListExclusionBulk(ctx context.Context, input ImportL
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -41,8 +41,8 @@ func (c Client) DeleteImportListExclusionBulk(ctx context.Context, input ImportL
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

@@ -4,7 +4,6 @@ package sonarr
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -25,12 +24,12 @@ func (c Client) DeleteCommandById(ctx context.Context, id CommandID) (result Del
 		},
 		HTTPMethod: http.MethodDelete,
 		Operation:  "DeleteCommandById",
-		Path:       fmt.Sprintf("/api/v3/command/%s", url.PathEscape(strconv.Itoa(int(id)))),
+		Path:       "/api/v3/command/" + url.PathEscape(strconv.Itoa(int(id))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -39,8 +38,8 @@ func (c Client) DeleteCommandById(ctx context.Context, id CommandID) (result Del
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

@@ -4,7 +4,6 @@ package sonarr
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -25,12 +24,12 @@ func (c Client) DeleteEpisodeFileById(ctx context.Context, id EpisodeFileID) (re
 		},
 		HTTPMethod: http.MethodDelete,
 		Operation:  "DeleteEpisodeFileById",
-		Path:       fmt.Sprintf("/api/v3/episodefile/%s", url.PathEscape(strconv.Itoa(int(id)))),
+		Path:       "/api/v3/episodefile/" + url.PathEscape(strconv.Itoa(int(id))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -39,8 +38,8 @@ func (c Client) DeleteEpisodeFileById(ctx context.Context, id EpisodeFileID) (re
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

@@ -53,7 +53,7 @@ func (c Client) GetLanguageProfileSchema(ctx context.Context) (result GetLanguag
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -62,15 +62,15 @@ func (c Client) GetLanguageProfileSchema(ctx context.Context) (result GetLanguag
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer LanguageProfileResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.LanguageProfileResource = result.Answer
 
-	return
+	return result, nil
 }

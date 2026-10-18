@@ -23,8 +23,7 @@ type PostIndexerTestOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o PostIndexerTestOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -40,8 +39,7 @@ func (o PostIndexerTestOptions) ToQuery() *client.QueryParams {
 func (c Client) PostIndexerTest(ctx context.Context, input IndexerResource, forceTest ...bool) (result PostIndexerTestResponse, err error) {
 	var option PostIndexerTestOptions
 	if len(forceTest) > 1 {
-		err = fmt.Errorf("PostIndexerTest takes one forceTest at most, not %d", len(forceTest))
-		return
+		return result, fmt.Errorf("PostIndexerTest takes one forceTest at most, not %d", len(forceTest))
 	}
 	if len(forceTest) == 1 {
 		option.ForceTest = &forceTest[0]
@@ -60,11 +58,11 @@ func (c Client) PostIndexerTest(ctx context.Context, input IndexerResource, forc
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -73,8 +71,8 @@ func (c Client) PostIndexerTest(ctx context.Context, input IndexerResource, forc
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

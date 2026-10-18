@@ -48,8 +48,7 @@ type GetFileSystemOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetFileSystemOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -70,8 +69,7 @@ func (o GetFileSystemOptions) ToQuery() *client.QueryParams {
 // GetFileSystem calls GET /api/v3/filesystem.
 func (c Client) GetFileSystem(ctx context.Context, options ...GetFileSystemOptions) (result GetFileSystemResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetFileSystem takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetFileSystem takes one options struct at most, not %d", len(options))
 	}
 	var option GetFileSystemOptions
 	if len(options) == 1 {
@@ -91,7 +89,7 @@ func (c Client) GetFileSystem(ctx context.Context, options ...GetFileSystemOptio
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -100,15 +98,15 @@ func (c Client) GetFileSystem(ctx context.Context, options ...GetFileSystemOptio
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer FileSystemResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.FileSystemResource = result.Answer
 
-	return
+	return result, nil
 }

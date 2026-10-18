@@ -5,8 +5,8 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -48,16 +48,16 @@ func (c Client) PutAutoTaggingById(ctx context.Context, id int, input AutoTaggin
 		},
 		HTTPMethod: http.MethodPut,
 		Operation:  "PutAutoTaggingById",
-		Path:       fmt.Sprintf("/api/v3/autotagging/%d", id),
+		Path:       "/api/v3/autotagging/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -66,15 +66,15 @@ func (c Client) PutAutoTaggingById(ctx context.Context, id int, input AutoTaggin
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer AutoTaggingResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.AutoTaggingResource = result.Answer
 
-	return
+	return result, nil
 }

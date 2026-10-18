@@ -46,8 +46,7 @@ type GetParseOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetParseOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -65,8 +64,7 @@ func (o GetParseOptions) ToQuery() *client.QueryParams {
 // GetParse calls GET /api/v3/parse.
 func (c Client) GetParse(ctx context.Context, options ...GetParseOptions) (result GetParseResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetParse takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetParse takes one options struct at most, not %d", len(options))
 	}
 	var option GetParseOptions
 	if len(options) == 1 {
@@ -86,7 +84,7 @@ func (c Client) GetParse(ctx context.Context, options ...GetParseOptions) (resul
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -95,15 +93,15 @@ func (c Client) GetParse(ctx context.Context, options ...GetParseOptions) (resul
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer ParseResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.ParseResource = result.Answer
 
-	return
+	return result, nil
 }

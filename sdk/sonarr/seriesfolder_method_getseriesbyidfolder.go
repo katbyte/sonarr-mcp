@@ -5,7 +5,6 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -49,12 +48,12 @@ func (c Client) GetSeriesByIdFolder(ctx context.Context, id SeriesID) (result Ge
 		},
 		HTTPMethod: http.MethodGet,
 		Operation:  "GetSeriesByIdFolder",
-		Path:       fmt.Sprintf("/api/v3/series/%s/folder", url.PathEscape(strconv.Itoa(int(id)))),
+		Path:       "/api/v3/series/" + url.PathEscape(strconv.Itoa(int(id))) + "/folder",
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -63,15 +62,15 @@ func (c Client) GetSeriesByIdFolder(ctx context.Context, id SeriesID) (result Ge
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer SeriesFolderResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.SeriesFolderResource = result.Answer
 
-	return
+	return result, nil
 }

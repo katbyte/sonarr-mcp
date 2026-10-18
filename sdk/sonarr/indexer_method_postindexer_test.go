@@ -31,7 +31,7 @@ func TestOperationPostIndexer(t *testing.T) {
 	if body != "{}" {
 		t.Errorf("an empty record sent %q, want %q: a field never set went out", body, "{}")
 	}
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 201 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusCreated {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {
@@ -40,7 +40,7 @@ func TestOperationPostIndexer(t *testing.T) {
 	if result.IndexerResource != result.Answer {
 		t.Error("the embedded answer is not the answer")
 	}
-	if record, err := result.Record(); err != nil || !reflect.DeepEqual(record, *result.Answer) {
+	if record, err := result.Record(); err != nil || !reflect.DeepEqual(&record, result.Answer) {
 		t.Errorf("Record = %+v, %v", record, err)
 	}
 
@@ -63,8 +63,8 @@ func TestOperationPostIndexer(t *testing.T) {
 	if _, err = c.PostIndexer(t.Context(), IndexerResource{}); err != nil {
 		t.Errorf("without the option = %v", err)
 	}
-	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("forceSave") != "" {
-		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("forceSave"))
+	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("Forcesave") != "" {
+		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("Forcesave"))
 	}
 	// two values are refused before any request
 	if _, err = c.PostIndexer(t.Context(), IndexerResource{}, true, true); err == nil || len(s.requests) != 1 {

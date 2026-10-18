@@ -27,8 +27,7 @@ type GetSeriesLookupOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetSeriesLookupOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -44,8 +43,7 @@ func (o GetSeriesLookupOptions) ToQuery() *client.QueryParams {
 func (c Client) GetSeriesLookup(ctx context.Context, term ...string) (result GetSeriesLookupResponse, err error) {
 	var option GetSeriesLookupOptions
 	if len(term) > 1 {
-		err = fmt.Errorf("GetSeriesLookup takes one term at most, not %d", len(term))
-		return
+		return result, fmt.Errorf("GetSeriesLookup takes one term at most, not %d", len(term))
 	}
 	if len(term) == 1 {
 		option.Term = term[0]
@@ -63,7 +61,7 @@ func (c Client) GetSeriesLookup(ctx context.Context, term ...string) (result Get
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -72,12 +70,12 @@ func (c Client) GetSeriesLookup(ctx context.Context, term ...string) (result Get
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(&result.Answer); err != nil {
+		return result, err
 	}
 
-	return
+	return result, nil
 }

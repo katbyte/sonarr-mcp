@@ -34,7 +34,7 @@ github.com/katbyte/go-kt/test/services/arrserver
 github.com/katbyte/go-kt/test/services/newznab
 github.com/katbyte/go-kt/test/services/sabnzbd
 github.com/katbyte/go-kt/version
-# github.com/katbyte/pandorest v0.12.0
+# github.com/katbyte/pandorest v0.13.1
 ## explicit; go 1.27.0
 github.com/katbyte/pandorest
 github.com/katbyte/pandorest/client

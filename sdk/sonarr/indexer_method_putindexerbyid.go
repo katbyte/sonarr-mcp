@@ -46,8 +46,7 @@ type PutIndexerByIdOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o PutIndexerByIdOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -63,8 +62,7 @@ func (o PutIndexerByIdOptions) ToQuery() *client.QueryParams {
 func (c Client) PutIndexerById(ctx context.Context, id int, input IndexerResource, forceSave ...bool) (result PutIndexerByIdResponse, err error) {
 	var option PutIndexerByIdOptions
 	if len(forceSave) > 1 {
-		err = fmt.Errorf("PutIndexerById takes one forceSave at most, not %d", len(forceSave))
-		return
+		return result, fmt.Errorf("PutIndexerById takes one forceSave at most, not %d", len(forceSave))
 	}
 	if len(forceSave) == 1 {
 		option.ForceSave = &forceSave[0]
@@ -79,16 +77,16 @@ func (c Client) PutIndexerById(ctx context.Context, id int, input IndexerResourc
 		HTTPMethod:    http.MethodPut,
 		Operation:     "PutIndexerById",
 		OptionsObject: option,
-		Path:          fmt.Sprintf("/api/v3/indexer/%d", id),
+		Path:          "/api/v3/indexer/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -97,15 +95,15 @@ func (c Client) PutIndexerById(ctx context.Context, id int, input IndexerResourc
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer IndexerResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.IndexerResource = result.Answer
 
-	return
+	return result, nil
 }

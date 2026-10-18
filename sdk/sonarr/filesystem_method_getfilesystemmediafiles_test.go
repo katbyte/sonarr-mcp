@@ -21,7 +21,7 @@ func TestOperationGetFileSystemMediaFiles(t *testing.T) {
 	_ = body
 	expectRequest(t, r, http.MethodGet, "/api/v3/filesystem/mediafiles")
 	expectQuery(t, r, "path", "v-Path")
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusOK {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {
@@ -47,8 +47,8 @@ func TestOperationGetFileSystemMediaFiles(t *testing.T) {
 	if _, err = c.GetFileSystemMediaFiles(t.Context()); err != nil {
 		t.Errorf("without the option = %v", err)
 	}
-	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("path") != "" {
-		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("path"))
+	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("Path") != "" {
+		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("Path"))
 	}
 	// two values are refused before any request
 	if _, err = c.GetFileSystemMediaFiles(t.Context(), "v-Path", "v-Path"); err == nil || len(s.requests) != 1 {

@@ -21,7 +21,7 @@ func TestOperationGetSeriesLookup(t *testing.T) {
 	_ = body
 	expectRequest(t, r, http.MethodGet, "/api/v3/series/lookup")
 	expectQuery(t, r, "term", "v-Term")
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusOK {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {
@@ -47,8 +47,8 @@ func TestOperationGetSeriesLookup(t *testing.T) {
 	if _, err = c.GetSeriesLookup(t.Context()); err != nil {
 		t.Errorf("without the option = %v", err)
 	}
-	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("term") != "" {
-		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("term"))
+	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("Term") != "" {
+		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("Term"))
 	}
 	// two values are refused before any request
 	if _, err = c.GetSeriesLookup(t.Context(), "v-Term", "v-Term"); err == nil || len(s.requests) != 1 {

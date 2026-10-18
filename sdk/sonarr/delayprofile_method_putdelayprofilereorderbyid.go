@@ -28,8 +28,7 @@ type PutDelayProfileReorderByIdOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o PutDelayProfileReorderByIdOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -45,8 +44,7 @@ func (o PutDelayProfileReorderByIdOptions) ToQuery() *client.QueryParams {
 func (c Client) PutDelayProfileReorderById(ctx context.Context, id int, after ...int) (result PutDelayProfileReorderByIdResponse, err error) {
 	var option PutDelayProfileReorderByIdOptions
 	if len(after) > 1 {
-		err = fmt.Errorf("PutDelayProfileReorderById takes one after at most, not %d", len(after))
-		return
+		return result, fmt.Errorf("PutDelayProfileReorderById takes one after at most, not %d", len(after))
 	}
 	if len(after) == 1 {
 		option.After = &after[0]
@@ -59,12 +57,12 @@ func (c Client) PutDelayProfileReorderById(ctx context.Context, id int, after ..
 		HTTPMethod:    http.MethodPut,
 		Operation:     "PutDelayProfileReorderById",
 		OptionsObject: option,
-		Path:          fmt.Sprintf("/api/v3/delayprofile/reorder/%d", id),
+		Path:          "/api/v3/delayprofile/reorder/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -73,12 +71,12 @@ func (c Client) PutDelayProfileReorderById(ctx context.Context, id int, after ..
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(&result.Answer); err != nil {
+		return result, err
 	}
 
-	return
+	return result, nil
 }

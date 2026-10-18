@@ -5,7 +5,6 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -28,7 +27,7 @@ type GetLogFileByFilenameResponse struct {
 // answer, so a deferred Close is always safe. The body stays readable after
 // the result goes out of scope, and has no size or time limit of the client's:
 // the caller's context is the one bound on a slow read.
-func (r GetLogFileByFilenameResponse) Reader() (io.ReadCloser, string) {
+func (r GetLogFileByFilenameResponse) Reader() (body io.ReadCloser, contentType string) {
 	if r.HttpResponse == nil || r.HttpResponse.Body == nil {
 		return http.NoBody, ""
 	}
@@ -68,14 +67,14 @@ func (r GetLogFileByFilenameResponse) WriteTo(w io.Writer) (int64, error) {
 	return client.Copy(w, r.HttpResponse.Body)
 }
 
-// Bytes reads the file whole, up to max bytes, and closes the body: a file
-// over max is a client.TooLargeError rather than cut short without a word.
-func (r GetLogFileByFilenameResponse) Bytes(max int64) ([]byte, error) {
+// Bytes reads the file whole, up to limit bytes, and closes the body: a file
+// over the limit is a client.TooLargeError rather than cut short without a word.
+func (r GetLogFileByFilenameResponse) Bytes(limit int64) ([]byte, error) {
 	if r.HttpResponse == nil || r.HttpResponse.Body == nil {
 		return nil, errors.New("no answer to read")
 	}
 
-	return client.ReadAtMost(r.HttpResponse.Body, max)
+	return client.ReadAtMost(r.HttpResponse.Body, limit)
 }
 
 // GetLogFileByFilename calls GET /api/v3/log/file/{filename}.
@@ -87,13 +86,13 @@ func (c Client) GetLogFileByFilename(ctx context.Context, filename string) (resu
 		},
 		HTTPMethod:     http.MethodGet,
 		Operation:      "GetLogFileByFilename",
-		Path:           fmt.Sprintf("/api/v3/log/file/%s", url.PathEscape(filename)),
+		Path:           "/api/v3/log/file/" + url.PathEscape(filename),
 		StreamResponse: true,
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -102,8 +101,8 @@ func (c Client) GetLogFileByFilename(ctx context.Context, filename string) (resu
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

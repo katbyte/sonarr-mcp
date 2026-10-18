@@ -5,8 +5,8 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -47,12 +47,12 @@ func (c Client) GetImportListExclusionById(ctx context.Context, id int) (result 
 		},
 		HTTPMethod: http.MethodGet,
 		Operation:  "GetImportListExclusionById",
-		Path:       fmt.Sprintf("/api/v3/importlistexclusion/%d", id),
+		Path:       "/api/v3/importlistexclusion/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -61,15 +61,15 @@ func (c Client) GetImportListExclusionById(ctx context.Context, id int) (result 
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer ImportListExclusionResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.ImportListExclusionResource = result.Answer
 
-	return
+	return result, nil
 }

@@ -29,7 +29,7 @@ func TestOperationDeleteQueueById(t *testing.T) {
 	expectQuery(t, r, "blocklist", "true")
 	expectQuery(t, r, "skipRedownload", "true")
 	expectQuery(t, r, "changeCategory", "true")
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusOK {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 

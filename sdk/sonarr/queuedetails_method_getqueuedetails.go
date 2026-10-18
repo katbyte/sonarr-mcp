@@ -31,8 +31,7 @@ type GetQueueDetailsOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetQueueDetailsOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -56,8 +55,7 @@ func (o GetQueueDetailsOptions) ToQuery() *client.QueryParams {
 // GetQueueDetails calls GET /api/v3/queue/details.
 func (c Client) GetQueueDetails(ctx context.Context, options ...GetQueueDetailsOptions) (result GetQueueDetailsResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetQueueDetails takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetQueueDetails takes one options struct at most, not %d", len(options))
 	}
 	var option GetQueueDetailsOptions
 	if len(options) == 1 {
@@ -76,7 +74,7 @@ func (c Client) GetQueueDetails(ctx context.Context, options ...GetQueueDetailsO
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -85,12 +83,12 @@ func (c Client) GetQueueDetails(ctx context.Context, options ...GetQueueDetailsO
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(&result.Answer); err != nil {
+		return result, err
 	}
 
-	return
+	return result, nil
 }

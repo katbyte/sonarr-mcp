@@ -51,7 +51,7 @@ func (c Client) GetConfigMediaManagement(ctx context.Context) (result GetConfigM
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -60,15 +60,15 @@ func (c Client) GetConfigMediaManagement(ctx context.Context) (result GetConfigM
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer MediaManagementConfigResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.MediaManagementConfigResource = result.Answer
 
-	return
+	return result, nil
 }

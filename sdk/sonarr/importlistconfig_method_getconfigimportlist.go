@@ -51,7 +51,7 @@ func (c Client) GetConfigImportList(ctx context.Context) (result GetConfigImport
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -60,15 +60,15 @@ func (c Client) GetConfigImportList(ctx context.Context) (result GetConfigImport
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer ImportListConfigResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.ImportListConfigResource = result.Answer
 
-	return
+	return result, nil
 }

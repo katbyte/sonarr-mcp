@@ -27,7 +27,7 @@ func TestOperationPutConfigUiById(t *testing.T) {
 	if !json.Valid([]byte(body)) {
 		t.Errorf("body = %q, want JSON", body)
 	}
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 202 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusAccepted {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {
@@ -36,7 +36,7 @@ func TestOperationPutConfigUiById(t *testing.T) {
 	if result.UiConfigResource != result.Answer {
 		t.Error("the embedded answer is not the answer")
 	}
-	if record, err := result.Record(); err != nil || !reflect.DeepEqual(record, *result.Answer) {
+	if record, err := result.Record(); err != nil || !reflect.DeepEqual(&record, result.Answer) {
 		t.Errorf("Record = %+v, %v", record, err)
 	}
 

@@ -46,8 +46,7 @@ type PutMetadataByIdOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o PutMetadataByIdOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -63,8 +62,7 @@ func (o PutMetadataByIdOptions) ToQuery() *client.QueryParams {
 func (c Client) PutMetadataById(ctx context.Context, id int, input MetadataResource, forceSave ...bool) (result PutMetadataByIdResponse, err error) {
 	var option PutMetadataByIdOptions
 	if len(forceSave) > 1 {
-		err = fmt.Errorf("PutMetadataById takes one forceSave at most, not %d", len(forceSave))
-		return
+		return result, fmt.Errorf("PutMetadataById takes one forceSave at most, not %d", len(forceSave))
 	}
 	if len(forceSave) == 1 {
 		option.ForceSave = &forceSave[0]
@@ -79,16 +77,16 @@ func (c Client) PutMetadataById(ctx context.Context, id int, input MetadataResou
 		HTTPMethod:    http.MethodPut,
 		Operation:     "PutMetadataById",
 		OptionsObject: option,
-		Path:          fmt.Sprintf("/api/v3/metadata/%d", id),
+		Path:          "/api/v3/metadata/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -97,15 +95,15 @@ func (c Client) PutMetadataById(ctx context.Context, id int, input MetadataResou
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer MetadataResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.MetadataResource = result.Answer
 
-	return
+	return result, nil
 }

@@ -5,8 +5,8 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -47,12 +47,12 @@ func (c Client) GetLanguageProfileById(ctx context.Context, id int) (result GetL
 		},
 		HTTPMethod: http.MethodGet,
 		Operation:  "GetLanguageProfileById",
-		Path:       fmt.Sprintf("/api/v3/languageprofile/%d", id),
+		Path:       "/api/v3/languageprofile/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -61,15 +61,15 @@ func (c Client) GetLanguageProfileById(ctx context.Context, id int) (result GetL
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer LanguageProfileResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.LanguageProfileResource = result.Answer
 
-	return
+	return result, nil
 }

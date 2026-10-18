@@ -55,11 +55,11 @@ func (c Client) RefreshMonitoredDownloads(ctx context.Context, input RefreshMoni
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -68,29 +68,28 @@ func (c Client) RefreshMonitoredDownloads(ctx context.Context, input RefreshMoni
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer CommandResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.CommandResource = result.Answer
 
-	return
+	return result, nil
 }
 
 // RefreshMonitoredDownloadsAndWait queues the RefreshMonitoredDownloads command and waits for it as WaitForCommand does, answering it as it stands.
 func (c Client) RefreshMonitoredDownloadsAndWait(ctx context.Context, input RefreshMonitoredDownloadsCommand, wait time.Duration) (result GetCommandByIdResponse, err error) {
 	queued, err := c.RefreshMonitoredDownloads(ctx, input)
 	if err != nil {
-		return
+		return result, err
 	}
 	if queued.Answer == nil {
-		err = errors.New("RefreshMonitoredDownloads answered no command to wait for")
-		return
+		return result, errors.New("RefreshMonitoredDownloads answered no command to wait for")
 	}
 
-	return c.WaitForCommand(ctx, CommandID(queued.Answer.Id), wait)
+	return c.WaitForCommand(ctx, queued.Answer.Id, wait)
 }

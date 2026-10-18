@@ -4,8 +4,8 @@ package sonarr
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -23,12 +23,12 @@ func (c Client) PostHistoryFailedById(ctx context.Context, id int) (result PostH
 		},
 		HTTPMethod: http.MethodPost,
 		Operation:  "PostHistoryFailedById",
-		Path:       fmt.Sprintf("/api/v3/history/failed/%d", id),
+		Path:       "/api/v3/history/failed/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -37,8 +37,8 @@ func (c Client) PostHistoryFailedById(ctx context.Context, id int) (result PostH
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

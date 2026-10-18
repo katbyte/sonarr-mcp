@@ -4,7 +4,6 @@ package sonarr
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -25,12 +24,12 @@ func (c Client) DeleteQualityProfileById(ctx context.Context, id QualityProfileI
 		},
 		HTTPMethod: http.MethodDelete,
 		Operation:  "DeleteQualityProfileById",
-		Path:       fmt.Sprintf("/api/v3/qualityprofile/%s", url.PathEscape(strconv.Itoa(int(id)))),
+		Path:       "/api/v3/qualityprofile/" + url.PathEscape(strconv.Itoa(int(id))),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -39,8 +38,8 @@ func (c Client) DeleteQualityProfileById(ctx context.Context, id QualityProfileI
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

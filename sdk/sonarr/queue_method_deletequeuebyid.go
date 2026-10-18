@@ -26,8 +26,7 @@ type DeleteQueueByIdOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o DeleteQueueByIdOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -51,8 +50,7 @@ func (o DeleteQueueByIdOptions) ToQuery() *client.QueryParams {
 // DeleteQueueById calls DELETE /api/v3/queue/{id}.
 func (c Client) DeleteQueueById(ctx context.Context, id int, options ...DeleteQueueByIdOptions) (result DeleteQueueByIdResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("DeleteQueueById takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("DeleteQueueById takes one options struct at most, not %d", len(options))
 	}
 	var option DeleteQueueByIdOptions
 	if len(options) == 1 {
@@ -66,12 +64,12 @@ func (c Client) DeleteQueueById(ctx context.Context, id int, options ...DeleteQu
 		HTTPMethod:    http.MethodDelete,
 		Operation:     "DeleteQueueById",
 		OptionsObject: option,
-		Path:          fmt.Sprintf("/api/v3/queue/%d", id),
+		Path:          "/api/v3/queue/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -80,8 +78,8 @@ func (c Client) DeleteQueueById(ctx context.Context, id int, options ...DeleteQu
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

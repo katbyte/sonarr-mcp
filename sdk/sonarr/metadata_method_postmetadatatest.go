@@ -23,8 +23,7 @@ type PostMetadataTestOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o PostMetadataTestOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -40,8 +39,7 @@ func (o PostMetadataTestOptions) ToQuery() *client.QueryParams {
 func (c Client) PostMetadataTest(ctx context.Context, input MetadataResource, forceTest ...bool) (result PostMetadataTestResponse, err error) {
 	var option PostMetadataTestOptions
 	if len(forceTest) > 1 {
-		err = fmt.Errorf("PostMetadataTest takes one forceTest at most, not %d", len(forceTest))
-		return
+		return result, fmt.Errorf("PostMetadataTest takes one forceTest at most, not %d", len(forceTest))
 	}
 	if len(forceTest) == 1 {
 		option.ForceTest = &forceTest[0]
@@ -60,11 +58,11 @@ func (c Client) PostMetadataTest(ctx context.Context, input MetadataResource, fo
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -73,8 +71,8 @@ func (c Client) PostMetadataTest(ctx context.Context, input MetadataResource, fo
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

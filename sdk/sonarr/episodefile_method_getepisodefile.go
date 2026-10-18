@@ -29,8 +29,7 @@ type GetEpisodeFileOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetEpisodeFileOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -48,8 +47,7 @@ func (o GetEpisodeFileOptions) ToQuery() *client.QueryParams {
 // GetEpisodeFile calls GET /api/v3/episodefile.
 func (c Client) GetEpisodeFile(ctx context.Context, options ...GetEpisodeFileOptions) (result GetEpisodeFileResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetEpisodeFile takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetEpisodeFile takes one options struct at most, not %d", len(options))
 	}
 	var option GetEpisodeFileOptions
 	if len(options) == 1 {
@@ -68,7 +66,7 @@ func (c Client) GetEpisodeFile(ctx context.Context, options ...GetEpisodeFileOpt
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -77,12 +75,12 @@ func (c Client) GetEpisodeFile(ctx context.Context, options ...GetEpisodeFileOpt
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(&result.Answer); err != nil {
+		return result, err
 	}
 
-	return
+	return result, nil
 }

@@ -29,7 +29,7 @@ func TestOperationGetQueueDetails(t *testing.T) {
 	expectQuery(t, r, "episodeIds", "1", "2")
 	expectQuery(t, r, "includeSeries", "true")
 	expectQuery(t, r, "includeEpisode", "true")
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 200 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusOK {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {

@@ -51,7 +51,7 @@ func (c Client) GetLocalization(ctx context.Context) (result GetLocalizationResp
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -60,15 +60,15 @@ func (c Client) GetLocalization(ctx context.Context) (result GetLocalizationResp
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer LocalizationResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.LocalizationResource = result.Answer
 
-	return
+	return result, nil
 }

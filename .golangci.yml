@@ -76,6 +76,7 @@ linters:
     - makezero                  # finds slice declarations with non-zero initial length but capacity is initialized
 
   exclusions:
+    generated: disable # the generated Go client and its tests are linted like the rest
     rules:
       # flag names ("repo", "build-type-id", ...) repeat across cobra/viper registration, env binding, and
       # validation lists by design; hoisting them into constants would just add indirection
@@ -121,8 +122,9 @@ linters:
         # this is a network-bound CLI; only flag genuinely huge copies, not every mid-size struct
         rangeValCopy:
           sizeThreshold: 512
+        # the generated client takes a body by value; Sonarr's largest, a release at 784 bytes, passes under this
         hugeParam:
-          sizeThreshold: 512
+          sizeThreshold: 1024
     revive:
       enable-all-rules: true
       rules:

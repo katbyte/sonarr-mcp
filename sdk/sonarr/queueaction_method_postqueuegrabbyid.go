@@ -4,8 +4,8 @@ package sonarr
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -23,12 +23,12 @@ func (c Client) PostQueueGrabById(ctx context.Context, id int) (result PostQueue
 		},
 		HTTPMethod: http.MethodPost,
 		Operation:  "PostQueueGrabById",
-		Path:       fmt.Sprintf("/api/v3/queue/grab/%d", id),
+		Path:       "/api/v3/queue/grab/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -37,8 +37,8 @@ func (c Client) PostQueueGrabById(ctx context.Context, id int) (result PostQueue
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }

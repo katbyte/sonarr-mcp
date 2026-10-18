@@ -46,8 +46,7 @@ type PostNotificationOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o PostNotificationOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -63,8 +62,7 @@ func (o PostNotificationOptions) ToQuery() *client.QueryParams {
 func (c Client) PostNotification(ctx context.Context, input NotificationResource, forceSave ...bool) (result PostNotificationResponse, err error) {
 	var option PostNotificationOptions
 	if len(forceSave) > 1 {
-		err = fmt.Errorf("PostNotification takes one forceSave at most, not %d", len(forceSave))
-		return
+		return result, fmt.Errorf("PostNotification takes one forceSave at most, not %d", len(forceSave))
 	}
 	if len(forceSave) == 1 {
 		option.ForceSave = &forceSave[0]
@@ -84,11 +82,11 @@ func (c Client) PostNotification(ctx context.Context, input NotificationResource
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -97,15 +95,15 @@ func (c Client) PostNotification(ctx context.Context, input NotificationResource
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer NotificationResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.NotificationResource = result.Answer
 
-	return
+	return result, nil
 }

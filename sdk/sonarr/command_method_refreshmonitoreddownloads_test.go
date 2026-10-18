@@ -33,7 +33,7 @@ func TestOperationRefreshMonitoredDownloads(t *testing.T) {
 	if body != "{\"name\":\"RefreshMonitoredDownloads\"}" {
 		t.Errorf("an empty record sent %q, want %q: a field never set went out", body, "{\"name\":\"RefreshMonitoredDownloads\"}")
 	}
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 201 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusCreated {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {
@@ -42,7 +42,7 @@ func TestOperationRefreshMonitoredDownloads(t *testing.T) {
 	if result.CommandResource != result.Answer {
 		t.Error("the embedded answer is not the answer")
 	}
-	if record, err := result.Record(); err != nil || !reflect.DeepEqual(record, *result.Answer) {
+	if record, err := result.Record(); err != nil || !reflect.DeepEqual(&record, result.Answer) {
 		t.Errorf("Record = %+v, %v", record, err)
 	}
 

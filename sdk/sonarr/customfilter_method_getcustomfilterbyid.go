@@ -5,8 +5,8 @@ package sonarr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/katbyte/pandorest/client"
 )
@@ -47,12 +47,12 @@ func (c Client) GetCustomFilterById(ctx context.Context, id int) (result GetCust
 		},
 		HTTPMethod: http.MethodGet,
 		Operation:  "GetCustomFilterById",
-		Path:       fmt.Sprintf("/api/v3/customfilter/%d", id),
+		Path:       "/api/v3/customfilter/" + strconv.Itoa(id),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -61,15 +61,15 @@ func (c Client) GetCustomFilterById(ctx context.Context, id int) (result GetCust
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var answer CustomFilterResource
 	result.Answer = &answer
-	if err = resp.Unmarshal(result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(result.Answer); err != nil {
+		return result, err
 	}
 	result.CustomFilterResource = result.Answer
 
-	return
+	return result, nil
 }

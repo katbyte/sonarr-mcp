@@ -26,7 +26,7 @@ func TestOperationPutQualityDefinitionUpdate(t *testing.T) {
 	if !json.Valid([]byte(body)) {
 		t.Errorf("body = %q, want JSON", body)
 	}
-	if result.HttpResponse == nil || result.HttpResponse.StatusCode != 202 {
+	if result.HttpResponse == nil || result.HttpResponse.StatusCode != http.StatusAccepted {
 		t.Fatalf("HttpResponse = %+v", result.HttpResponse)
 	}
 	if result.Answer == nil || !result.Answered() {

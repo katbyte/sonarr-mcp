@@ -32,8 +32,7 @@ type GetHistorySeriesOptions struct {
 
 // ToHeaders returns the header parameters the options set.
 func (o GetHistorySeriesOptions) ToHeaders() *client.Headers {
-	out := client.Headers{}
-	return &out
+	return &client.Headers{}
 }
 
 // ToQuery returns the query parameters the options set.
@@ -60,8 +59,7 @@ func (o GetHistorySeriesOptions) ToQuery() *client.QueryParams {
 // GetHistorySeries calls GET /api/v3/history/series.
 func (c Client) GetHistorySeries(ctx context.Context, options ...GetHistorySeriesOptions) (result GetHistorySeriesResponse, err error) {
 	if len(options) > 1 {
-		err = fmt.Errorf("GetHistorySeries takes one options struct at most, not %d", len(options))
-		return
+		return result, fmt.Errorf("GetHistorySeries takes one options struct at most, not %d", len(options))
 	}
 	var option GetHistorySeriesOptions
 	if len(options) == 1 {
@@ -80,7 +78,7 @@ func (c Client) GetHistorySeries(ctx context.Context, options ...GetHistorySerie
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
 	var resp *client.Response
@@ -89,12 +87,12 @@ func (c Client) GetHistorySeries(ctx context.Context, options ...GetHistorySerie
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = resp.Unmarshal(&result.Answer); err != nil {
-		return
+	if err := resp.Unmarshal(&result.Answer); err != nil {
+		return result, err
 	}
 
-	return
+	return result, nil
 }

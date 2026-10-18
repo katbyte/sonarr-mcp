@@ -4,7 +4,6 @@ package sonarr
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 
@@ -25,16 +24,16 @@ func (c Client) PostNotificationActionByName(ctx context.Context, name string, i
 		},
 		HTTPMethod: http.MethodPost,
 		Operation:  "PostNotificationActionByName",
-		Path:       fmt.Sprintf("/api/v3/notification/action/%s", url.PathEscape(name)),
+		Path:       "/api/v3/notification/action/" + url.PathEscape(name),
 	}
 
 	req, err := c.Client.NewRequest(ctx, opts)
 	if err != nil {
-		return
+		return result, err
 	}
 
-	if err = req.Marshal(input); err != nil {
-		return
+	if err := req.Marshal(input); err != nil {
+		return result, err
 	}
 
 	var resp *client.Response
@@ -43,8 +42,8 @@ func (c Client) PostNotificationActionByName(ctx context.Context, name string, i
 		result.HttpResponse = resp.Response
 	}
 	if err != nil {
-		return
+		return result, err
 	}
 
-	return
+	return result, nil
 }
