@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (2026-10-18)
+
+In the Go client, an operation with one option takes it as an argument. A config file takes every flag and says when a name in it is wrong, and `audit_no_files` leaves out shows that have not aired.
 
 ### Breaking
 
