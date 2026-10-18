@@ -101,7 +101,7 @@ func TestOperationGetLogComplete(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			c, starts := pagedServer(t, "page", "{}", tc.total, tc.pages)
+			c, starts := pagedServer(t, "page", "records", "totalRecords", "{}", tc.total, tc.pages)
 			result, err := c.GetLogComplete(t.Context(), tc.options)
 			if err != nil {
 				t.Fatal(err)
@@ -116,7 +116,7 @@ func TestOperationGetLogComplete(t *testing.T) {
 func TestOperationGetLogEach(t *testing.T) {
 	t.Parallel()
 
-	c, starts := pagedServer(t, "page", "{}", 0, 2)
+	c, starts := pagedServer(t, "page", "records", "totalRecords", "{}", 0, 2)
 	n := 0
 	for _, err := range c.GetLogEach(t.Context(), GetLogOptions{PageSize: new(1)}) {
 		if err != nil {
@@ -129,7 +129,7 @@ func TestOperationGetLogEach(t *testing.T) {
 	}
 
 	// stopping after the first result asks for no page more
-	c, starts = pagedServer(t, "page", "{}", 0, 2)
+	c, starts = pagedServer(t, "page", "records", "totalRecords", "{}", 0, 2)
 	for range c.GetLogEach(t.Context(), GetLogOptions{PageSize: new(1)}) {
 		break
 	}

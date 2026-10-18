@@ -170,34 +170,21 @@ func expectQuery(t *testing.T, r *http.Request, name string, want ...string) {
 
 `
 
-// pagedServerHelper is the canned server the Complete tests share, which
-// answers pages in the shape the service's lists have: the JSON names of the
-// first list operation's items and total. A service with no lists has none.
+// pagedServerHelper is the canned server the Complete tests share, which answers pages in the names each list's answer
+// carries, since a service's lists need not all answer alike. A service with no lists has none.
 func (g *gen) pagedServerHelper() string {
 	if g.paged == nil {
 		return ""
 	}
-	items, total := g.paged.Pageable.ItemsField, g.paged.Pageable.TotalField
-	if m := g.models[g.paged.Response.Type.ReferenceName]; m != nil {
-		for i := range m.Fields {
-			switch m.Fields[i].Name {
-			case g.paged.Pageable.ItemsField:
-				items = m.Fields[i].JSONName
-			case g.paged.Pageable.TotalField:
-				total = m.Fields[i].JSONName
-			}
-		}
-	}
-	answer := strconv.Quote(fmt.Sprintf(`{%q:[%%s],%q:%%d}`, items, total))
 	records := "start index"
 	if g.paged.Pageable.ByPage {
 		records = "page"
 	}
 
 	return `// pagedServer answers the first pages requests with one item each and an
-// empty list after, reporting total items, and records the ` + records + ` of
-// each request.
-func pagedServer(t *testing.T, startIndex, item string, total, pages int) (` + g.clientType() + `, *[]string) {
+// empty list after, reporting total items under the names the list answers
+// with, and records the ` + records + ` of each request.
+func pagedServer(t *testing.T, startIndex, items, total, item string, count, pages int) (` + g.clientType() + `, *[]string) {
 	t.Helper()
 
 	var starts []string
@@ -207,7 +194,7 @@ func pagedServer(t *testing.T, startIndex, item string, total, pages int) (` + g
 		if len(starts) > pages {
 			item = ""
 		}
-		_, _ = fmt.Fprintf(w, ` + answer + `, item, total)
+		_, _ = fmt.Fprintf(w, "{%q:[%s],%q:%d}", items, item, total, count)
 	}))
 	t.Cleanup(srv.Close)
 ` + g.newTestClient("srv.URL") + `	c.Client.HTTPClient = srv.Client()
@@ -702,10 +689,28 @@ func (g *gen) responseChecks(o *definitions.Operation, call testCallInfo) string
 	}
 }
 
+// pagedNames is what a list's answer calls its items and its total on the wire.
+func (g *gen) pagedNames(o *definitions.Operation) (items, total string) {
+	items, total = o.Pageable.ItemsField, o.Pageable.TotalField
+	if m := g.models[o.Response.Type.ReferenceName]; m != nil {
+		for i := range m.Fields {
+			switch m.Fields[i].Name {
+			case o.Pageable.ItemsField:
+				items = m.Fields[i].JSONName
+			case o.Pageable.TotalField:
+				total = m.Fields[i].JSONName
+			}
+		}
+	}
+
+	return items, total
+}
+
 // completeTest proves a paged list's Complete method walks the pages.
 func (g *gen) completeTest(o *definitions.Operation, call testCallInfo) string {
 	p := o.Pageable
 	startName := call.optNames[p.StartIndexOption]
+	items, total := g.pagedNames(o)
 	args := strings.Join(slicesWithout(call.args, call.options), ", ")
 	if args != "" {
 		args += ", "
@@ -739,7 +744,7 @@ func (g *gen) completeTest(o *definitions.Operation, call testCallInfo) string {
 		fmt.Fprintf(&b, "\t\t{\"short page\", 0, 9, %s, 1, []string{%s}},\n", options(2), starts[2])
 	}
 	b.WriteString("\t} {\n\t\tt.Run(tc.name, func(t *testing.T) {\n\t\t\tt.Parallel()\n\n")
-	fmt.Fprintf(&b, "\t\t\tc, starts := pagedServer(t, %q, %q, tc.total, tc.pages)\n", startName, g.sampleJSON(p.ItemType))
+	fmt.Fprintf(&b, "\t\t\tc, starts := pagedServer(t, %q, %q, %q, %q, tc.total, tc.pages)\n", startName, items, total, g.sampleJSON(p.ItemType))
 	fmt.Fprintf(&b, "\t\t\tresult, err := c.%sComplete(%stc.options)\n", o.Name, args)
 	b.WriteString("\t\t\tif err != nil {\n\t\t\t\tt.Fatal(err)\n\t\t\t}\n")
 	b.WriteString("\t\t\tif len(result.Items) != tc.items || !slices.Equal(*starts, tc.starts) || result.LatestHttpResponse == nil {\n")
@@ -748,12 +753,12 @@ func (g *gen) completeTest(o *definitions.Operation, call testCallInfo) string {
 
 	// Each hands out the same results one at a time, and a loop that stops asks for no page more
 	fmt.Fprintf(&b, "\nfunc TestOperation%sEach(t *testing.T) {\n\tt.Parallel()\n\n", o.Name)
-	fmt.Fprintf(&b, "\tc, starts := pagedServer(t, %q, %q, 0, 2)\n", startName, g.sampleJSON(p.ItemType))
+	fmt.Fprintf(&b, "\tc, starts := pagedServer(t, %q, %q, %q, %q, 0, 2)\n", startName, items, total, g.sampleJSON(p.ItemType))
 	b.WriteString("\tn := 0\n")
 	fmt.Fprintf(&b, "\tfor _, err := range c.%sEach(%s%s) {\n\t\tif err != nil {\n\t\t\tt.Fatal(err)\n\t\t}\n\t\tn++\n\t}\n", o.Name, args, options(1))
 	b.WriteString("\tif n != 2 || len(*starts) != 3 {\n\t\tt.Errorf(\"Each handed out %d results over %d pages, want 2 over 3\", n, len(*starts))\n\t}\n\n")
 	b.WriteString("\t// stopping after the first result asks for no page more\n")
-	fmt.Fprintf(&b, "\tc, starts = pagedServer(t, %q, %q, 0, 2)\n", startName, g.sampleJSON(p.ItemType))
+	fmt.Fprintf(&b, "\tc, starts = pagedServer(t, %q, %q, %q, %q, 0, 2)\n", startName, items, total, g.sampleJSON(p.ItemType))
 	fmt.Fprintf(&b, "\tfor range c.%sEach(%s%s) {\n\t\tbreak\n\t}\n", o.Name, args, options(1))
 	b.WriteString("\tif len(*starts) != 1 {\n\t\tt.Errorf(\"a stopped Each asked for %d pages, want 1\", len(*starts))\n\t}\n}\n")
 

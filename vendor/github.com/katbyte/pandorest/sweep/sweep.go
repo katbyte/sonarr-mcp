@@ -180,18 +180,28 @@ type Sweep struct {
 	// for, by model and key. Without it only an object lost whole is a
 	// failure, since servers send many fields their documents leave out.
 	Strict bool
-	// MissingIDs are, per kind of id the service declares, a value of the
-	// right shape that nothing on the server has: the sweep calls the first
-	// GET whose path takes the kind with it and notes what the server
-	// answers (a 404, or a 200 with nothing), so the service's own file can
-	// say it rather than each tool learning it from the server.
-	MissingIDs map[string]string
+	// MissingIDs are, per kind of id the service declares, a value of the right shape that nothing on the server has, and what
+	// a missing one should get: the sweep calls a GET whose path takes the kind with it, fails when the answer is not the one
+	// wanted, and notes what it was, so the service's own file says what a missing id gets rather than each tool learning it.
+	MissingIDs map[string]Missing
 	// Timeout is how long one operation gets; zero is DefaultTimeout.
 	Timeout time.Duration
 	// EventWait is how long an event stream gets, once it has answered, to
 	// send its first event before the sweep hangs up and counts it as an
 	// answer with nothing in it; zero is DefaultEventWait.
 	EventWait time.Duration
+}
+
+// Missing is a value of one kind of id that nothing on the server has, and what a missing one should get.
+type Missing struct {
+	// ID is a value of the right shape that nothing has.
+	ID string
+	// Operation names the GET to probe with, by its generated name, so the probe goes through the route a tool relies on;
+	// empty is the first GET whose path takes the kind.
+	Operation string
+	// Want is what the server should answer a missing id: a status such as "404", or "nothing" for a success with nothing
+	// in it. Any other answer fails the run. Empty only notes what came back.
+	Want string
 }
 
 // Outcome is what the sweep made of one operation.
@@ -253,11 +263,18 @@ func (s Sweep) Run(t *testing.T) {
 		t.Errorf("the case for %s names no %s", name, strings.TrimSuffix(s.word(), "s"))
 	}
 
-	// what a missing id of each kind gets, what the run came to, and what its answers left unproven
+	// what a missing id of each kind gets, failing where it is not what the service's file says, then what the run came to, and what
+	// its answers left unproven
 	for _, kind := range slices.Sorted(maps.Keys(s.MissingIDs)) {
 		ctx, cancel := context.WithTimeout(t.Context(), cmp.Or(s.Timeout, DefaultTimeout))
-		report.Notes = append(report.Notes, s.probeMissing(ctx, kind, s.MissingIDs[kind]))
+		note, failure := s.probeMissing(ctx, kind, s.MissingIDs[kind])
 		cancel()
+		if failure != "" {
+			t.Error(s.Definitions.Name + ": " + failure)
+		}
+		if note != "" {
+			report.Notes = append(report.Notes, note)
+		}
 	}
 	report.Notes = append(report.Notes, cov.notes()...)
 	t.Log(report.Summary(s.Definitions.Name))
@@ -266,10 +283,11 @@ func (s Sweep) Run(t *testing.T) {
 	}
 }
 
-// probeMissing calls the first GET whose path takes the kind with an id nothing has, and says what the server answered.
-func (s Sweep) probeMissing(ctx context.Context, kind, id string) string {
+// probeMissing calls a GET whose path takes the kind with an id nothing has, the one named or else the first, and says what the
+// server answered: a note of it, and a failure when it is not what is wanted or the probe could not be made.
+func (s Sweep) probeMissing(ctx context.Context, kind string, m Missing) (note, failure string) {
 	for _, op := range s.Definitions.Operations() {
-		if op.Method != http.MethodGet {
+		if op.Method != http.MethodGet || (m.Operation != "" && op.Name != m.Operation) {
 			continue
 		}
 		for _, p := range op.PathParameters {
@@ -281,28 +299,54 @@ func (s Sweep) probeMissing(ctx context.Context, kind, id string) string {
 			if c.Path == nil {
 				c.Path = map[string]string{}
 			}
-			c.Path[p.Name] = id
+			c.Path[p.Name] = m.ID
 			args, err := s.arguments(ctx, op, c)
 			if err != nil {
-				return fmt.Sprintf("a missing %s could not be probed through %s: %v", kind, op.Key(), err)
+				return "", fmt.Sprintf("a missing %s could not be probed through %s: %v", kind, op.Key(), err)
 			}
 			called, hangUp := context.WithCancel(ctx)
 			a, err := s.call(called, hangUp, op, args, nil)
 			hangUp()
+
+			// what came back, in the words Want is written in
+			got := "something"
 			switch {
 			case err != nil && a.status != 0:
-				return fmt.Sprintf("a missing %s answers HTTP %d (%s)", kind, a.status, op.Key())
+				got = strconv.Itoa(a.status)
 			case err != nil:
-				return fmt.Sprintf("a missing %s fails %s: %v", kind, op.Key(), err)
+				return "", fmt.Sprintf("a missing %s fails %s: %v", kind, op.Key(), err)
 			case a.empty:
-				return fmt.Sprintf("a missing %s answers %s with nothing", kind, op.Key())
-			default:
-				return fmt.Sprintf("a missing %s answers %s with something", kind, op.Key())
+				got = "nothing"
 			}
+
+			return missingVerdict(kind, op.Key(), got, m)
 		}
 	}
+	if m.Operation != "" {
+		return "", fmt.Sprintf("a missing %s was not probed: %s is no GET taking a %s in its path", kind, m.Operation, kind)
+	}
 
-	return fmt.Sprintf("no GET takes a %s in its path, so a missing one was not probed", kind)
+	return fmt.Sprintf("no GET takes a %s in its path, so a missing one was not probed", kind), ""
+}
+
+// missingVerdict is the note of what a missing id of kind got through the operation key, and the failure when that is not
+// what its Missing wants.
+func missingVerdict(kind, key, got string, m Missing) (note, failure string) {
+	note = fmt.Sprintf("a missing %s answers %s (%s)", kind, describeMissing(got), key)
+	if m.Want != "" && got != m.Want {
+		return note, fmt.Sprintf("%s, want %s", note, describeMissing(m.Want))
+	}
+
+	return note, ""
+}
+
+// describeMissing is a Want, or what a probe got, as words: "HTTP 404", "nothing" or "something".
+func describeMissing(answer string) string {
+	if _, err := strconv.Atoi(answer); err == nil {
+		return "HTTP " + answer
+	}
+
+	return answer
 }
 
 // StaleCases names the cases that are for no GET operation of the service,

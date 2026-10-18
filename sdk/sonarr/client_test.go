@@ -93,9 +93,9 @@ func expectQuery(t *testing.T, r *http.Request, name string, want ...string) {
 }
 
 // pagedServer answers the first pages requests with one item each and an
-// empty list after, reporting total items, and records the page of
-// each request.
-func pagedServer(t *testing.T, startIndex, item string, total, pages int) (*Client, *[]string) {
+// empty list after, reporting total items under the names the list answers
+// with, and records the page of each request.
+func pagedServer(t *testing.T, startIndex, items, total, item string, count, pages int) (*Client, *[]string) {
 	t.Helper()
 
 	var starts []string
@@ -105,7 +105,7 @@ func pagedServer(t *testing.T, startIndex, item string, total, pages int) (*Clie
 		if len(starts) > pages {
 			item = ""
 		}
-		_, _ = fmt.Fprintf(w, "{\"records\":[%s],\"totalRecords\":%d}", item, total)
+		_, _ = fmt.Fprintf(w, "{%q:[%s],%q:%d}", items, item, total, count)
 	}))
 	t.Cleanup(srv.Close)
 	c, err := New(srv.URL, "test-token")
