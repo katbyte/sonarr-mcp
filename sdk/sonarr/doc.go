@@ -15,7 +15,8 @@
 // request body (input: the model for a JSON body, or an io.Reader and its
 // content type for raw bytes), then, when the operation has query or header
 // parameters, a <Name>Options, which may be left out when every one of them
-// is optional.
+// is optional, and which an operation with one parameter takes as the
+// parameter itself, variadic when optional.
 // Unset options are not sent: a boolean or a number is a pointer, sent when
 // set (so 0 and false can be asked for), an empty string or list is skipped,
 // and a list is sent comma-joined or as one parameter for each element, as

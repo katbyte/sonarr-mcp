@@ -45,11 +45,11 @@ func registerSettingsTools(r *registry) {
 			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.IndexerResource, force bool) (*sonarr.IndexerResource, error) {
-			res, err := c.PostIndexer(ctx, rec, sonarr.PostIndexerOptions{ForceSave: new(force)})
+			res, err := c.PostIndexer(ctx, rec, force)
 			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.IndexerResource, force bool) (*sonarr.IndexerResource, error) {
-			res, err := c.PutIndexerById(ctx, id, rec, sonarr.PutIndexerByIdOptions{ForceSave: new(force)})
+			res, err := c.PutIndexerById(ctx, id, rec, force)
 			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
@@ -57,7 +57,7 @@ func registerSettingsTools(r *registry) {
 			return err
 		},
 		test: func(ctx context.Context, rec sonarr.IndexerResource) error {
-			_, err := c.PostIndexerTest(ctx, rec, sonarr.PostIndexerTestOptions{ForceTest: new(true)})
+			_, err := c.PostIndexerTest(ctx, rec, true)
 			return err
 		},
 		// as Sonarr's own page does: used for whatever the kind supports
@@ -84,11 +84,11 @@ func registerSettingsTools(r *registry) {
 			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.DownloadClientResource, force bool) (*sonarr.DownloadClientResource, error) {
-			res, err := c.PostDownloadClient(ctx, rec, sonarr.PostDownloadClientOptions{ForceSave: new(force)})
+			res, err := c.PostDownloadClient(ctx, rec, force)
 			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.DownloadClientResource, force bool) (*sonarr.DownloadClientResource, error) {
-			res, err := c.PutDownloadClientById(ctx, id, rec, sonarr.PutDownloadClientByIdOptions{ForceSave: new(force)})
+			res, err := c.PutDownloadClientById(ctx, id, rec, force)
 			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
@@ -96,7 +96,7 @@ func registerSettingsTools(r *registry) {
 			return err
 		},
 		test: func(ctx context.Context, rec sonarr.DownloadClientResource) error {
-			_, err := c.PostDownloadClientTest(ctx, rec, sonarr.PostDownloadClientTestOptions{ForceTest: new(true)})
+			_, err := c.PostDownloadClientTest(ctx, rec, true)
 			return err
 		},
 		on:         switchedOn("enable"),
@@ -119,11 +119,11 @@ func registerSettingsTools(r *registry) {
 			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.NotificationResource, force bool) (*sonarr.NotificationResource, error) {
-			res, err := c.PostNotification(ctx, rec, sonarr.PostNotificationOptions{ForceSave: new(force)})
+			res, err := c.PostNotification(ctx, rec, force)
 			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.NotificationResource, force bool) (*sonarr.NotificationResource, error) {
-			res, err := c.PutNotificationById(ctx, id, rec, sonarr.PutNotificationByIdOptions{ForceSave: new(force)})
+			res, err := c.PutNotificationById(ctx, id, rec, force)
 			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
@@ -131,7 +131,7 @@ func registerSettingsTools(r *registry) {
 			return err
 		},
 		test: func(ctx context.Context, rec sonarr.NotificationResource) error {
-			_, err := c.PostNotificationTest(ctx, rec, sonarr.PostNotificationTestOptions{ForceTest: new(true)})
+			_, err := c.PostNotificationTest(ctx, rec, true)
 			return err
 		},
 		testAll: func(ctx context.Context) ([]sonarr.ProviderTestAllResult, error) {
@@ -162,11 +162,11 @@ func registerSettingsTools(r *registry) {
 			return res.Answer, err
 		},
 		create: func(ctx context.Context, rec sonarr.ImportListResource, force bool) (*sonarr.ImportListResource, error) {
-			res, err := c.PostImportList(ctx, rec, sonarr.PostImportListOptions{ForceSave: new(force)})
+			res, err := c.PostImportList(ctx, rec, force)
 			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.ImportListResource, force bool) (*sonarr.ImportListResource, error) {
-			res, err := c.PutImportListById(ctx, id, rec, sonarr.PutImportListByIdOptions{ForceSave: new(force)})
+			res, err := c.PutImportListById(ctx, id, rec, force)
 			return res.Answer, err
 		},
 		remove: func(ctx context.Context, id int) error {
@@ -174,7 +174,7 @@ func registerSettingsTools(r *registry) {
 			return err
 		},
 		test: func(ctx context.Context, rec sonarr.ImportListResource) error {
-			_, err := c.PostImportListTest(ctx, rec, sonarr.PostImportListTestOptions{ForceTest: new(true)})
+			_, err := c.PostImportListTest(ctx, rec, true)
 			return err
 		},
 		testAll: func(ctx context.Context) ([]sonarr.ProviderTestAllResult, error) {
@@ -205,7 +205,7 @@ func registerSettingsTools(r *registry) {
 			return res.Answer, err
 		},
 		update: func(ctx context.Context, id int, rec sonarr.MetadataResource, force bool) (*sonarr.MetadataResource, error) {
-			res, err := c.PutMetadataById(ctx, id, rec, sonarr.PutMetadataByIdOptions{ForceSave: new(force)})
+			res, err := c.PutMetadataById(ctx, id, rec, force)
 			return res.Answer, err
 		},
 		listSays: "The metadata Sonarr writes beside episode files for a media player to read - Kodi (XBMC) and Emby .nfo files and images, Roksbox, WDTV, Plex - each with whether it is on and what it writes.",

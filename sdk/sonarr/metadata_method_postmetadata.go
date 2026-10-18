@@ -60,14 +60,14 @@ func (o PostMetadataOptions) ToQuery() *client.QueryParams {
 }
 
 // PostMetadata calls POST /api/v3/metadata.
-func (c Client) PostMetadata(ctx context.Context, input MetadataResource, options ...PostMetadataOptions) (result PostMetadataResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PostMetadata takes one options struct at most, not %d", len(options))
+func (c Client) PostMetadata(ctx context.Context, input MetadataResource, forceSave ...bool) (result PostMetadataResponse, err error) {
+	var option PostMetadataOptions
+	if len(forceSave) > 1 {
+		err = fmt.Errorf("PostMetadata takes one forceSave at most, not %d", len(forceSave))
 		return
 	}
-	var option PostMetadataOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceSave) == 1 {
+		option.ForceSave = &forceSave[0]
 	}
 
 	result.MetadataResource = &MetadataResource{}

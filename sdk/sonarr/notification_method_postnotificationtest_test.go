@@ -14,9 +14,7 @@ func TestOperationPostNotificationTest(t *testing.T) {
 	t.Parallel()
 
 	c, s := newOperationServer(t, 200, "", "")
-	result, err := c.PostNotificationTest(t.Context(), NotificationResource{}, PostNotificationTestOptions{
-		ForceTest: new(true),
-	})
+	result, err := c.PostNotificationTest(t.Context(), NotificationResource{}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,19 +36,21 @@ func TestOperationPostNotificationTest(t *testing.T) {
 
 	// a status the operation does not document is an error, with the response
 	c, _ = newOperationServer(t, 418, "text/plain", "no")
-	result, err = c.PostNotificationTest(t.Context(), NotificationResource{}, PostNotificationTestOptions{
-		ForceTest: new(true),
-	})
+	result, err = c.PostNotificationTest(t.Context(), NotificationResource{}, true)
 	if client.StatusCode(err) != 418 || result.HttpResponse == nil {
 		t.Errorf("an undocumented status = %v, %+v", err, result.HttpResponse)
 	}
 
-	// the options may be left out, and two are refused before any request
+	// the option may be left out, and then nothing is sent for it
 	c, s = newOperationServer(t, 200, "", "")
 	if _, err = c.PostNotificationTest(t.Context(), NotificationResource{}); err != nil {
-		t.Errorf("without options = %v", err)
+		t.Errorf("without the option = %v", err)
 	}
-	if _, err = c.PostNotificationTest(t.Context(), NotificationResource{}, PostNotificationTestOptions{}, PostNotificationTestOptions{}); err == nil || len(s.requests) != 1 {
-		t.Errorf("two options structs = %v, %d requests", err, len(s.requests))
+	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("forceTest") != "" {
+		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("forceTest"))
+	}
+	// two values are refused before any request
+	if _, err = c.PostNotificationTest(t.Context(), NotificationResource{}, true, true); err == nil || len(s.requests) != 1 {
+		t.Errorf("two values = %v, %d requests", err, len(s.requests))
 	}
 }

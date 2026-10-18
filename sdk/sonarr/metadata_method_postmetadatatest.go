@@ -37,14 +37,14 @@ func (o PostMetadataTestOptions) ToQuery() *client.QueryParams {
 }
 
 // PostMetadataTest calls POST /api/v3/metadata/test.
-func (c Client) PostMetadataTest(ctx context.Context, input MetadataResource, options ...PostMetadataTestOptions) (result PostMetadataTestResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PostMetadataTest takes one options struct at most, not %d", len(options))
+func (c Client) PostMetadataTest(ctx context.Context, input MetadataResource, forceTest ...bool) (result PostMetadataTestResponse, err error) {
+	var option PostMetadataTestOptions
+	if len(forceTest) > 1 {
+		err = fmt.Errorf("PostMetadataTest takes one forceTest at most, not %d", len(forceTest))
 		return
 	}
-	var option PostMetadataTestOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceTest) == 1 {
+		option.ForceTest = &forceTest[0]
 	}
 
 	opts := client.RequestOptions{

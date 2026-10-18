@@ -37,14 +37,14 @@ func (o PostIndexerTestOptions) ToQuery() *client.QueryParams {
 }
 
 // PostIndexerTest calls POST /api/v3/indexer/test.
-func (c Client) PostIndexerTest(ctx context.Context, input IndexerResource, options ...PostIndexerTestOptions) (result PostIndexerTestResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PostIndexerTest takes one options struct at most, not %d", len(options))
+func (c Client) PostIndexerTest(ctx context.Context, input IndexerResource, forceTest ...bool) (result PostIndexerTestResponse, err error) {
+	var option PostIndexerTestOptions
+	if len(forceTest) > 1 {
+		err = fmt.Errorf("PostIndexerTest takes one forceTest at most, not %d", len(forceTest))
 		return
 	}
-	var option PostIndexerTestOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceTest) == 1 {
+		option.ForceTest = &forceTest[0]
 	}
 
 	opts := client.RequestOptions{

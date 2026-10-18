@@ -60,14 +60,14 @@ func (o PutIndexerByIdOptions) ToQuery() *client.QueryParams {
 }
 
 // PutIndexerById calls PUT /api/v3/indexer/{id}.
-func (c Client) PutIndexerById(ctx context.Context, id int, input IndexerResource, options ...PutIndexerByIdOptions) (result PutIndexerByIdResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PutIndexerById takes one options struct at most, not %d", len(options))
+func (c Client) PutIndexerById(ctx context.Context, id int, input IndexerResource, forceSave ...bool) (result PutIndexerByIdResponse, err error) {
+	var option PutIndexerByIdOptions
+	if len(forceSave) > 1 {
+		err = fmt.Errorf("PutIndexerById takes one forceSave at most, not %d", len(forceSave))
 		return
 	}
-	var option PutIndexerByIdOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceSave) == 1 {
+		option.ForceSave = &forceSave[0]
 	}
 
 	result.IndexerResource = &IndexerResource{}

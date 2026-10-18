@@ -60,14 +60,14 @@ func (o PostNotificationOptions) ToQuery() *client.QueryParams {
 }
 
 // PostNotification calls POST /api/v3/notification.
-func (c Client) PostNotification(ctx context.Context, input NotificationResource, options ...PostNotificationOptions) (result PostNotificationResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PostNotification takes one options struct at most, not %d", len(options))
+func (c Client) PostNotification(ctx context.Context, input NotificationResource, forceSave ...bool) (result PostNotificationResponse, err error) {
+	var option PostNotificationOptions
+	if len(forceSave) > 1 {
+		err = fmt.Errorf("PostNotification takes one forceSave at most, not %d", len(forceSave))
 		return
 	}
-	var option PostNotificationOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceSave) == 1 {
+		option.ForceSave = &forceSave[0]
 	}
 
 	result.NotificationResource = &NotificationResource{}

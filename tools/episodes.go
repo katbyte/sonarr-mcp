@@ -191,7 +191,7 @@ func registerEpisodeTools(r *registry) {
 		if err != nil {
 			return nil, monitorOut{}, err
 		}
-		res, err := client.PutEpisodeMonitor(ctx, sonarr.EpisodesMonitoredResource{EpisodeIds: episodeIDs(picked), Monitored: new(in.Monitored)}, sonarr.PutEpisodeMonitorOptions{})
+		res, err := client.PutEpisodeMonitor(ctx, sonarr.EpisodesMonitoredResource{EpisodeIds: episodeIDs(picked), Monitored: new(in.Monitored)})
 		if err != nil {
 			return nil, monitorOut{}, err
 		}
@@ -231,7 +231,7 @@ func registerEpisodeTools(r *registry) {
 		unlock := r.locking().By(seriesLock(s.Id))
 		defer unlock()
 
-		cur, err := client.GetSeriesById(ctx, s.Id, sonarr.GetSeriesByIdOptions{})
+		cur, err := client.GetSeriesById(ctx, s.Id)
 		if err != nil {
 			return nil, seasonMonitorOut{}, err
 		}
@@ -292,12 +292,12 @@ func registerEpisodeTools(r *registry) {
 		// Sonarr sets every episode of a season whose flag changed to match
 		// it (SeriesService.UpdateSeries), as its own season toggle does
 		if write {
-			if _, err := client.PutSeriesById(ctx, body.Id, body, sonarr.PutSeriesByIdOptions{}); err != nil {
+			if _, err := client.PutSeriesById(ctx, body.Id, body); err != nil {
 				return nil, seasonMonitorOut{}, err
 			}
 		}
 		if len(stragglers) > 0 {
-			if _, err := client.PutEpisodeMonitor(ctx, sonarr.EpisodesMonitoredResource{EpisodeIds: stragglers, Monitored: new(in.Monitored)}, sonarr.PutEpisodeMonitorOptions{}); err != nil {
+			if _, err := client.PutEpisodeMonitor(ctx, sonarr.EpisodesMonitoredResource{EpisodeIds: stragglers, Monitored: new(in.Monitored)}); err != nil {
 				return nil, out, err
 			}
 		}

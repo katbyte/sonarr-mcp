@@ -41,14 +41,14 @@ func (o GetFileSystemMediaFilesOptions) ToQuery() *client.QueryParams {
 }
 
 // GetFileSystemMediaFiles calls GET /api/v3/filesystem/mediafiles.
-func (c Client) GetFileSystemMediaFiles(ctx context.Context, options ...GetFileSystemMediaFilesOptions) (result GetFileSystemMediaFilesResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("GetFileSystemMediaFiles takes one options struct at most, not %d", len(options))
+func (c Client) GetFileSystemMediaFiles(ctx context.Context, path ...string) (result GetFileSystemMediaFilesResponse, err error) {
+	var option GetFileSystemMediaFilesOptions
+	if len(path) > 1 {
+		err = fmt.Errorf("GetFileSystemMediaFiles takes one path at most, not %d", len(path))
 		return
 	}
-	var option GetFileSystemMediaFilesOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(path) == 1 {
+		option.Path = path[0]
 	}
 
 	opts := client.RequestOptions{

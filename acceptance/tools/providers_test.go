@@ -110,7 +110,7 @@ func addBrokenIndexer(t *testing.T) *newznab.Indexer {
 	idx.Fields = providerFields(idx.Fields, map[string]any{
 		"baseUrl": srv.URL(), "apiPath": "/api", "apiKey": testenv.FakeKey, "categories": []int{5030, 5040},
 	})
-	made, err := api.PostIndexer(ctx, idx, sonarr.PostIndexerOptions{})
+	made, err := api.PostIndexer(ctx, idx)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Breaking
+
+- **In the Go client, an operation with one option takes it as an argument.** `GetSeriesLookup(ctx, "firefly")`, where it was `GetSeriesLookup(ctx, sonarr.GetSeriesLookupOptions{Term: "firefly"})`, and `GetSeriesById(ctx, id)` with nothing after it when the option is left out. It is 22 operations: the series search, reading and saving a series, a folder's video files and a path's type, setting episodes monitored, moving a delay profile, and saving or testing each kind of provider.
+
 ### Fixed
 
 - **A config file took only some of the flags, and ignored the rest without a word.** A flag with a `-` in its name (`read-only`, `enable-delete`, `allow-tools`, `deny-tools`, `auth-token`, `allow-no-auth`) could not be set in one at all. It is now written with a `_`, such as `ALLOW_TOOLS=`. A name the file does not take, such as the environment's `SONARR_SERVER=`, stops the program and says what to write instead.

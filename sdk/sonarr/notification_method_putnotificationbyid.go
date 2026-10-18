@@ -60,14 +60,14 @@ func (o PutNotificationByIdOptions) ToQuery() *client.QueryParams {
 }
 
 // PutNotificationById calls PUT /api/v3/notification/{id}.
-func (c Client) PutNotificationById(ctx context.Context, id int, input NotificationResource, options ...PutNotificationByIdOptions) (result PutNotificationByIdResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PutNotificationById takes one options struct at most, not %d", len(options))
+func (c Client) PutNotificationById(ctx context.Context, id int, input NotificationResource, forceSave ...bool) (result PutNotificationByIdResponse, err error) {
+	var option PutNotificationByIdOptions
+	if len(forceSave) > 1 {
+		err = fmt.Errorf("PutNotificationById takes one forceSave at most, not %d", len(forceSave))
 		return
 	}
-	var option PutNotificationByIdOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceSave) == 1 {
+		option.ForceSave = &forceSave[0]
 	}
 
 	result.NotificationResource = &NotificationResource{}

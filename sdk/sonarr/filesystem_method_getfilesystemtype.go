@@ -59,14 +59,14 @@ func (o GetFileSystemTypeOptions) ToQuery() *client.QueryParams {
 }
 
 // GetFileSystemType calls GET /api/v3/filesystem/type.
-func (c Client) GetFileSystemType(ctx context.Context, options ...GetFileSystemTypeOptions) (result GetFileSystemTypeResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("GetFileSystemType takes one options struct at most, not %d", len(options))
+func (c Client) GetFileSystemType(ctx context.Context, path ...string) (result GetFileSystemTypeResponse, err error) {
+	var option GetFileSystemTypeOptions
+	if len(path) > 1 {
+		err = fmt.Errorf("GetFileSystemType takes one path at most, not %d", len(path))
 		return
 	}
-	var option GetFileSystemTypeOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(path) == 1 {
+		option.Path = path[0]
 	}
 
 	result.FileSystemTypeResource = &FileSystemTypeResource{}

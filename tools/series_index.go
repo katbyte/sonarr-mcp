@@ -112,7 +112,7 @@ func sortKey(s *sonarr.SeriesResource) string {
 
 // seriesByID reads one series as it stands now.
 func (r *registry) seriesByID(ctx context.Context, id sonarr.SeriesID) (*sonarr.SeriesResource, error) {
-	res, err := r.client.GetSeriesById(ctx, id, sonarr.GetSeriesByIdOptions{})
+	res, err := r.client.GetSeriesById(ctx, id)
 	switch {
 	case apiclient.IsNotFound(err):
 		return nil, fmt.Errorf("no series with id %d in Sonarr", id)

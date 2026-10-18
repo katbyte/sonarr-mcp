@@ -53,6 +53,9 @@ var Services = []config.Service{{
 	Plain: sonarrPlainIDs,
 	// season 0 is the specials, so a season search sends its season whenever one is set
 	KeepNull: []string{"SeasonSearchCommand.seasonNumber"},
+	// an operation with one option takes it as an argument: a search's term, a series read with its season images, and the switch that saves or
+	// tests a provider without asking it to pass first
+	InlineSingleOptions: true,
 	// Swashbuckle lists text/plain beside every JSON response, which Sonarr never sends for them
 	PreferJSON: true,
 	// a test of every indexer, download client, import list or connection answers 400 with the same list of results when any of them fails

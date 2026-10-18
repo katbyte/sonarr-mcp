@@ -60,14 +60,14 @@ func (o PutMetadataByIdOptions) ToQuery() *client.QueryParams {
 }
 
 // PutMetadataById calls PUT /api/v3/metadata/{id}.
-func (c Client) PutMetadataById(ctx context.Context, id int, input MetadataResource, options ...PutMetadataByIdOptions) (result PutMetadataByIdResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PutMetadataById takes one options struct at most, not %d", len(options))
+func (c Client) PutMetadataById(ctx context.Context, id int, input MetadataResource, forceSave ...bool) (result PutMetadataByIdResponse, err error) {
+	var option PutMetadataByIdOptions
+	if len(forceSave) > 1 {
+		err = fmt.Errorf("PutMetadataById takes one forceSave at most, not %d", len(forceSave))
 		return
 	}
-	var option PutMetadataByIdOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceSave) == 1 {
+		option.ForceSave = &forceSave[0]
 	}
 
 	result.MetadataResource = &MetadataResource{}

@@ -352,13 +352,13 @@ func TestDelayedDownloads(t *testing.T) {
 func tagSeries(ctx context.Context, t *testing.T, id sonarr.SeriesID, tag sonarr.TagID) {
 	t.Helper()
 
-	s := *must(sc.GetSeriesById(ctx, id, sonarr.GetSeriesByIdOptions{})).Answer
+	s := *must(sc.GetSeriesById(ctx, id)).Answer
 	s.Tags = append(s.Tags, tag)
-	must(sc.PutSeriesById(ctx, id, s, sonarr.PutSeriesByIdOptions{}))
+	must(sc.PutSeriesById(ctx, id, s))
 	t.Cleanup(func() {
 		bg := context.WithoutCancel(ctx)
-		s := *must(sc.GetSeriesById(bg, id, sonarr.GetSeriesByIdOptions{})).Answer
+		s := *must(sc.GetSeriesById(bg, id)).Answer
 		s.Tags = slices.DeleteFunc(s.Tags, func(x sonarr.TagID) bool { return x == tag })
-		_, _ = sc.PutSeriesById(bg, id, s, sonarr.PutSeriesByIdOptions{})
+		_, _ = sc.PutSeriesById(bg, id, s)
 	})
 }

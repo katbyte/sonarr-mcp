@@ -14,9 +14,7 @@ func TestOperationGetSeriesById(t *testing.T) {
 	t.Parallel()
 
 	c, s := newOperationServer(t, 200, "application/json", "{}")
-	result, err := c.GetSeriesById(t.Context(), SeriesID(7), GetSeriesByIdOptions{
-		IncludeSeasonImages: new(true),
-	})
+	result, err := c.GetSeriesById(t.Context(), SeriesID(7), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,28 +37,28 @@ func TestOperationGetSeriesById(t *testing.T) {
 
 	// an answer that does not decode is an error, with the response
 	c, _ = newOperationServer(t, 200, "application/json", "<html>")
-	result, err = c.GetSeriesById(t.Context(), SeriesID(7), GetSeriesByIdOptions{
-		IncludeSeasonImages: new(true),
-	})
+	result, err = c.GetSeriesById(t.Context(), SeriesID(7), true)
 	if err == nil || client.StatusCode(err) != 0 || result.HttpResponse == nil {
 		t.Errorf("an answer that does not decode = %v", err)
 	}
 
 	// a status the operation does not document is an error, with the response
 	c, _ = newOperationServer(t, 418, "text/plain", "no")
-	result, err = c.GetSeriesById(t.Context(), SeriesID(7), GetSeriesByIdOptions{
-		IncludeSeasonImages: new(true),
-	})
+	result, err = c.GetSeriesById(t.Context(), SeriesID(7), true)
 	if client.StatusCode(err) != 418 || result.HttpResponse == nil {
 		t.Errorf("an undocumented status = %v, %+v", err, result.HttpResponse)
 	}
 
-	// the options may be left out, and two are refused before any request
+	// the option may be left out, and then nothing is sent for it
 	c, s = newOperationServer(t, 200, "application/json", "{}")
 	if _, err = c.GetSeriesById(t.Context(), SeriesID(7)); err != nil {
-		t.Errorf("without options = %v", err)
+		t.Errorf("without the option = %v", err)
 	}
-	if _, err = c.GetSeriesById(t.Context(), SeriesID(7), GetSeriesByIdOptions{}, GetSeriesByIdOptions{}); err == nil || len(s.requests) != 1 {
-		t.Errorf("two options structs = %v, %d requests", err, len(s.requests))
+	if r, _ := s.only(t); r.URL.RawQuery != "" || r.Header.Get("includeSeasonImages") != "" {
+		t.Errorf("without the option, sent %q and %q", r.URL.RawQuery, r.Header.Get("includeSeasonImages"))
+	}
+	// two values are refused before any request
+	if _, err = c.GetSeriesById(t.Context(), SeriesID(7), true, true); err == nil || len(s.requests) != 1 {
+		t.Errorf("two values = %v, %d requests", err, len(s.requests))
 	}
 }

@@ -64,7 +64,7 @@ func TestIndexers(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	create := func(name string) sonarr.IndexerResource {
-		res := must(sc.PostIndexer(ctx, newIndexer(ctx, name), sonarr.PostIndexerOptions{}))
+		res := must(sc.PostIndexer(ctx, newIndexer(ctx, name)))
 		status(t, res.HttpResponse, http.StatusCreated)
 		id := res.Answer.Id
 		t.Cleanup(func() { _, _ = sc.DeleteIndexerById(context.WithoutCancel(ctx), id) })
@@ -87,13 +87,13 @@ func TestIndexers(t *testing.T) {
 	}
 
 	idx.Priority = 40
-	upd := must(sc.PutIndexerById(ctx, idx.Id, idx, sonarr.PutIndexerByIdOptions{}))
+	upd := must(sc.PutIndexerById(ctx, idx.Id, idx))
 	status(t, upd.HttpResponse, http.StatusAccepted)
 	if upd.Answer.Priority != 40 {
 		t.Errorf("PutIndexerById = %+v", upd.Answer)
 	}
 	// the key sent back masked still works: the test fetches the feed with it
-	status(t, must(sc.PostIndexerTest(ctx, must(upd.Record()), sonarr.PostIndexerTestOptions{})).HttpResponse, http.StatusOK)
+	status(t, must(sc.PostIndexerTest(ctx, must(upd.Record()))).HttpResponse, http.StatusOK)
 	all := must(sc.PostIndexerTestAll(ctx))
 	status(t, all.HttpResponse, http.StatusOK)
 	allValid(t, "PostIndexerTestAll", all.Answer, idx.Id, indexerID)
@@ -138,7 +138,7 @@ func TestDownloadClients(t *testing.T) {
 	ctx := skipUnlessUp(t)
 
 	create := func(name string) sonarr.DownloadClientResource {
-		res := must(sc.PostDownloadClient(ctx, newDownloadClient(ctx, name), sonarr.PostDownloadClientOptions{}))
+		res := must(sc.PostDownloadClient(ctx, newDownloadClient(ctx, name)))
 		status(t, res.HttpResponse, http.StatusCreated)
 		id := res.Answer.Id
 		t.Cleanup(func() { _, _ = sc.DeleteDownloadClientById(context.WithoutCancel(ctx), id) })
@@ -156,12 +156,12 @@ func TestDownloadClients(t *testing.T) {
 	}
 
 	dc.Priority = 10
-	upd := must(sc.PutDownloadClientById(ctx, dc.Id, dc, sonarr.PutDownloadClientByIdOptions{}))
+	upd := must(sc.PutDownloadClientById(ctx, dc.Id, dc))
 	status(t, upd.HttpResponse, http.StatusAccepted)
 	if upd.Answer.Priority != 10 {
 		t.Errorf("PutDownloadClientById = %+v", upd.Answer)
 	}
-	status(t, must(sc.PostDownloadClientTest(ctx, must(upd.Record()), sonarr.PostDownloadClientTestOptions{})).HttpResponse, http.StatusOK)
+	status(t, must(sc.PostDownloadClientTest(ctx, must(upd.Record()))).HttpResponse, http.StatusOK)
 	all := must(sc.PostDownloadClientTestAll(ctx))
 	status(t, all.HttpResponse, http.StatusOK)
 	allValid(t, "PostDownloadClientTestAll", all.Answer, dc.Id, downloadClient)
@@ -254,7 +254,7 @@ func TestNotifications(t *testing.T) {
 
 	// an enabled notification is tested before it is saved: Sonarr sends it
 	// a test event
-	res := must(sc.PostNotification(ctx, n, sonarr.PostNotificationOptions{}))
+	res := must(sc.PostNotification(ctx, n))
 	status(t, res.HttpResponse, http.StatusCreated)
 	created := must(res.Record())
 	t.Cleanup(func() { _, _ = sc.DeleteNotificationById(context.WithoutCancel(ctx), created.Id) })
@@ -272,14 +272,14 @@ func TestNotifications(t *testing.T) {
 	}
 
 	created.OnDownload = new(false)
-	upd := must(sc.PutNotificationById(ctx, created.Id, created, sonarr.PutNotificationByIdOptions{}))
+	upd := must(sc.PutNotificationById(ctx, created.Id, created))
 	status(t, upd.HttpResponse, http.StatusAccepted)
 	if boolValue(upd.Answer.OnDownload) {
 		t.Errorf("PutNotificationById = %+v", upd.Answer)
 	}
 
 	before := hooks.count("Test")
-	status(t, must(sc.PostNotificationTest(ctx, must(upd.Record()), sonarr.PostNotificationTestOptions{})).HttpResponse, http.StatusOK)
+	status(t, must(sc.PostNotificationTest(ctx, must(upd.Record()))).HttpResponse, http.StatusOK)
 	if !poll(10*time.Second, func() bool { return hooks.count("Test") > before }) {
 		t.Error("PostNotificationTest sent the webhook nothing")
 	}
@@ -313,7 +313,7 @@ func TestMetadata(t *testing.T) {
 	// a second writer, left off, so it writes nothing into the library
 	md := schemas[i]
 	md.Name, md.Enable = "SDK Kodi", new(false)
-	res := must(sc.PostMetadata(ctx, md, sonarr.PostMetadataOptions{}))
+	res := must(sc.PostMetadata(ctx, md))
 	status(t, res.HttpResponse, http.StatusCreated)
 	created := must(res.Record())
 	t.Cleanup(func() { _, _ = sc.DeleteMetadataById(context.WithoutCancel(ctx), created.Id) })
@@ -325,12 +325,12 @@ func TestMetadata(t *testing.T) {
 	}
 
 	created.Fields = fields(created.Fields, map[string]any{"seriesImages": false})
-	upd := must(sc.PutMetadataById(ctx, created.Id, created, sonarr.PutMetadataByIdOptions{}))
+	upd := must(sc.PutMetadataById(ctx, created.Id, created))
 	status(t, upd.HttpResponse, http.StatusAccepted)
 	if on, ok := fieldValue(upd.Answer.Fields, "seriesImages").(bool); !ok || on {
 		t.Errorf("PutMetadataById = %+v", upd.Answer.Fields)
 	}
-	status(t, must(sc.PostMetadataTest(ctx, must(upd.Record()), sonarr.PostMetadataTestOptions{})).HttpResponse, http.StatusOK)
+	status(t, must(sc.PostMetadataTest(ctx, must(upd.Record()))).HttpResponse, http.StatusOK)
 	// testing all tests the enabled ones, which is none of these
 	status(t, must(sc.PostMetadataTestAll(ctx)).HttpResponse, http.StatusOK)
 	action := must(sc.PostMetadataActionByName(ctx, "sdkNoSuchAction", must(upd.Record())))
@@ -361,7 +361,7 @@ func newImportList(ctx context.Context, t *testing.T, name string) sonarr.Import
 	l.QualityProfileId, l.RootFolderPath, l.SeasonFolder = profileID, "/tv", new(true)
 	l.ShouldMonitor, l.MonitorNewItems, l.SeriesType = sonarr.MonitorTypesNone, sonarr.NewItemMonitorTypesNone, sonarr.SeriesTypesStandard
 	l.Fields = fields(l.Fields, map[string]any{"baseUrl": "http://localhost:8989", "apiKey": os.Getenv("SONARR_TOKEN")})
-	res := must(sc.PostImportList(ctx, l, sonarr.PostImportListOptions{}))
+	res := must(sc.PostImportList(ctx, l))
 	status(t, res.HttpResponse, http.StatusCreated)
 	id := res.Answer.Id
 	t.Cleanup(func() { _, _ = sc.DeleteImportListById(context.WithoutCancel(ctx), id) })
@@ -384,9 +384,9 @@ func TestImportLists(t *testing.T) {
 	}
 
 	list.ListOrder = 3
-	upd := must(sc.PutImportListById(ctx, list.Id, list, sonarr.PutImportListByIdOptions{}))
+	upd := must(sc.PutImportListById(ctx, list.Id, list))
 	status(t, upd.HttpResponse, http.StatusAccepted)
-	status(t, must(sc.PostImportListTest(ctx, must(upd.Record()), sonarr.PostImportListTestOptions{})).HttpResponse, http.StatusOK)
+	status(t, must(sc.PostImportListTest(ctx, must(upd.Record()))).HttpResponse, http.StatusOK)
 	// testing all tests the lists that add series automatically, which this
 	// one (left off, so it never adds this Sonarr's series to itself) is not
 	all := must(sc.PostImportListTestAll(ctx))

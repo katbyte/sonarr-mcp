@@ -29,7 +29,7 @@ func waitForFiles(ctx context.Context, t *testing.T, id sonarr.SeriesID, want in
 
 	var s sonarr.SeriesResource
 	if !poll(2*time.Minute, func() bool {
-		s = *must(sc.GetSeriesById(ctx, id, sonarr.GetSeriesByIdOptions{})).Answer
+		s = *must(sc.GetSeriesById(ctx, id)).Answer
 		return s.Statistics != nil && s.Statistics.TotalEpisodeCount > 0 && s.Statistics.EpisodeFileCount == want
 	}) {
 		t.Fatalf("series %d never settled on %d files: %+v", id, want, s.Statistics)
@@ -43,7 +43,7 @@ func TestSeriesLifecycle(t *testing.T) {
 
 	// a lookup by title answers candidates; the folder the seed left unmapped
 	// is one of them
-	found := must(sc.GetSeriesLookup(ctx, sonarr.GetSeriesLookupOptions{Term: theExpanse.Title})).Answer
+	found := must(sc.GetSeriesLookup(ctx, theExpanse.Title)).Answer
 	i := slices.IndexFunc(found, func(s sonarr.SeriesResource) bool { return s.TvdbId == theExpanse.TvdbID })
 	if i < 0 || found[i].Title != theExpanse.Title || found[i].Year != 2015 || len(found[i].Seasons) == 0 || found[i].Id != 0 {
 		t.Fatalf("GetSeriesLookup(%s) = %d candidates, want The Expanse not yet in the library", theExpanse.Title, len(found))
@@ -80,14 +80,14 @@ func TestSeriesLifecycle(t *testing.T) {
 
 	// an edit, then a move: the record changes at once, the files follow
 	s.Monitored = new(false)
-	upd := must(sc.PutSeriesById(ctx, id, s, sonarr.PutSeriesByIdOptions{}))
+	upd := must(sc.PutSeriesById(ctx, id, s))
 	status(t, upd.HttpResponse, http.StatusAccepted)
 	if boolValue(upd.Answer.Monitored) {
 		t.Errorf("PutSeriesById = %+v", upd.Answer)
 	}
 	moved := must(upd.Record())
 	moved.Path = "/tv/The Expanse (2015)"
-	status(t, must(sc.PutSeriesById(ctx, id, moved, sonarr.PutSeriesByIdOptions{MoveFiles: new(true)})).HttpResponse, http.StatusAccepted)
+	status(t, must(sc.PutSeriesById(ctx, id, moved, true)).HttpResponse, http.StatusAccepted)
 	if !poll(time.Minute, func() bool {
 		entries, err := os.ReadDir(testenv.DataDir("tv", "The Expanse (2015)", "Season 1"))
 		return err == nil && len(entries) == theExpanse.Files
@@ -100,7 +100,7 @@ func TestSeriesLifecycle(t *testing.T) {
 		Series: []sonarr.SeasonPassSeriesResource{{Id: id, Monitored: new(true), Seasons: []sonarr.SeasonResource{{SeasonNumber: 1, Monitored: new(false)}}}},
 	}))
 	status(t, pass.HttpResponse, http.StatusAccepted)
-	after := must(sc.GetSeriesById(ctx, id, sonarr.GetSeriesByIdOptions{IncludeSeasonImages: new(true)})).Answer
+	after := must(sc.GetSeriesById(ctx, id, true)).Answer
 	if j := slices.IndexFunc(after.Seasons, func(se sonarr.SeasonResource) bool { return se.SeasonNumber == 1 }); j < 0 || boolValue(after.Seasons[j].Monitored) {
 		t.Errorf("season 1 after the season pass = %+v", after.Seasons)
 	}
@@ -117,7 +117,7 @@ func TestSeriesLifecycle(t *testing.T) {
 
 	// and the editor's delete, leaving the files where they are
 	status(t, must(sc.DeleteSeriesEditor(ctx, sonarr.SeriesEditorResource{SeriesIds: []sonarr.SeriesID{id}, DeleteFiles: new(false)})).HttpResponse, http.StatusOK)
-	_, err := sc.GetSeriesById(ctx, id, sonarr.GetSeriesByIdOptions{})
+	_, err := sc.GetSeriesById(ctx, id)
 	gone(t, "GetSeriesById after the editor's delete", err)
 	if _, err := os.Stat(testenv.DataDir("tv", "The Expanse (2015)", "Season 1")); err != nil {
 		t.Errorf("the editor's delete without deleteFiles took the files: %v", err)
@@ -142,7 +142,7 @@ func TestSeriesAddAndDelete(t *testing.T) {
 	// the add queues a refresh from SkyHook; deleting under it would leave
 	// what it fetches to chance, and a replay run short of a recording
 	if !poll(time.Minute, func() bool {
-		s := must(sc.GetSeriesById(ctx, added.Id, sonarr.GetSeriesByIdOptions{})).Answer
+		s := must(sc.GetSeriesById(ctx, added.Id)).Answer
 		return s.Statistics != nil && s.Statistics.TotalEpisodeCount > 0
 	}) {
 		t.Fatal("the added series was never refreshed")
@@ -156,7 +156,7 @@ func TestSeriesAddAndDelete(t *testing.T) {
 	}
 
 	status(t, must(sc.DeleteSeriesById(ctx, added.Id, sonarr.DeleteSeriesByIdOptions{DeleteFiles: new(true), AddImportListExclusion: new(true)})).HttpResponse, http.StatusOK)
-	_, err := sc.GetSeriesById(ctx, added.Id, sonarr.GetSeriesByIdOptions{})
+	_, err := sc.GetSeriesById(ctx, added.Id)
 	gone(t, "GetSeriesById", err)
 	// the exclusion is added after the delete answers: Sonarr handles the
 	// series' deletion in the background (ImportListExclusionService handles
@@ -210,7 +210,7 @@ func TestEpisodes(t *testing.T) {
 	if boolValue(upd.Answer.Monitored) {
 		t.Errorf("PutEpisodeById = %+v", upd.Answer)
 	}
-	back := must(sc.PutEpisodeMonitor(ctx, sonarr.EpisodesMonitoredResource{EpisodeIds: []sonarr.EpisodeID{e.Id, e2.Id}, Monitored: new(true)}, sonarr.PutEpisodeMonitorOptions{}))
+	back := must(sc.PutEpisodeMonitor(ctx, sonarr.EpisodesMonitoredResource{EpisodeIds: []sonarr.EpisodeID{e.Id, e2.Id}, Monitored: new(true)}))
 	status(t, back.HttpResponse, http.StatusAccepted)
 	if len(back.Answer) != 2 || slices.ContainsFunc(back.Answer, func(x sonarr.EpisodeResource) bool { return !boolValue(x.Monitored) }) {
 		t.Errorf("PutEpisodeMonitor = %+v", back.Answer)

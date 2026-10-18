@@ -14,6 +14,8 @@ for _, s := range series.Answer { ... }
 
 specials, err := c.GetEpisode(ctx, sonarr.GetEpisodeOptions{SeriesId: series.Answer[0].Id, SeasonNumber: new(0)}) // a number or a flag is a pointer, so 0 and false can be asked for
 
+found, err := c.GetSeriesLookup(ctx, "firefly") // an operation with one option takes it straight, or nothing when it is left out
+
 missing, err := c.GetWantedMissingComplete(ctx, sonarr.GetWantedMissingOptions{Monitored: new(true), IncludeSeries: new(true)}) // every page
 for _, e := range missing.Items { ... }
 
@@ -27,6 +29,7 @@ rescan, err := c.RescanSeriesAndWait(ctx, sonarr.RescanSeriesCommand{SeriesId: s
 ## What it gives you
 
 - **A method for every one of Sonarr's 239 operations.** Each has typed options, a typed body and a typed answer.
+- **One option, one argument.** An operation that takes a single option takes it as an argument, not in an options record: a search's term, the path of a folder, or the switch that saves a provider without testing it first.
 - **Every page of a list.** A paged list has a `Complete` form that reads every page, and an `Each` form that reads a page at a time.
 - **Commands that wait.** Each command Sonarr can be asked to run has a method, and a form that waits for it to finish.
 - **Dates are dates.** Each date is a `sonarr.Time`, and an episode's air date a `sonarr.Day`. Both hold a `time.Time`, so `e.AirDateUtc.Before(time.Now())` works. A date Sonarr has not set reads as zero.

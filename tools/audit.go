@@ -250,7 +250,7 @@ func (s *snapshot) diskOf(ctx context.Context, series *sonarr.SeriesResource) ([
 // the extras and specials folders it skips itself. A folder that is not
 // there has none.
 func (s *snapshot) videoFiles(ctx context.Context, folder string) ([]string, error) {
-	res, err := s.r.client.GetFileSystemMediaFiles(ctx, sonarr.GetFileSystemMediaFilesOptions{Path: folder})
+	res, err := s.r.client.GetFileSystemMediaFiles(ctx, folder)
 	if err != nil {
 		return nil, err
 	}

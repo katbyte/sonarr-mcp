@@ -37,14 +37,14 @@ func (o PostNotificationTestOptions) ToQuery() *client.QueryParams {
 }
 
 // PostNotificationTest calls POST /api/v3/notification/test.
-func (c Client) PostNotificationTest(ctx context.Context, input NotificationResource, options ...PostNotificationTestOptions) (result PostNotificationTestResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PostNotificationTest takes one options struct at most, not %d", len(options))
+func (c Client) PostNotificationTest(ctx context.Context, input NotificationResource, forceTest ...bool) (result PostNotificationTestResponse, err error) {
+	var option PostNotificationTestOptions
+	if len(forceTest) > 1 {
+		err = fmt.Errorf("PostNotificationTest takes one forceTest at most, not %d", len(forceTest))
 		return
 	}
-	var option PostNotificationTestOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceTest) == 1 {
+		option.ForceTest = &forceTest[0]
 	}
 
 	opts := client.RequestOptions{

@@ -299,7 +299,7 @@ func queueCommand(ctx context.Context, name string) (*sonarr.CommandResource, er
 // lookupSeries asks Sonarr, and through it SkyHook, for a show by its tvdb
 // id.
 func lookupSeries(ctx context.Context, tvdb sonarr.TvdbID) (sonarr.SeriesResource, error) {
-	res, err := sc.GetSeriesLookup(ctx, sonarr.GetSeriesLookupOptions{Term: "tvdb:" + strconv.Itoa(int(tvdb))})
+	res, err := sc.GetSeriesLookup(ctx, "tvdb:"+strconv.Itoa(int(tvdb)))
 	if err != nil {
 		return sonarr.SeriesResource{}, err
 	}
@@ -463,7 +463,7 @@ func seedDownloads(ctx context.Context) error {
 	if i := slices.IndexFunc(indexers.Answer, func(x sonarr.IndexerResource) bool { return x.Name == sdkIndexer }); i >= 0 {
 		idx = indexers.Answer[i]
 	} else {
-		made, postErr := sc.PostIndexer(ctx, newIndexer(ctx, sdkIndexer), sonarr.PostIndexerOptions{})
+		made, postErr := sc.PostIndexer(ctx, newIndexer(ctx, sdkIndexer))
 		if postErr != nil {
 			return fmt.Errorf("adding the fake indexer: %w", postErr)
 		}
@@ -479,7 +479,7 @@ func seedDownloads(ctx context.Context) error {
 	if i := slices.IndexFunc(clients.Answer, func(x sonarr.DownloadClientResource) bool { return x.Name == sdkClient }); i >= 0 {
 		dc = clients.Answer[i]
 	} else {
-		made, err := sc.PostDownloadClient(ctx, newDownloadClient(ctx, sdkClient), sonarr.PostDownloadClientOptions{})
+		made, err := sc.PostDownloadClient(ctx, newDownloadClient(ctx, sdkClient))
 		if err != nil {
 			return fmt.Errorf("adding the fake download client: %w", err)
 		}
@@ -490,10 +490,10 @@ func seedDownloads(ctx context.Context) error {
 	// a container left up between runs has tried the fakes while they were
 	// down, and holds back a provider that failed until a test of it passes
 	// (IndexerFactory.Test and DownloadClientFactory.Test record either)
-	if _, err := sc.PostIndexerTest(ctx, idx, sonarr.PostIndexerTestOptions{}); err != nil {
+	if _, err := sc.PostIndexerTest(ctx, idx); err != nil {
 		return fmt.Errorf("testing the fake indexer: %w", err)
 	}
-	if _, err := sc.PostDownloadClientTest(ctx, dc, sonarr.PostDownloadClientTestOptions{}); err != nil {
+	if _, err := sc.PostDownloadClientTest(ctx, dc); err != nil {
 		return fmt.Errorf("testing the fake download client: %w", err)
 	}
 
@@ -571,7 +571,7 @@ func seriesByTitle(ctx context.Context, t *testing.T, title string) sonarr.Serie
 		t.Fatalf("%s was not seeded", title)
 	}
 
-	return *must(sc.GetSeriesById(ctx, id, sonarr.GetSeriesByIdOptions{})).Answer
+	return *must(sc.GetSeriesById(ctx, id)).Answer
 }
 
 // episodesOf reads a series' episodes, with their files.

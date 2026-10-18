@@ -42,14 +42,14 @@ func (o PutDelayProfileReorderByIdOptions) ToQuery() *client.QueryParams {
 }
 
 // PutDelayProfileReorderById calls PUT /api/v3/delayprofile/reorder/{id}.
-func (c Client) PutDelayProfileReorderById(ctx context.Context, id int, options ...PutDelayProfileReorderByIdOptions) (result PutDelayProfileReorderByIdResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PutDelayProfileReorderById takes one options struct at most, not %d", len(options))
+func (c Client) PutDelayProfileReorderById(ctx context.Context, id int, after ...int) (result PutDelayProfileReorderByIdResponse, err error) {
+	var option PutDelayProfileReorderByIdOptions
+	if len(after) > 1 {
+		err = fmt.Errorf("PutDelayProfileReorderById takes one after at most, not %d", len(after))
 		return
 	}
-	var option PutDelayProfileReorderByIdOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(after) == 1 {
+		option.After = &after[0]
 	}
 
 	opts := client.RequestOptions{

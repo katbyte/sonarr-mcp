@@ -136,7 +136,7 @@ func TestFileSystem(t *testing.T) {
 		t.Errorf("GetFileSystem(/tv/) = %+v", listing.Answer)
 	}
 
-	media := must(sc.GetFileSystemMediaFiles(ctx, sonarr.GetFileSystemMediaFilesOptions{Path: "/tv/" + firefly.Folder})).Answer
+	media := must(sc.GetFileSystemMediaFiles(ctx, "/tv/"+firefly.Folder)).Answer
 	if len(media) < firefly.Files || !strings.HasSuffix(media[0].Name, ".mkv") {
 		t.Fatalf("GetFileSystemMediaFiles = %+v", media)
 	}
@@ -144,7 +144,7 @@ func TestFileSystem(t *testing.T) {
 	// a file is a file; anything else is answered as a folder, so the
 	// picker gives nothing away about what is not there
 	for path, want := range map[string]string{media[0].Path: "file", "/tv": "folder", "/nowhere": "folder"} {
-		if kind := must(sc.GetFileSystemType(ctx, sonarr.GetFileSystemTypeOptions{Path: path})); kind.Type != want {
+		if kind := must(sc.GetFileSystemType(ctx, path)); kind.Type != want {
 			t.Errorf("GetFileSystemType(%s) = %+v, want %s", path, kind.Answer, want)
 		}
 	}

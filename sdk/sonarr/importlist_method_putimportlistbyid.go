@@ -60,14 +60,14 @@ func (o PutImportListByIdOptions) ToQuery() *client.QueryParams {
 }
 
 // PutImportListById calls PUT /api/v3/importlist/{id}.
-func (c Client) PutImportListById(ctx context.Context, id int, input ImportListResource, options ...PutImportListByIdOptions) (result PutImportListByIdResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PutImportListById takes one options struct at most, not %d", len(options))
+func (c Client) PutImportListById(ctx context.Context, id int, input ImportListResource, forceSave ...bool) (result PutImportListByIdResponse, err error) {
+	var option PutImportListByIdOptions
+	if len(forceSave) > 1 {
+		err = fmt.Errorf("PutImportListById takes one forceSave at most, not %d", len(forceSave))
 		return
 	}
-	var option PutImportListByIdOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceSave) == 1 {
+		option.ForceSave = &forceSave[0]
 	}
 
 	result.ImportListResource = &ImportListResource{}

@@ -224,7 +224,7 @@ func sweepResources(ctx context.Context, t *testing.T) sweepMade {
 	}
 	n := schemas[i]
 	n.Name, n.Fields = "SDK Sweep", fields(n.Fields, map[string]any{"url": "http://localhost:9/sweep", "method": 1})
-	m.notification = must(sc.PostNotification(ctx, n, sonarr.PostNotificationOptions{})).Answer.Id
+	m.notification = must(sc.PostNotification(ctx, n)).Answer.Id
 	cleanup(func(ctx context.Context) error { _, err := sc.DeleteNotificationById(ctx, m.notification); return err })
 
 	return m

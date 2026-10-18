@@ -60,14 +60,14 @@ func (o PostImportListOptions) ToQuery() *client.QueryParams {
 }
 
 // PostImportList calls POST /api/v3/importlist.
-func (c Client) PostImportList(ctx context.Context, input ImportListResource, options ...PostImportListOptions) (result PostImportListResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PostImportList takes one options struct at most, not %d", len(options))
+func (c Client) PostImportList(ctx context.Context, input ImportListResource, forceSave ...bool) (result PostImportListResponse, err error) {
+	var option PostImportListOptions
+	if len(forceSave) > 1 {
+		err = fmt.Errorf("PostImportList takes one forceSave at most, not %d", len(forceSave))
 		return
 	}
-	var option PostImportListOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceSave) == 1 {
+		option.ForceSave = &forceSave[0]
 	}
 
 	result.ImportListResource = &ImportListResource{}

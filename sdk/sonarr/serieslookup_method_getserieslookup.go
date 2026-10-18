@@ -41,14 +41,14 @@ func (o GetSeriesLookupOptions) ToQuery() *client.QueryParams {
 }
 
 // GetSeriesLookup calls GET /api/v3/series/lookup.
-func (c Client) GetSeriesLookup(ctx context.Context, options ...GetSeriesLookupOptions) (result GetSeriesLookupResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("GetSeriesLookup takes one options struct at most, not %d", len(options))
+func (c Client) GetSeriesLookup(ctx context.Context, term ...string) (result GetSeriesLookupResponse, err error) {
+	var option GetSeriesLookupOptions
+	if len(term) > 1 {
+		err = fmt.Errorf("GetSeriesLookup takes one term at most, not %d", len(term))
 		return
 	}
-	var option GetSeriesLookupOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(term) == 1 {
+		option.Term = term[0]
 	}
 
 	opts := client.RequestOptions{

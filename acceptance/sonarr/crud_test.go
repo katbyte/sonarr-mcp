@@ -87,14 +87,14 @@ func TestTags(t *testing.T) {
 	}
 	s := seriesByTitle(ctx, t, severance.Title)
 	s.Tags = append(slices.Clone(s.Tags), tag.Id)
-	must(sc.PutSeriesById(ctx, s.Id, s, sonarr.PutSeriesByIdOptions{}))
+	must(sc.PutSeriesById(ctx, s.Id, s))
 	details := must(sc.GetTagDetail(ctx)).Answer
 	i := slices.IndexFunc(details, func(d sonarr.TagDetailsResource) bool { return d.Id == tag.Id })
 	if i < 0 || !slices.Contains(details[i].SeriesIds, s.Id) {
 		t.Errorf("GetTagDetail = %+v, want the tag on %s", details, s.Title)
 	}
 	s.Tags = slices.DeleteFunc(s.Tags, func(id sonarr.TagID) bool { return id == tag.Id })
-	must(sc.PutSeriesById(ctx, s.Id, s, sonarr.PutSeriesByIdOptions{}))
+	must(sc.PutSeriesById(ctx, s.Id, s))
 
 	status(t, must(sc.DeleteTagById(ctx, tag.Id)).HttpResponse, http.StatusOK)
 	_, err := sc.GetTagById(ctx, tag.Id)
@@ -344,7 +344,7 @@ func TestDelayProfiles(t *testing.T) {
 	}
 
 	// moving a after b answers the whole ordered list, a now below b
-	order := must(sc.PutDelayProfileReorderById(ctx, a.Id, sonarr.PutDelayProfileReorderByIdOptions{After: new(b.Id)}))
+	order := must(sc.PutDelayProfileReorderById(ctx, a.Id, b.Id))
 	status(t, order.HttpResponse, http.StatusOK)
 	ia := slices.IndexFunc(order.Answer, func(p sonarr.DelayProfileResource) bool { return p.Id == a.Id })
 	ib := slices.IndexFunc(order.Answer, func(p sonarr.DelayProfileResource) bool { return p.Id == b.Id })

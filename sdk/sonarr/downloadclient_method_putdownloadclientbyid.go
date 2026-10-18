@@ -60,14 +60,14 @@ func (o PutDownloadClientByIdOptions) ToQuery() *client.QueryParams {
 }
 
 // PutDownloadClientById calls PUT /api/v3/downloadclient/{id}.
-func (c Client) PutDownloadClientById(ctx context.Context, id int, input DownloadClientResource, options ...PutDownloadClientByIdOptions) (result PutDownloadClientByIdResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PutDownloadClientById takes one options struct at most, not %d", len(options))
+func (c Client) PutDownloadClientById(ctx context.Context, id int, input DownloadClientResource, forceSave ...bool) (result PutDownloadClientByIdResponse, err error) {
+	var option PutDownloadClientByIdOptions
+	if len(forceSave) > 1 {
+		err = fmt.Errorf("PutDownloadClientById takes one forceSave at most, not %d", len(forceSave))
 		return
 	}
-	var option PutDownloadClientByIdOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceSave) == 1 {
+		option.ForceSave = &forceSave[0]
 	}
 
 	result.DownloadClientResource = &DownloadClientResource{}

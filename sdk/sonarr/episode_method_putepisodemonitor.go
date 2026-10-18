@@ -42,14 +42,14 @@ func (o PutEpisodeMonitorOptions) ToQuery() *client.QueryParams {
 }
 
 // PutEpisodeMonitor calls PUT /api/v3/episode/monitor.
-func (c Client) PutEpisodeMonitor(ctx context.Context, input EpisodesMonitoredResource, options ...PutEpisodeMonitorOptions) (result PutEpisodeMonitorResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PutEpisodeMonitor takes one options struct at most, not %d", len(options))
+func (c Client) PutEpisodeMonitor(ctx context.Context, input EpisodesMonitoredResource, includeImages ...bool) (result PutEpisodeMonitorResponse, err error) {
+	var option PutEpisodeMonitorOptions
+	if len(includeImages) > 1 {
+		err = fmt.Errorf("PutEpisodeMonitor takes one includeImages at most, not %d", len(includeImages))
 		return
 	}
-	var option PutEpisodeMonitorOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(includeImages) == 1 {
+		option.IncludeImages = &includeImages[0]
 	}
 
 	opts := client.RequestOptions{

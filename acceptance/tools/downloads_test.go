@@ -431,7 +431,7 @@ func setIndexerRSS(t *testing.T, on bool) {
 	}
 	body := res.Answer[i]
 	body.EnableRss = new(on)
-	if _, err := api.PutIndexerById(ctx, body.Id, body, sonarr.PutIndexerByIdOptions{}); err != nil {
+	if _, err := api.PutIndexerById(ctx, body.Id, body); err != nil {
 		t.Fatal(err)
 	}
 }

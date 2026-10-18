@@ -60,14 +60,14 @@ func (o PostDownloadClientOptions) ToQuery() *client.QueryParams {
 }
 
 // PostDownloadClient calls POST /api/v3/downloadclient.
-func (c Client) PostDownloadClient(ctx context.Context, input DownloadClientResource, options ...PostDownloadClientOptions) (result PostDownloadClientResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PostDownloadClient takes one options struct at most, not %d", len(options))
+func (c Client) PostDownloadClient(ctx context.Context, input DownloadClientResource, forceSave ...bool) (result PostDownloadClientResponse, err error) {
+	var option PostDownloadClientOptions
+	if len(forceSave) > 1 {
+		err = fmt.Errorf("PostDownloadClient takes one forceSave at most, not %d", len(forceSave))
 		return
 	}
-	var option PostDownloadClientOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceSave) == 1 {
+		option.ForceSave = &forceSave[0]
 	}
 
 	result.DownloadClientResource = &DownloadClientResource{}

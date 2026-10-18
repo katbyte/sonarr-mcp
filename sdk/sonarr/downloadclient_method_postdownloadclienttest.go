@@ -37,14 +37,14 @@ func (o PostDownloadClientTestOptions) ToQuery() *client.QueryParams {
 }
 
 // PostDownloadClientTest calls POST /api/v3/downloadclient/test.
-func (c Client) PostDownloadClientTest(ctx context.Context, input DownloadClientResource, options ...PostDownloadClientTestOptions) (result PostDownloadClientTestResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PostDownloadClientTest takes one options struct at most, not %d", len(options))
+func (c Client) PostDownloadClientTest(ctx context.Context, input DownloadClientResource, forceTest ...bool) (result PostDownloadClientTestResponse, err error) {
+	var option PostDownloadClientTestOptions
+	if len(forceTest) > 1 {
+		err = fmt.Errorf("PostDownloadClientTest takes one forceTest at most, not %d", len(forceTest))
 		return
 	}
-	var option PostDownloadClientTestOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceTest) == 1 {
+		option.ForceTest = &forceTest[0]
 	}
 
 	opts := client.RequestOptions{

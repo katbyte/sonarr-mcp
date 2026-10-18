@@ -61,14 +61,14 @@ func (o GetSeriesByIdOptions) ToQuery() *client.QueryParams {
 }
 
 // GetSeriesById calls GET /api/v3/series/{id}.
-func (c Client) GetSeriesById(ctx context.Context, id SeriesID, options ...GetSeriesByIdOptions) (result GetSeriesByIdResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("GetSeriesById takes one options struct at most, not %d", len(options))
+func (c Client) GetSeriesById(ctx context.Context, id SeriesID, includeSeasonImages ...bool) (result GetSeriesByIdResponse, err error) {
+	var option GetSeriesByIdOptions
+	if len(includeSeasonImages) > 1 {
+		err = fmt.Errorf("GetSeriesById takes one includeSeasonImages at most, not %d", len(includeSeasonImages))
 		return
 	}
-	var option GetSeriesByIdOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(includeSeasonImages) == 1 {
+		option.IncludeSeasonImages = &includeSeasonImages[0]
 	}
 
 	result.SeriesResource = &SeriesResource{}

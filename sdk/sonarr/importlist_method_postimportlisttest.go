@@ -37,14 +37,14 @@ func (o PostImportListTestOptions) ToQuery() *client.QueryParams {
 }
 
 // PostImportListTest calls POST /api/v3/importlist/test.
-func (c Client) PostImportListTest(ctx context.Context, input ImportListResource, options ...PostImportListTestOptions) (result PostImportListTestResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PostImportListTest takes one options struct at most, not %d", len(options))
+func (c Client) PostImportListTest(ctx context.Context, input ImportListResource, forceTest ...bool) (result PostImportListTestResponse, err error) {
+	var option PostImportListTestOptions
+	if len(forceTest) > 1 {
+		err = fmt.Errorf("PostImportListTest takes one forceTest at most, not %d", len(forceTest))
 		return
 	}
-	var option PostImportListTestOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceTest) == 1 {
+		option.ForceTest = &forceTest[0]
 	}
 
 	opts := client.RequestOptions{

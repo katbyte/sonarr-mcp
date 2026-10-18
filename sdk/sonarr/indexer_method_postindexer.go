@@ -60,14 +60,14 @@ func (o PostIndexerOptions) ToQuery() *client.QueryParams {
 }
 
 // PostIndexer calls POST /api/v3/indexer.
-func (c Client) PostIndexer(ctx context.Context, input IndexerResource, options ...PostIndexerOptions) (result PostIndexerResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PostIndexer takes one options struct at most, not %d", len(options))
+func (c Client) PostIndexer(ctx context.Context, input IndexerResource, forceSave ...bool) (result PostIndexerResponse, err error) {
+	var option PostIndexerOptions
+	if len(forceSave) > 1 {
+		err = fmt.Errorf("PostIndexer takes one forceSave at most, not %d", len(forceSave))
 		return
 	}
-	var option PostIndexerOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(forceSave) == 1 {
+		option.ForceSave = &forceSave[0]
 	}
 
 	result.IndexerResource = &IndexerResource{}

@@ -253,7 +253,7 @@ func seedDownloads() error {
 	idx.Fields = providerFields(idx.Fields, map[string]any{
 		"baseUrl": indexer.URL(), "apiPath": "/api", "apiKey": testenv.FakeKey, "categories": []int{5030, 5040, 5045},
 	})
-	if _, err := api.PostIndexer(ctx, idx, sonarr.PostIndexerOptions{}); err != nil {
+	if _, err := api.PostIndexer(ctx, idx); err != nil {
 		return fmt.Errorf("adding the fake indexer: %w", err)
 	}
 
@@ -270,7 +270,7 @@ func seedDownloads() error {
 	dc.Fields = providerFields(dc.Fields, map[string]any{
 		"host": sab.Host(), "port": sab.Port(), "apiKey": testenv.FakeKey, "tvCategory": sab.Category(), "useSsl": false, "urlBase": "",
 	})
-	if _, err := api.PostDownloadClient(ctx, dc, sonarr.PostDownloadClientOptions{}); err != nil {
+	if _, err := api.PostDownloadClient(ctx, dc); err != nil {
 		return fmt.Errorf("adding the fake download client: %w", err)
 	}
 

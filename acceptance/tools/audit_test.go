@@ -312,12 +312,12 @@ func TestAuditProfiles(t *testing.T) {
 	}
 	indexer := indexers.Answer[0]
 	indexer.Tags = []sonarr.TagID{sonarr.TagID(tagID)}
-	if _, err := api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOptions{}); err != nil {
+	if _, err := api.PutIndexerById(ctx, indexer.Id, indexer); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
 		indexer.Tags = nil
-		_, _ = api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOptions{})
+		_, _ = api.PutIndexerById(ctx, indexer.Id, indexer)
 	})
 
 	again := audit(t, "audit_profiles", nil)
@@ -332,7 +332,7 @@ func TestAuditProfiles(t *testing.T) {
 	// the fix the findings name: take the tag off the indexer and delete it,
 	// and the audit has nothing more to say about it
 	indexer.Tags = nil
-	if _, err := api.PutIndexerById(ctx, indexer.Id, indexer, sonarr.PutIndexerByIdOptions{}); err != nil {
+	if _, err := api.PutIndexerById(ctx, indexer.Id, indexer); err != nil {
 		t.Fatal(err)
 	}
 	call(t, "tag_delete", map[string]any{"label": scopingTag, "confirm": true})

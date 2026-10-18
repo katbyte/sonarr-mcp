@@ -61,7 +61,7 @@ func shortText(s string, n int) string {
 // lookup asks Sonarr (and through it SkyHook, TheTVDB's front) for the shows a
 // term could mean.
 func (r *registry) lookup(ctx context.Context, term string) ([]sonarr.SeriesResource, error) {
-	res, err := r.client.GetSeriesLookup(ctx, sonarr.GetSeriesLookupOptions{Term: strings.TrimSpace(term)})
+	res, err := r.client.GetSeriesLookup(ctx, strings.TrimSpace(term))
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +308,7 @@ func registerSeriesWriteTools(r *registry) {
 		// are gone
 		var added *sonarr.SeriesResource
 		for deadline := time.Now().Add(mcpregistry.WaitFor(in.Wait, commandWait)); ; {
-			now, readErr := client.GetSeriesById(ctx, res.Answer.Id, sonarr.GetSeriesByIdOptions{})
+			now, readErr := client.GetSeriesById(ctx, res.Answer.Id)
 			if readErr != nil {
 				return nil, addOut{}, fmt.Errorf("%s was added, and reading it back failed: %w", res.Answer.Title, readErr)
 			}
@@ -368,7 +368,7 @@ func registerSeriesWriteTools(r *registry) {
 		// the index holds a series without its statistics' latest word, and
 		// another edit may have just changed it, so the record to write back
 		// is read fresh, once the series is this call's alone
-		cur, err := client.GetSeriesById(ctx, s.Id, sonarr.GetSeriesByIdOptions{})
+		cur, err := client.GetSeriesById(ctx, s.Id)
 		if err != nil {
 			return nil, editOut{}, err
 		}
@@ -453,7 +453,7 @@ func registerSeriesWriteTools(r *registry) {
 			return nil, editOut{Series: summariseSeries(&body, profiles, tagNames)}, nil
 		}
 
-		res, err := client.PutSeriesById(ctx, body.Id, body, sonarr.PutSeriesByIdOptions{MoveFiles: new(in.MoveFiles)})
+		res, err := client.PutSeriesById(ctx, body.Id, body, in.MoveFiles)
 		if err != nil {
 			return nil, editOut{}, err
 		}
@@ -531,7 +531,7 @@ func registerSeriesWriteTools(r *registry) {
 		if err != nil {
 			return seriesCommandOut{}, err
 		}
-		after, err := client.GetSeriesById(ctx, s.Id, sonarr.GetSeriesByIdOptions{})
+		after, err := client.GetSeriesById(ctx, s.Id)
 		if err != nil {
 			return seriesCommandOut{}, err
 		}

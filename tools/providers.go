@@ -162,7 +162,7 @@ func registerProviderTools(r *registry) {
 		if i < 0 {
 			return nil, testOut{}, fmt.Errorf("no indexer %q (have: %s)", in.Name, strings.Join(mapValues(names), ", "))
 		}
-		_, err = sc.PostIndexerTest(ctx, res.Answer[i], sonarr.PostIndexerTestOptions{ForceTest: new(true)})
+		_, err = sc.PostIndexerTest(ctx, res.Answer[i], true)
 		row, err := testOne(res.Answer[i].Name, err)
 
 		return nil, testOut{Results: []testRow{row}}, err
@@ -234,7 +234,7 @@ func registerProviderTools(r *registry) {
 		if i < 0 {
 			return nil, testOut{}, fmt.Errorf("no download client %q (have: %s)", in.Name, strings.Join(mapValues(names), ", "))
 		}
-		_, err = sc.PostDownloadClientTest(ctx, res.Answer[i], sonarr.PostDownloadClientTestOptions{ForceTest: new(true)})
+		_, err = sc.PostDownloadClientTest(ctx, res.Answer[i], true)
 		row, err := testOne(res.Answer[i].Name, err)
 
 		return nil, testOut{Results: []testRow{row}}, err

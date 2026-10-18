@@ -61,14 +61,14 @@ func (o PutSeriesByIdOptions) ToQuery() *client.QueryParams {
 }
 
 // PutSeriesById calls PUT /api/v3/series/{id}.
-func (c Client) PutSeriesById(ctx context.Context, id SeriesID, input SeriesResource, options ...PutSeriesByIdOptions) (result PutSeriesByIdResponse, err error) {
-	if len(options) > 1 {
-		err = fmt.Errorf("PutSeriesById takes one options struct at most, not %d", len(options))
+func (c Client) PutSeriesById(ctx context.Context, id SeriesID, input SeriesResource, moveFiles ...bool) (result PutSeriesByIdResponse, err error) {
+	var option PutSeriesByIdOptions
+	if len(moveFiles) > 1 {
+		err = fmt.Errorf("PutSeriesById takes one moveFiles at most, not %d", len(moveFiles))
 		return
 	}
-	var option PutSeriesByIdOptions
-	if len(options) == 1 {
-		option = options[0]
+	if len(moveFiles) == 1 {
+		option.MoveFiles = &moveFiles[0]
 	}
 
 	result.SeriesResource = &SeriesResource{}
