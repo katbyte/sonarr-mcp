@@ -275,13 +275,15 @@ func (*registry) auditCutoffUnmet(ctx context.Context, s *snapshot, limit int) (
 }
 
 // auditNoFiles lists every series Sonarr records no file for, one finding each, and says which it is: wanted and never fetched, with nothing of it
-// monitored, with files in its folder Sonarr does not track, with no episode Sonarr knows of, or with nothing aired. Which series those are comes
-// from the counts in the series list; the episodes and the folder are read only for the series listed.
+// monitored, with files in its folder Sonarr does not track, with no episode Sonarr knows of, or with no air dates. A series that has not aired
+// yet has nothing to fetch, so it is left out. Which series those are comes from the series list; the episodes and the folder are read only for
+// the series listed.
 func (r *registry) auditNoFiles(ctx context.Context, s *snapshot, limit int) (auditOut, error) {
 	out := auditOut{Scanned: len(s.series)}
+	now := time.Now()
 	listed := map[sonarr.SeriesID]bool{}
 	for i := range s.series {
-		if !hasFiles(&s.series[i]) && len(listed) < mcpregistry.LimitOr(limit, 100) {
+		if !hasFiles(&s.series[i]) && !notAiredYet(&s.series[i], now) && len(listed) < mcpregistry.LimitOr(limit, 100) {
 			listed[s.series[i].Id] = true
 		}
 	}
@@ -297,10 +299,9 @@ func (r *registry) auditNoFiles(ctx context.Context, s *snapshot, limit int) (au
 		return auditOut{}, err
 	}
 
-	now := time.Now()
 	for i := range s.series {
 		series := &s.series[i]
-		if hasFiles(series) {
+		if hasFiles(series) || notAiredYet(series, now) {
 			continue
 		}
 		// past the limit a series is counted and not read
@@ -318,14 +319,22 @@ func (r *registry) auditNoFiles(ctx context.Context, s *snapshot, limit int) (au
 		if err != nil {
 			return auditOut{}, err
 		}
-		out.report(limit, noFiles(series, eps, disk, queued, now))
+		if f, ok := noFiles(series, eps, disk, queued, now); ok {
+			out.report(limit, f)
+		}
 	}
 
 	return out, nil
 }
 
-// noFiles is the finding for a series with no files: which of the five kinds it is, since each is put right a different way.
-func noFiles(series *sonarr.SeriesResource, eps []sonarr.EpisodeResource, disk []string, queued map[sonarr.EpisodeID]bool, now time.Time) finding {
+// notAiredYet reports whether the series list says a series has not aired: Sonarr calls it upcoming, or its first episode airs later.
+func notAiredYet(series *sonarr.SeriesResource, now time.Time) bool {
+	return series.Status == sonarr.SeriesStatusTypeUpcoming || series.FirstAired.After(now)
+}
+
+// noFiles is the finding for a series with no files: which of the five kinds it is, since each is put right a different way. A series none of
+// whose episodes has aired, with one to come, has none: there is nothing to fetch until it airs.
+func noFiles(series *sonarr.SeriesResource, eps []sonarr.EpisodeResource, disk []string, queued map[sonarr.EpisodeID]bool, now time.Time) (finding, bool) {
 	// a special nobody monitors says nothing about a show that has seasons: one often airs before the show itself does
 	seasons := slices.ContainsFunc(eps, func(e sonarr.EpisodeResource) bool { return e.SeasonNumber > 0 })
 	known, shown, wanted, downloading := 0, 0, 0, 0
@@ -370,17 +379,12 @@ func noFiles(series *sonarr.SeriesResource, eps []sonarr.EpisodeResource, disk [
 		f.Problem = problemNoneTracked
 		f.Detail = fmt.Sprintf("its folder holds %s, and Sonarr tracks none", countOf(len(disk), "video file"))
 		f.Fix = "import_scan the folder, then import_apply; audit_untracked_files says why each file is not tracked"
-	case shown == 0 && next.IsZero():
-		f.Problem = problemNothingAired
+	case shown == 0 && !next.IsZero():
+		return finding{}, false
+	case shown == 0:
+		f.Problem = problemNoAirDates
 		f.Detail = fmt.Sprintf("Sonarr has an air date for none of its %s, so it never looks for one", countOf(known, "episode"))
 		f.Fix = "series_refresh, in case TheTVDB has the dates now; season_search fetches a season without them"
-	case shown == 0:
-		f.Problem = problemNothingAired
-		f.Detail = fmt.Sprintf("none of its %s has aired; the first airs %s", countOf(known, "episode"), day(next))
-		f.Fix = "nothing yet: Sonarr fetches an episode once it has aired"
-		if !boolv(series.Monitored) {
-			f.Fix = "series_edit monitored true, if it is wanted: unmonitored, nothing is fetched when it airs"
-		}
 	case !boolv(series.Monitored):
 		f.Problem = problemNoFilesUnwanted
 		f.Detail = countOf(shown, "episode") + " aired and Sonarr will fetch none: the series is not monitored"
@@ -408,5 +412,5 @@ func noFiles(series *sonarr.SeriesResource, eps []sonarr.EpisodeResource, disk [
 		f.Detail += "; added " + added
 	}
 
-	return f
+	return f, true
 }

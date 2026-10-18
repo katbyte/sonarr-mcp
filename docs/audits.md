@@ -32,9 +32,9 @@ Series Sonarr records no file for at all. Each is one finding, with the series' 
 | `no files and nothing wanted` | Nothing of it is monitored, so nothing will ever be fetched. | `series_edit` or `season_monitor`, then `series_search` |
 | `files in the folder, none tracked` | Its folder holds video files, and Sonarr tracks none. | `import_scan`, then `import_apply` |
 | `no episodes known` | Sonarr lists no episode for it. | `series_refresh` |
-| `nothing has aired` | No episode has aired yet, or none has an air date. | Nothing yet, or `series_refresh` for the dates |
+| `no air dates` | No episode has an air date, so Sonarr never looks for one. | `series_refresh`, for the dates |
 
-A series with some of its files is `audit_missing_episodes`' finding.
+A series that has not aired yet is left out: there is nothing to fetch until it does. A series with some of its files is `audit_missing_episodes`' finding.
 
 ## audit_cutoff_unmet
 

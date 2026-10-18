@@ -1277,7 +1277,8 @@ func TestAuditCutoffFormatScore(t *testing.T) {
 }
 
 // A series with no files is one of five things, each put right a different way: wanted and never fetched, with nothing of it monitored, with files
-// in its folder Sonarr does not track, with no episode Sonarr knows of, or with nothing aired. A series with files is not this audit's business.
+// in its folder Sonarr does not track, with no episode Sonarr knows of, or with no air dates. A series with files is not this audit's business, and
+// nor is one that has not aired yet, whether the series list says so or its episodes do.
 func TestAuditNoFilesSaysWhich(t *testing.T) {
 	t.Parallel()
 
@@ -1315,6 +1316,9 @@ func TestAuditNoFilesSaysWhich(t *testing.T) {
 		map[string]any{"id": 10, "title": "Undated", "path": "/tv/Undated", "monitored": true, "status": "ended"},
 		map[string]any{"id": 11, "title": "Specials Only", "path": "/tv/Specials Only", "monitored": true},
 		map[string]any{"id": 12, "title": "Empty With Files", "path": "/tv/Empty With Files", "monitored": true},
+		// the series list alone says these have not aired: one Sonarr calls upcoming, one whose first episode airs later
+		map[string]any{"id": 13, "title": "Premieres Soon", "path": "/tv/Premieres Soon", "monitored": true, "firstAired": "2999-03-01T00:00:00Z"},
+		map[string]any{"id": 14, "title": "Announced", "path": "/tv/Announced", "monitored": true, "status": "upcoming"},
 	)
 	f.mux.HandleFunc("GET /api/v3/episode", func(w http.ResponseWriter, r *http.Request) {
 		eps := episodes[r.URL.Query().Get("seriesId")]
@@ -1337,8 +1341,6 @@ func TestAuditNoFilesSaysWhich(t *testing.T) {
 
 	out := mustCall(t, cs, "audit_no_files", nil)
 	want := []struct{ series, problem, detail, fix string }{
-		{"Airing Later", "nothing has aired", "none of its 2 episodes has aired; the first airs 2999-01-01", "nothing yet"},
-		{"Airing Unwatched", "nothing has aired", "none of its 1 episode has aired", "series_edit monitored true"},
 		{"Copied In", "files in the folder, none tracked", "holds 2 video files, and Sonarr tracks none", "import_apply"},
 		{"Empty", "no episodes known", "lists no episode of it, so there is nothing for it to fetch; TheTVDB has removed the show", "if it stays empty, series_delete"},
 		{"Empty With Files", "no episodes known", "its folder holds 2 video files, which Sonarr has no episode to match to", "series_import adds the folder as the right one"},
@@ -1348,11 +1350,11 @@ func TestAuditNoFilesSaysWhich(t *testing.T) {
 		{"Seasons Off", "no files and nothing wanted", "2 episodes aired and Sonarr will fetch none: not one is monitored", "season_monitor the seasons wanted"},
 		// a show that is all specials has aired when they have
 		{"Specials Only", "no files and nothing wanted", "2 episodes aired and Sonarr will fetch none: not one is monitored", "season_monitor the seasons wanted"},
-		{"Undated", "nothing has aired", "an air date for none of its 2 episodes, so it never looks for one", "series_refresh"},
+		{"Undated", "no air dates", "an air date for none of its 2 episodes, so it never looks for one", "series_refresh"},
 	}
 	rows := rowsOf(out["findings"])
-	if len(rows) != len(want) || number(out["total_findings"]) != len(want) || number(out["scanned"]) != 12 {
-		t.Fatalf("audit_no_files = %v, want the %d series with no files of the 12", out, len(want))
+	if len(rows) != len(want) || number(out["total_findings"]) != len(want) || number(out["scanned"]) != 14 {
+		t.Fatalf("audit_no_files = %v, want the %d series with no files that have aired, of the 14", out, len(want))
 	}
 	for i, w := range want {
 		row := rows[i]

@@ -10,6 +10,7 @@
 
 ### Changed
 
+- `audit_no_files` leaves out a series that has not aired yet, since there is nothing to fetch until it does. A series Sonarr has no air dates for is reported as `no air dates`, where both were `nothing has aired`.
 - The shared library goes from go-kt v0.6.4 to v0.9.0, and the generator from pandorest v0.9.0 to v0.11.0, whose client is on go-kt's new HTTP package. The Go client comes out the same. Three small helpers the tools kept their own copies of (the page size asked for, where the next page starts, how long to wait for a command) are go-kt's now.
 
 ## 0.3.0 (2026-10-14)

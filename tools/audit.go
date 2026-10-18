@@ -319,7 +319,7 @@ const (
 	problemNoFilesUnwanted = "no files and nothing wanted"
 	problemNoneTracked     = "files in the folder, none tracked"
 	problemNoEpisodes      = "no episodes known"
-	problemNothingAired    = "nothing has aired"
+	problemNoAirDates      = "no air dates"
 	// audit_cutoff_unmet
 	problemBelowQualityCutoff = "below quality cutoff"
 	problemBelowFormatCutoff  = "below custom format cutoff"
@@ -396,7 +396,7 @@ const (
 // the prefix of a finding that ends in the check's own level.
 var AuditProblems = map[string][]string{
 	"audit_missing_episodes": {problemEpisodesMissing, problemWholeSeasonMissing},
-	"audit_no_files":         {problemNoFiles, problemNoFilesUnwanted, problemNoneTracked, problemNoEpisodes, problemNothingAired},
+	"audit_no_files":         {problemNoFiles, problemNoFilesUnwanted, problemNoneTracked, problemNoEpisodes, problemNoAirDates},
 	"audit_cutoff_unmet":     {problemBelowQualityCutoff, problemBelowFormatCutoff},
 	"audit_stuck_downloads": {
 		problemCannotImport, problemDownloadFailed, problemWaitingToImport, problemClientUnreachable,
@@ -444,7 +444,7 @@ func (r *registry) auditSpecs() []auditSpec {
 		},
 		{
 			name: "audit_no_files", run: r.auditNoFiles,
-			description: "Series Sonarr records no file for at all, one finding each with its folder, saying which it is: wanted and never fetched, with nothing of it monitored so nothing ever will be, with video files in its folder that Sonarr does not track, with no episode Sonarr knows of, or with nothing aired. A series with some of its files is audit_missing_episodes' finding. Fix with series_search, series_edit or season_monitor, import_apply or series_refresh; a series that is not wanted is removed with the admin toolset.",
+			description: "Series Sonarr records no file for at all, one finding each with its folder, saying which it is: wanted and never fetched, with nothing of it monitored so nothing ever will be, with video files in its folder that Sonarr does not track, with no episode Sonarr knows of, or with no air dates. A series that has not aired yet is left out. A series with some of its files is audit_missing_episodes' finding. Fix with series_search, series_edit or season_monitor, import_apply or series_refresh; a series that is not wanted is removed with the admin toolset.",
 		},
 		{
 			name: "audit_cutoff_unmet", run: r.auditCutoffUnmet,
