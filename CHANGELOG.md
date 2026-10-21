@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 (2026-10-20)
+
+### Fixed
+
+- A bare `make` formats and builds, where it only said a lint tool was up to date and stopped.
+
 ## 0.4.1 (2026-10-18)
 
 The Go client is checked by the linters, its tests included, like the rest of the code.
