@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -221,10 +222,9 @@ func TestListsPageThroughTheTools(t *testing.T) {
 	}
 }
 
-// The history is paged by Sonarr when no age is asked for, from the offset
-// asked for even when that falls inside one of its pages; with an age it is
-// read newest first as far as the first entry older than that, and the count
-// is of the entries inside it.
+// The history is paged by Sonarr when no age is asked for, from the offset asked for even when that falls inside one of its pages. With an age it
+// is everything since that day in one call, put newest first, and the count is of the entries inside it; one series' is still read newest first
+// as far as the first entry older than that, since Sonarr cannot be asked for a series' entries by age.
 func TestHistoryListPages(t *testing.T) {
 	t.Parallel()
 
@@ -244,6 +244,23 @@ func TestHistoryListPages(t *testing.T) {
 		from := min((n-1)*size, len(all))
 		writeJSON(t, w, map[string]any{"page": n, "pageSize": size, "totalRecords": len(all), "records": all[from:min(from+size, len(all))]})
 	})
+
+	// everything since a date, oldest first and with an import among the grabs
+	f.mux.HandleFunc("GET /api/v3/history/since", func(w http.ResponseWriter, r *http.Request) {
+		since, err := time.Parse(time.RFC3339, r.URL.Query().Get("date"))
+		if err != nil {
+			t.Errorf("history since %q: %v", r.URL.Query().Get("date"), err)
+		}
+
+		recent := []map[string]any{}
+		for _, h := range slices.Backward(all) {
+			if at, _ := time.Parse(time.RFC3339, text(h["date"])); at.After(since) {
+				recent = append(recent, h)
+			}
+		}
+		writeJSON(t, w, append(recent, map[string]any{"id": 61, "date": ago(time.Minute), "eventType": "downloadFolderImported", "sourceTitle": "the import"}))
+	})
+	library(t, f, map[string]any{"id": 1, "title": "Firefly", "year": 2002, "tvdbId": 78874})
 	cs := session(t, f, Options{})
 
 	titles := func(out map[string]any) []string {
@@ -262,14 +279,166 @@ func TestHistoryListPages(t *testing.T) {
 		t.Errorf("from 3 of 6 = %v, %v", titles(page), page)
 	}
 
-	// an age: only what is inside it is counted and paged
+	// an age: only what is inside it is counted and paged, newest first, and Sonarr is asked once rather than a page at a time
+	paged := len(f.requests("/api/v3/history"))
 	recent := mustCall(t, cs, "history_list", map[string]any{"days": 5, "limit": 2})
-	if number(recent["total"]) != 3 || number(recent["next_offset"]) != 2 || !slices.Equal(titles(recent), []string{"release 0", "release 1"}) {
+	if number(recent["total"]) != 4 || number(recent["next_offset"]) != 2 || !slices.Equal(titles(recent), []string{"the import", "release 0"}) {
 		t.Errorf("the last five days = %v, %v", titles(recent), recent)
 	}
 	rest := mustCall(t, cs, "history_list", map[string]any{"days": 5, "limit": 2, "offset": 2})
-	if _, more := rest["next_offset"]; more || number(rest["total"]) != 3 || !slices.Equal(titles(rest), []string{"release 2"}) {
+	if _, more := rest["next_offset"]; more || number(rest["total"]) != 4 || !slices.Equal(titles(rest), []string{"release 1", "release 2"}) {
 		t.Errorf("the rest of the last five days = %v, %v", titles(rest), rest)
+	}
+	if asked := len(f.requests("/api/v3/history")) - paged; asked != 0 || len(f.requests("/api/v3/history/since")) != 2 {
+		t.Errorf("an age read %d pages of history and asked for what is since a date %d times, want no pages and one call for each", asked, len(f.requests("/api/v3/history/since")))
+	}
+
+	// an age and an event: the other events since then are left out
+	grabs := mustCall(t, cs, "history_list", map[string]any{"days": 5, "events": []string{"grabbed"}})
+	if number(grabs["total"]) != 3 || !slices.Equal(titles(grabs), []string{"release 0", "release 1", "release 2"}) {
+		t.Errorf("the grabs of the last five days = %v, %v", titles(grabs), grabs)
+	}
+
+	// an age and a series: read back through that series' entries as far as the first older one
+	since := len(f.requests("/api/v3/history/since"))
+	one := mustCall(t, cs, "history_list", map[string]any{"series": "Firefly", "days": 5})
+	if number(one["total"]) != 3 || !slices.Equal(titles(one), []string{"release 0", "release 1", "release 2"}) {
+		t.Errorf("one series' last five days = %v, %v", titles(one), one)
+	}
+	if len(f.requests("/api/v3/history/since")) != since || !strings.Contains(f.requests("/api/v3/history")[len(f.requests("/api/v3/history"))-1].Query, "seriesIds=1") {
+		t.Errorf("one series' history was not asked for by its series: %v", f.requests("/api/v3/history"))
+	}
+}
+
+// A filter that names nothing Sonarr has is refused with what there is, before the library is read: a mistyped status, tag or profile answered
+// with no series reads as there being none.
+func TestAFilterThatNamesNothingIsRefused(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f, map[string]any{"id": 1, "title": "Firefly", "status": "ended", "qualityProfileId": 1, "tags": []int{2}})
+	f.answer(t, "GET /api/v3/qualityprofile", []any{map[string]any{"id": 1, "name": "HD-1080p"}, map[string]any{"id": 2, "name": "Any"}})
+	f.answer(t, "GET /api/v3/tag", []any{map[string]any{"id": 2, "label": "scifi"}, map[string]any{"id": 3, "label": "anime"}})
+	cs := session(t, f, Options{})
+
+	for _, c := range []struct {
+		args map[string]any
+		want string
+	}{
+		{map[string]any{"status": "finished"}, `status must be continuing, ended, upcoming or deleted, got "finished"`},
+		{map[string]any{"tag": "sci-fi"}, `no tag "sci-fi" (have: anime, scifi)`},
+		{map[string]any{"quality_profile": "HD"}, `no quality profile "HD" (have: Any, HD-1080p)`},
+	} {
+		if msg := mustFail(t, cs, "series_list", c.args); !strings.Contains(msg, c.want) {
+			t.Errorf("series_list %v = %q, want %q", c.args, msg, c.want)
+		}
+	}
+	if n := len(f.requests("/api/v3/series")); n != 0 {
+		t.Errorf("the library was read %d times for filters that were refused", n)
+	}
+
+	// a name there is, in any case, filters; one nothing is on answers no series, which is then true
+	for _, args := range []map[string]any{{"status": "Ended"}, {"tag": "SciFi"}, {"quality_profile": "hd-1080p"}} {
+		if out := mustCall(t, cs, "series_list", args); number(out["total"]) != 1 {
+			t.Errorf("series_list %v = %v, want Firefly", args, out)
+		}
+	}
+	for _, args := range []map[string]any{{"status": "upcoming"}, {"tag": "anime"}, {"quality_profile": "Any"}} {
+		if out := mustCall(t, cs, "series_list", args); number(out["total"]) != 0 {
+			t.Errorf("series_list %v = %v, want no series", args, out)
+		}
+	}
+}
+
+// A list asked for again is cut from the read just made, a write through this server has the next one read again, and a list that only names
+// series reads their titles from what is held, reading again only for a series it does not know.
+func TestListsDoNotEachReadTheLibrary(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	library(t, f, map[string]any{"id": 1, "title": "Firefly", "qualityProfileId": 1}, map[string]any{"id": 2, "title": "Severance", "qualityProfileId": 1})
+	f.answer(t, "GET /api/v3/qualityprofile", []any{map[string]any{"id": 1, "name": "HD-1080p"}})
+	f.answer(t, "GET /api/v3/tag", []any{map[string]any{"id": 2, "label": "scifi"}})
+	f.answer(t, "GET /api/v3/system/status", map[string]any{"version": "4.0.0"})
+	f.answer(t, "GET /api/v3/health", []any{})
+	f.answer(t, "GET /api/v3/tag/detail", []any{map[string]any{"id": 2, "label": "scifi", "seriesIds": []int{1, 2}}})
+	f.answerStatus(t, "POST /api/v3/tag", http.StatusCreated, map[string]any{"id": 3, "label": "new"})
+
+	// a release of a series the library has, and once gone is set one of a series it has not
+	var gone atomic.Bool
+	f.mux.HandleFunc("GET /api/v3/blocklist", func(w http.ResponseWriter, _ *http.Request) {
+		blocked := []map[string]any{{"id": 7, "seriesId": 2, "sourceTitle": "Severance.S01E01", "date": ago(time.Hour)}, {"id": 8, "seriesId": 9, "sourceTitle": "Gone.S01E01", "date": ago(2 * time.Hour)}}
+		if !gone.Load() {
+			blocked = blocked[:1]
+		}
+		writeJSON(t, w, map[string]any{"page": 1, "pageSize": len(blocked), "totalRecords": len(blocked), "records": blocked})
+	})
+	cs := session(t, f, Options{})
+	reads := func() int { return len(f.requests("/api/v3/series")) }
+
+	mustCall(t, cs, "series_list", map[string]any{"limit": 1})
+	mustCall(t, cs, "series_list", map[string]any{"limit": 1, "offset": 1})
+	mustCall(t, cs, "series_list", map[string]any{"query": "fire"})
+	if out := mustCall(t, cs, "profile_list", nil); number(rowsOf(out["profiles"])[0]["series"]) != 2 {
+		t.Errorf("profile_list = %v, want 2 series on the profile", out)
+	}
+	if out := mustCall(t, cs, "server_info", nil); number(out["series"]) != 2 {
+		t.Errorf("server_info = %v, want 2 series", out)
+	}
+	if out := mustCall(t, cs, "tag_list", nil); !slices.Equal(strs(rowsOf(out["tags"])[0]["series"]), []string{"Firefly", "Severance"}) {
+		t.Errorf("tag_list = %v, want both series by title", out)
+	}
+	if out := mustCall(t, cs, "blocklist_list", nil); text(rowsOf(out["entries"])[0]["series"]) != "Severance" {
+		t.Errorf("blocklist_list = %v, want its series by title", out)
+	}
+	if reads() != 1 {
+		t.Errorf("seven lists read the library %d times, want once", reads())
+	}
+
+	// a write may have changed a series, so the list after it reads again
+	mustCall(t, cs, "tag_create", map[string]any{"label": "new"})
+	mustCall(t, cs, "series_list", nil)
+	if reads() != 2 {
+		t.Errorf("a list after a write read the library %d times in all, want it read again", reads())
+	}
+
+	// a series the read held does not know is looked for in a new one, once
+	gone.Store(true)
+	mustCall(t, cs, "blocklist_list", nil)
+	if reads() != 3 {
+		t.Errorf("a blocklist naming a series not held read the library %d times in all, want one more read", reads())
+	}
+
+	// an audit works from the library as it is now, whatever a list has just read
+	mustCall(t, cs, "audit_monitoring", nil)
+	if reads() != 4 {
+		t.Errorf("an audit after a list read the library %d times in all, want it read afresh", reads())
+	}
+}
+
+// A folder that is not there is refused, where Sonarr answers it as it does an empty one; an empty folder that is there is still answered empty.
+func TestAFolderThatIsNotThereIsNotAnEmptyOne(t *testing.T) {
+	t.Parallel()
+
+	f := newFakeServer(t)
+	f.mux.HandleFunc("GET /api/v3/filesystem", func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Query().Get("path") {
+		case "/data/":
+			writeJSON(t, w, map[string]any{"parent": "/", "directories": []any{map[string]any{"name": "empty", "path": "/data/empty/", "type": "folder"}}, "files": []any{}})
+		default:
+			writeJSON(t, w, map[string]any{"parent": "/data/", "directories": []any{}, "files": []any{}})
+		}
+	})
+	cs := session(t, f, Options{})
+
+	if msg := mustFail(t, cs, "filesystem_list", map[string]any{"path": "/data/missing"}); !strings.Contains(msg, "no folder /data/missing as Sonarr sees it") || !strings.Contains(msg, "path /data/") {
+		t.Errorf("a folder that is not there = %q", msg)
+	}
+	if out := mustCall(t, cs, "filesystem_list", map[string]any{"path": "/data/empty"}); number(out["total"]) != 0 || text(out["path"]) != "/data/empty" {
+		t.Errorf("an empty folder = %v", out)
+	}
+	if out := mustCall(t, cs, "filesystem_list", map[string]any{"path": "/data"}); number(out["total"]) != 1 || len(f.requests("/api/v3/filesystem")) != 5 {
+		t.Errorf("a folder with something in it = %v after %d calls, want it answered without a look at the folder above", out, len(f.requests("/api/v3/filesystem")))
 	}
 }
 

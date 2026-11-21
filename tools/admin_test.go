@@ -223,6 +223,7 @@ func TestLogFileRead(t *testing.T) {
 		_, _ = w.Write([]byte("1|Info|started\n2|Warn|Firefly.S01E01 not an upgrade\n3|Info|idle\n4|Error|FIREFLY.S01E02 import failed\n5|Info|done\n"))
 	})
 	f.mux.HandleFunc("GET /api/v3/log/file/gone.txt", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
+	f.mux.HandleFunc("GET /api/v3/log/file/config.xml", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusBadRequest) })
 	cs := session(t, f, Options{})
 
 	tail := mustCall(t, cs, "logfile_read", map[string]any{"lines": 2})
@@ -235,6 +236,9 @@ func TestLogFileRead(t *testing.T) {
 	}
 	if msg := mustFail(t, cs, "logfile_read", map[string]any{"filename": "gone.txt"}); !strings.Contains(msg, "no log file") {
 		t.Errorf("a file there is not = %q", msg)
+	}
+	if msg := mustFail(t, cs, "logfile_read", map[string]any{"filename": "config.xml"}); !strings.Contains(msg, `no log file "config.xml"; logfile_list shows the ones there are`) || strings.Contains(msg, "HTTP") {
+		t.Errorf("a name Sonarr refuses = %q", msg)
 	}
 }
 

@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -74,14 +75,27 @@ func registerSeriesTools(r *registry) {
 		Name:        "series_list",
 		Description: "List the series in Sonarr, sorted by title, filtered by title, monitoring, status, tag, quality profile, or only those missing episodes. Each row says how many episodes are on disk out of those Sonarr wants.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in listIn) (*mcp.CallToolResult, listOut, error) {
-		all, err := r.allSeries(ctx)
-		if err != nil {
-			return nil, listOut{}, err
-		}
 		profiles, tags, err := r.lookupNames(ctx)
 		if err != nil {
 			return nil, listOut{}, err
 		}
+
+		// a filter that names nothing Sonarr has is refused: answered with no series, a mistyped name reads as there being none
+		if in.Status != "" && !slices.ContainsFunc(sonarr.PossibleValuesForSeriesStatusType(), func(s string) bool { return strings.EqualFold(s, in.Status) }) {
+			return nil, listOut{}, fmt.Errorf("status must be continuing, ended, upcoming or deleted, got %q", in.Status)
+		}
+		if err := knownName("tag", in.Tag, tags); err != nil {
+			return nil, listOut{}, err
+		}
+		if err := knownName("quality profile", in.QualityProfile, profiles); err != nil {
+			return nil, listOut{}, err
+		}
+
+		all, err := r.recentSeries(ctx)
+		if err != nil {
+			return nil, listOut{}, err
+		}
+
 		query := normaliseTitle(in.Query)
 		var rows []seriesSummary
 		for i := range all {

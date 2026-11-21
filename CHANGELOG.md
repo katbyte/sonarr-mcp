@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **A list asked for again within 30 seconds does not wait on Sonarr again.** `series_list`, `profile_list` and `server_info` are cut from the read of the library just made, where each call read every series, which takes Sonarr several seconds on a library of thousands. So a series' counts in a list can be up to 30 seconds old. A change made through this server has the next list read again, `series_get` always reads the series as it is, and the audits still read afresh.
+- `tag_list` and `blocklist_list` name their series from the titles already held, and read the library only for a series they do not know. A blocklist with nothing on it reads no series at all.
+- `history_list` with `days` and no series asks Sonarr once for everything since that day, where it read back a page at a time. On a long history each page took seconds.
+
+### Fixed
+
+- **A filter that names nothing answered an empty list, which reads as nothing matching.** `series_list` refuses a `status`, `tag` or `quality_profile` Sonarr does not have and says which there are. `filesystem_list` refuses a folder that is not there, where Sonarr answers it as it does an empty one.
+- `logfile_read` given a name Sonarr refuses, such as one with a folder in it, says there is no such log file, where it answered Sonarr's raw error.
+
 ## 0.4.2 (2026-10-20)
 
 ### Fixed

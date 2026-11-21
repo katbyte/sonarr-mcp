@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -411,20 +412,38 @@ func registerHistoryTools(r *registry) {
 			return nil, out, nil
 		}
 
-		// Sonarr cannot filter by age, so the entries are read newest first
-		// until the first one older than the cutoff, and paged from those
 		cutoff := time.Now().AddDate(0, 0, -in.Days)
 		var rows []historyRow
-		opts.Page, opts.PageSize = nil, new(historyPage)
-		for h, err := range client.GetHistoryEach(ctx, opts) {
+		if in.Series == "" {
+			// across the library Sonarr answers everything since a date in one call, where reading back to that date is a slow call for every page
+			recent, err := client.GetHistorySince(ctx, sonarr.GetHistorySinceOptions{Date: sonarr.Time{Time: cutoff.UTC()}, IncludeSeries: new(true), IncludeEpisode: new(true)})
 			if err != nil {
 				return nil, listOut{}, err
 			}
-			if h.Date.Before(cutoff) {
-				break
+			slices.SortStableFunc(recent.Answer, func(a, b sonarr.HistoryResource) int {
+				return cmp.Or(b.Date.Compare(a.Date.Time), cmp.Compare(b.Id, a.Id))
+			})
+
+			for i := range recent.Answer {
+				h := &recent.Answer[i]
+				if len(events) == 0 || slices.Contains(events, historyEvents[strings.ToLower(string(h.EventType))]) {
+					rows = append(rows, projectHistory(h))
+				}
 			}
-			rows = append(rows, projectHistory(&h))
+		} else {
+			// one series' entries Sonarr cannot ask for by age, so they are read newest first until the first one older than the cutoff
+			opts.Page, opts.PageSize = nil, new(historyPage)
+			for h, err := range client.GetHistoryEach(ctx, opts) {
+				if err != nil {
+					return nil, listOut{}, err
+				}
+				if h.Date.Before(cutoff) {
+					break
+				}
+				rows = append(rows, projectHistory(&h))
+			}
 		}
+
 		out := listOut{}
 		out.Entries, out.pageOut = pageRows(rows, in.pageIn)
 
@@ -479,15 +498,17 @@ func registerHistoryTools(r *registry) {
 		if err != nil {
 			return nil, blockOut{}, err
 		}
-		series, err := r.allSeries(ctx)
+		items, paged := pageRows(res.Items, in.pageIn)
+
+		ids := make([]sonarr.SeriesID, 0, len(items))
+		for _, b := range items {
+			ids = append(ids, b.SeriesId)
+		}
+		titles, err := r.seriesTitles(ctx, ids)
 		if err != nil {
 			return nil, blockOut{}, err
 		}
-		titles := map[sonarr.SeriesID]string{}
-		for i := range series {
-			titles[series[i].Id] = series[i].Title
-		}
-		items, paged := pageRows(res.Items, in.pageIn)
+
 		out := blockOut{pageOut: paged, Entries: make([]blocklistRow, 0, len(items))}
 		for _, b := range items {
 			out.Entries = append(out.Entries, blocklistRow{
