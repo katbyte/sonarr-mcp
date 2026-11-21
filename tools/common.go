@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -189,6 +190,24 @@ func (r *registry) tagLabels(ctx context.Context) (map[sonarr.TagID]string, erro
 	}
 
 	return out, nil
+}
+
+// knownName checks that a name a list is filtered by is one Sonarr has, whatever its case, and says which there are when it is not. An empty
+// name is no filter.
+func knownName[K comparable](what, name string, byID map[K]string) error {
+	if name == "" {
+		return nil
+	}
+
+	have := slices.Sorted(maps.Values(byID))
+	switch {
+	case slices.ContainsFunc(have, func(n string) bool { return strings.EqualFold(n, name) }):
+		return nil
+	case len(have) == 0:
+		return fmt.Errorf("no %s %q: Sonarr has none", what, name)
+	}
+
+	return fmt.Errorf("no %s %q (have: %s)", what, name, strings.Join(have, ", "))
 }
 
 // labels names a list of tag ids, sorted.

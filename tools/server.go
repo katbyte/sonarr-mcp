@@ -50,7 +50,7 @@ func registerServerTools(r *registry) {
 		if err != nil {
 			return nil, serverInfoOut{}, err
 		}
-		series, err := r.allSeries(ctx)
+		series, err := r.recentSeries(ctx)
 		if err != nil {
 			return nil, serverInfoOut{}, err
 		}

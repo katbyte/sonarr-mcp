@@ -917,7 +917,8 @@ func registerSystemTools(r *registry) {
 		}
 		res, err := client.GetLogFileByFilename(ctx, name)
 		switch {
-		case apiclient.IsNotFound(err):
+		// Sonarr refuses a name that could not be a log file's, such as one with a folder in it, where it fails to find any other
+		case apiclient.IsNotFound(err), apiclient.StatusCode(err) == http.StatusBadRequest:
 			return nil, logReadOut{}, fmt.Errorf("no log file %q; logfile_list shows the ones there are", name)
 		case err != nil:
 			return nil, logReadOut{}, err
@@ -1013,6 +1014,21 @@ func registerSystemTools(r *registry) {
 		if err != nil {
 			return nil, browseOut{}, err
 		}
+
+		// Sonarr answers a folder that is not there as it does an empty one, so one with nothing in it is looked for in the folder above
+		if len(res.Directories)+len(res.Files) == 0 && res.Parent != "" {
+			above, err := client.GetFileSystem(ctx, sonarr.GetFileSystemOptions{Path: res.Parent})
+			if err != nil {
+				return nil, browseOut{}, err
+			}
+
+			asked := strings.TrimRight(path, `/\`)
+			name := asked[strings.LastIndexAny(asked, `/\`)+1:]
+			if !slices.ContainsFunc(above.Directories, func(d sonarr.FileSystemEntryResource) bool { return strings.EqualFold(d.Name, name) }) {
+				return nil, browseOut{}, fmt.Errorf("no folder %s as Sonarr sees it; filesystem_list with path %s shows what is there", asked, res.Parent)
+			}
+		}
+
 		rows := make([]browseRow, 0, len(res.Directories)+len(res.Files))
 		for _, d := range res.Directories {
 			rows = append(rows, browseRow{Name: d.Name, Path: d.Path, Kind: "folder"})

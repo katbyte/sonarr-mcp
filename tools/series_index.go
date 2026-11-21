@@ -34,6 +34,11 @@ import (
 // minute ago still resolves.
 const seriesIndexTTL = 2 * time.Minute
 
+// seriesListTTL is how long a read of the library answers the lists that show the series themselves: their episode counts, sizes and settings.
+// Sonarr takes seconds to answer a big library, so a list asked for again, with another filter or for its next page, is cut from the read just
+// made. It is short because Sonarr changes those counts by itself as downloads import; an audit, and a tool about to change Sonarr, read afresh.
+const seriesListTTL = 30 * time.Second
+
 type seriesIndex struct {
 	series []sonarr.SeriesResource
 	byID   map[sonarr.SeriesID]int
@@ -60,13 +65,12 @@ func (c *seriesCache) invalidate() {
 	c.idx = nil
 }
 
-// get returns the index, reading the library when there is none, it has gone
-// stale, or fresh is set.
-func (c *seriesCache) get(ctx context.Context, client *sonarr.Client, fresh bool) (*seriesIndex, error) {
+// get returns the index, reading the library when there is none or the one held was read longer ago than within. A within of 0 always reads.
+func (c *seriesCache) get(ctx context.Context, client *sonarr.Client, within time.Duration) (*seriesIndex, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.idx != nil && !fresh && time.Since(c.idx.read) < seriesIndexTTL {
+	if c.idx != nil && time.Since(c.idx.read) < within {
 		return c.idx, nil
 	}
 	res, err := client.GetSeries(ctx, sonarr.GetSeriesOptions{})
@@ -82,12 +86,20 @@ func (c *seriesCache) get(ctx context.Context, client *sonarr.Client, fresh bool
 	return idx, nil
 }
 
-// allSeries returns every series in the library, sorted by title, read
-// fresh: a list reports each series' statistics, which Sonarr changes on its
-// own as downloads import, so the cached read is only for resolving names.
-// The fresh read replaces the cached one.
+// allSeries returns every series in the library, sorted by title, read now: for an audit, and for a tool about to change Sonarr, which must not
+// work from what was true a moment ago. The read replaces the one held.
 func (r *registry) allSeries(ctx context.Context) ([]sonarr.SeriesResource, error) {
-	idx, err := r.seriesCache().get(ctx, r.client, true)
+	return r.seriesRead(ctx, 0)
+}
+
+// recentSeries returns every series in the library, sorted by title, from a read at most seriesListTTL old: for the lists, which are asked for
+// several times in a row and would otherwise wait on Sonarr each time.
+func (r *registry) recentSeries(ctx context.Context) ([]sonarr.SeriesResource, error) {
+	return r.seriesRead(ctx, seriesListTTL)
+}
+
+func (r *registry) seriesRead(ctx context.Context, within time.Duration) ([]sonarr.SeriesResource, error) {
+	idx, err := r.seriesCache().get(ctx, r.client, within)
 	if err != nil {
 		return nil, err
 	}
@@ -100,6 +112,39 @@ func (r *registry) allSeries(ctx context.Context) ([]sonarr.SeriesResource, erro
 	})
 
 	return out, nil
+}
+
+// seriesTitles is the title of each of these series, by id, for a list that names the series its rows belong to. A title does not change the way
+// a series' counts do, so it is read from the index, and the library is read again only when the index does not know one of the series.
+func (r *registry) seriesTitles(ctx context.Context, ids []sonarr.SeriesID) (map[sonarr.SeriesID]string, error) {
+	titles := make(map[sonarr.SeriesID]string, len(ids))
+	if len(ids) == 0 {
+		return titles, nil
+	}
+
+	asked := time.Now()
+	for _, within := range []time.Duration{seriesIndexTTL, 0} {
+		idx, err := r.seriesCache().get(ctx, r.client, within)
+		if err != nil {
+			return nil, err
+		}
+
+		unknown := false
+		for _, id := range ids {
+			if i, ok := idx.byID[id]; ok {
+				titles[id] = idx.series[i].Title
+			} else {
+				unknown = true
+			}
+		}
+
+		// an index read for this call is as new as another read would be
+		if !unknown || idx.read.After(asked) {
+			break
+		}
+	}
+
+	return titles, nil
 }
 
 func sortKey(s *sonarr.SeriesResource) string {
@@ -154,8 +199,8 @@ func (r *registry) resolveSeries(ctx context.Context, ref string) (*sonarr.Serie
 		return r.seriesByID(ctx, sonarr.SeriesID(id))
 	}
 
-	for _, fresh := range []bool{false, true} {
-		idx, err := r.seriesCache().get(ctx, r.client, fresh)
+	for _, within := range []time.Duration{seriesIndexTTL, 0} {
+		idx, err := r.seriesCache().get(ctx, r.client, within)
 		if err != nil {
 			return nil, err
 		}

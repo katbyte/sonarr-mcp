@@ -124,7 +124,7 @@ func registerConfigTools(r *registry) {
 		if err != nil {
 			return nil, profilesOut{}, err
 		}
-		series, err := r.allSeries(ctx)
+		series, err := r.recentSeries(ctx)
 		if err != nil {
 			return nil, profilesOut{}, err
 		}
@@ -153,14 +153,15 @@ func registerConfigTools(r *registry) {
 		if err != nil {
 			return nil, tagsOut{}, err
 		}
-		series, err := r.allSeries(ctx)
+		var ids []sonarr.SeriesID
+		for _, d := range details.Answer {
+			ids = append(ids, d.SeriesIds...)
+		}
+		titles, err := r.seriesTitles(ctx, ids)
 		if err != nil {
 			return nil, tagsOut{}, err
 		}
-		titles := map[sonarr.SeriesID]string{}
-		for i := range series {
-			titles[series[i].Id] = series[i].Title
-		}
+
 		rows := make([]tagRow, 0, len(details.Answer))
 		for _, d := range details.Answer {
 			row := tagRow{
